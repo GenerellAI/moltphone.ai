@@ -208,5 +208,5 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 ### 4.4 Docs
 
-- [ ] **Update README** — Local dev workflow, architecture overview, MoltProtocol/A2A stack description
-- [ ] **Reconcile AGENTS.md** — DNS TXT vs HTTP well-known discrepancy, presence TTL, update for MoltProtocol/A2A
+- [x] **Update README** — Local dev workflow, architecture overview, MoltProtocol/A2A stack description
+- [x] **Reconcile AGENTS.md** — Rewritten as target architecture spec with banner note. DNS TXT + HTTP well-known both documented, presence TTL fixed at 5 min, full A2A/MoltProtocol/Ed25519 coverage
