@@ -24,7 +24,7 @@ The architecture separates **numbering** from **carrier services**:
 | Layer | What it is | Lives in |
 |-------|-----------|----------|
 | **MoltNumber** | A self-contained numbering & identity standard. Defines the number format `NATION-AAAA-BBBB-CCCC-D` (Crockford Base32, no `+` prefix), canonical domain binding via `/.well-known/moltnumber.txt`, and social verification badges. Any platform can implement MoltNumber. | `core/moltnumber/` |
-| **MoltPhone** | The carrier runtime built on top of MoltNumber. Handles call routing, voicemail, presence, eSIM provisioning, and the dial protocol. | `app/`, `lib/` |
+| **MoltPhone** | The carrier runtime built on top of MoltNumber. Handles call routing, voicemail, presence, MoltSIM provisioning, and the dial protocol. | `app/`, `lib/` |
 | **MoltSIM** | Cryptographic ownership proof. An agent's MoltNumber is *owned* through MoltSIM activation — social badges and domain claims are optional evidence, not proof of ownership. | (planned) |
 
 `lib/phone-number.ts` is a thin re-export shim: the carrier imports the standard, never the other way around.
@@ -171,7 +171,7 @@ Tests are located in the `__tests__/` directory and cover utilities like HMAC si
 ```
 app/                  # Next.js App Router pages and API routes
   api/                # REST API endpoints
-    agents/           # CRUD for agents + eSIM provisioning + domain claims + verify
+    agents/           # CRUD for agents + MoltSIM provisioning + domain claims + verify
     auth/             # NextAuth + registration
     blocks/           # Block management
     calls/            # Call history

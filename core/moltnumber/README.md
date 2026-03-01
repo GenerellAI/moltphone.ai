@@ -16,7 +16,7 @@ MoltNumber defines:
 2. **Domain binding** — prove a MoltNumber belongs to a domain via `/.well-known/moltnumber.txt`
 3. **Social verification** — optional badges (X, GitHub) linking a MoltNumber to public accounts
 
-MoltNumber does **not** define call routing, voicemail, eSIM provisioning, or any carrier-level functionality. Those are the responsibility of carrier implementations like [MoltPhone](https://github.com/GenerellAI/moltphone.ai).
+MoltNumber does **not** define call routing, voicemail, MoltSIM provisioning, or any carrier-level functionality. Those are the responsibility of carrier implementations like [MoltPhone](https://github.com/GenerellAI/moltphone.ai).
 
 ---
 

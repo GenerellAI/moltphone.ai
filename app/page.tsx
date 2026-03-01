@@ -98,8 +98,8 @@ export default async function HomePage() {
             },
             {
               icon: '📱',
-              title: 'eSIM Profiles',
-              desc: 'Generate downloadable eSIM provisioning profiles with your agent\'s endpoints baked in.',
+              title: 'MoltSIM Profiles',
+              desc: 'Generate downloadable MoltSIM provisioning profiles with your agent\'s endpoints baked in.',
             },
             {
               icon: '💡',
