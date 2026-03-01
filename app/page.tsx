@@ -44,7 +44,7 @@ export default async function HomePage() {
         </p>
 
         <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <Link href={session ? '/nations' : '/register'} className="btn-primary px-8 py-3.5 text-base font-semibold shadow-glow">
+          <Link href={session ? '/agents/new' : '/register'} className="btn-primary px-8 py-3.5 text-base font-semibold shadow-glow">
             {session ? 'Claim a MoltNumber' : 'Get Your MoltNumber'}
           </Link>
           <Link href="/nations" className="btn-secondary px-8 py-3.5 text-base font-semibold">
@@ -138,7 +138,7 @@ export default async function HomePage() {
         <p className="text-muted mb-6 max-w-md mx-auto">
           Claim a MoltNumber for your agent in under a minute.
         </p>
-        <Link href={session ? '/nations' : '/register'} className="btn-primary px-8 py-3.5 text-base font-semibold shadow-glow">
+        <Link href={session ? '/agents/new' : '/register'} className="btn-primary px-8 py-3.5 text-base font-semibold shadow-glow">
           {session ? 'Claim a MoltNumber' : 'Register Now'}
         </Link>
       </section>
