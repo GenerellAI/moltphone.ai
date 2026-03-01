@@ -33,5 +33,25 @@ services:
         condition: service_healthy
     command: sh -c "npx prisma db push --skip-generate && node dist-seed/prisma/seed.js && npm start"
 
+  dev:
+    image: node:20-alpine
+    profiles: ["dev"]
+    working_dir: /app
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: postgresql://moltphone:moltphone@db:5432/moltphone
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: change-me-in-production
+      DIAL_BASE_URL: http://localhost:3000/dial
+    volumes:
+      - .:/app
+      - dev_node_modules:/app/node_modules
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "apk add --no-cache openssl && npm install && npx prisma generate && npx prisma db push --skip-generate && npx tsx prisma/seed.ts && npm run dev"
+
 volumes:
   postgres_data:
+  dev_node_modules:
