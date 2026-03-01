@@ -7,6 +7,10 @@ export default function MascotAudio({ videoSelector }: { videoSelector: string }
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = 0.65;
+  }, []);
+
+  useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     // Sync audio loop with video
