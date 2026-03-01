@@ -48,6 +48,7 @@ services:
       DIAL_BASE_URL: http://localhost:3000/dial
     volumes:
       - .:/app
+      - ./docker-dev-entrypoint.sh:/entrypoint.sh
       - dev_node_modules:/app/node_modules
     depends_on:
       db:
