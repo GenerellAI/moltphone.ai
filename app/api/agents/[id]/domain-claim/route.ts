@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateDomainClaimToken, buildWellKnownUrl, validateDomainClaim } from '@/core/moltnumber';
+import { generateDomainClaimToken, buildWellKnownUrl, validateDomainClaim } from '@/core/moltnumber/src';
 import { validateWebhookUrl } from '@/lib/ssrf';
 
 const CLAIM_TTL_HOURS = 48;

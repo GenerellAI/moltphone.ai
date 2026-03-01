@@ -5,14 +5,14 @@ import {
   parseMoltNumber,
   computeCheckDigit,
   CROCKFORD_ALPHABET,
-} from '../core/moltnumber/src/format';
+} from '../src/format';
 
 import {
   generateDomainClaimToken,
   buildWellKnownUrl,
   parseWellKnownFile,
   validateDomainClaim,
-} from '../core/moltnumber/src/domain-binding';
+} from '../src/domain-binding';
 
 // ── MoltNumber Format ────────────────────────────────────
 
@@ -44,6 +44,12 @@ describe('MoltNumber Format', () => {
     expect(num).toBe(num.toUpperCase());
   });
 
+  it('generates unique numbers', () => {
+    const nums = new Set<string>();
+    for (let i = 0; i < 100; i++) nums.add(generateMoltNumber('MOLT'));
+    expect(nums.size).toBe(100);
+  });
+
   it('check digit detects single-char tampering', () => {
     const num = generateMoltNumber('MOLT');
     const last = num[num.length - 1];
@@ -68,6 +74,19 @@ describe('MoltNumber Format', () => {
   it('rejects + prefixed numbers', () => {
     const num = generateMoltNumber('MOLT');
     expect(validateMoltNumber('+' + num)).toBe(false);
+  });
+
+  it('rejects invalid formats', () => {
+    expect(validateMoltNumber('MOLT-XXXX-YYYY-ZZZZ-0')).toBe(false);
+    expect(validateMoltNumber('+MOLT-1234-5678-9012-3')).toBe(false);
+    expect(validateMoltNumber('MOL-1234-5678-9012-3')).toBe(false);
+    expect(validateMoltNumber('MOLT-1234-5678-9012')).toBe(false);
+  });
+
+  it('throws for invalid nation code', () => {
+    expect(() => generateMoltNumber('MOL')).toThrow();
+    expect(() => generateMoltNumber('molt')).toThrow();
+    expect(() => generateMoltNumber('12AB')).toThrow();
   });
 });
 
