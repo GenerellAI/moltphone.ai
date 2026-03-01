@@ -1,6 +1,6 @@
 # TODO
 
-Status: **Planning** — do not implement until approved.
+Status: **GO** — approved for implementation. Work through phases in order. Check off items as completed. Commit after each logical chunk.
 
 > **No production data exists.** Schema changes are a clean break — just rewrite the Prisma schema and re-seed. No migration scripts needed. Only the seed templates are affected.
 
