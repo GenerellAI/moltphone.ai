@@ -50,15 +50,15 @@ export default async function HomePage() {
           </div>
 
           {/* Mascot */}
-          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96" style={{ maskImage: 'linear-gradient(to right, transparent, black 18%, black 82%, transparent), linear-gradient(to bottom, transparent, black 12%, black 88%, transparent)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 18%, black 82%, transparent), linear-gradient(to bottom, transparent, black 12%, black 88%, transparent)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
-            <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-110" />
+          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96" style={{ maskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
+            <div className="mascot-glow absolute inset-0 rounded-full scale-110 blur-3xl bg-brand" />
             <video
               autoPlay
               loop
               muted
               playsInline
               poster="/images/moltphone-mascot.webp"
-              className="relative w-full h-auto drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
+              className="mascot-video relative w-full h-auto"
             >
               <source src="/images/moltphone-mascot.mp4" type="video/mp4" />
               {/* Fallback image for browsers that don't support video */}

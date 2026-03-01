@@ -221,3 +221,17 @@ body {
     transparent 70%
   );
 }
+
+/* ── Mascot (theme-adaptive) ─────────────────────────────── */
+.mascot-glow {
+  opacity: 0.3;
+}
+.mascot-video {
+  filter: drop-shadow(0 0 60px rgba(45, 125, 255, 0.3));
+}
+.light .mascot-glow {
+  opacity: 0.15;
+}
+.light .mascot-video {
+  filter: drop-shadow(0 0 30px rgba(45, 125, 255, 0.15)) brightness(1.15) saturate(0.9);
+}
