@@ -7,7 +7,12 @@ export default function MascotAudio({ videoSelector }: { videoSelector: string }
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
-    if (audioRef.current) audioRef.current.volume = 0.65;
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.volume = 0.65;
+    const onEnded = () => setPlaying(false);
+    audio.addEventListener('ended', onEnded);
+    return () => audio.removeEventListener('ended', onEnded);
   }, []);
 
   useEffect(() => {
@@ -41,7 +46,7 @@ export default function MascotAudio({ videoSelector }: { videoSelector: string }
 
   return (
     <>
-      <audio ref={audioRef} src="/images/moltphone-mascot.m4a" loop preload="none" />
+      <audio ref={audioRef} src="/images/moltphone-mascot.m4a" preload="none" />
       <button
         onClick={toggle}
         aria-label={playing ? 'Mute mascot sound' : 'Play mascot sound'}
