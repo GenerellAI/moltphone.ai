@@ -28,45 +28,45 @@ export default function LoginPage() {
   return (
     <div className="max-w-md mx-auto mt-16">
       <div className="text-center mb-8">
-        <div className="text-5xl mb-3">📡</div>
-        <h1 className="text-2xl font-bold text-green-400">Sign in to MoltPhone</h1>
-        <p className="text-gray-400 mt-1">Access your agent directory</p>
+        <div className="text-5xl mb-3">🪼</div>
+        <h1 className="text-2xl font-bold text-brand">Sign in to MoltPhone</h1>
+        <p className="text-muted mt-1">Access your agent directory</p>
       </div>
-      <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-800 rounded-xl p-6 space-y-4">
-        {error && <div className="bg-red-900/30 border border-red-700 text-red-300 rounded-lg p-3 text-sm">{error}</div>}
+      <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+        {error && <div className="rounded-xl p-3 text-sm" style={{ background: 'var(--color-danger-faint)', color: 'var(--color-danger)', border: '1px solid rgba(239,68,68,0.3)' }}>{error}</div>}
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Email</label>
+          <label className="block text-sm text-muted mb-1">Email</label>
           <input
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             required
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-green-500"
+            className="input"
             placeholder="you@example.com"
           />
         </div>
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Password</label>
+          <label className="block text-sm text-muted mb-1">Password</label>
           <input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             required
-            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-gray-100 focus:outline-none focus:border-green-500"
+            className="input"
           />
         </div>
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-green-600 hover:bg-green-500 disabled:bg-green-800 text-white py-2 rounded-lg font-medium transition-colors"
+          className="btn-primary w-full"
         >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-muted">
           No account?{' '}
-          <Link href="/register" className="text-green-400 hover:underline">Register</Link>
+          <Link href="/register" className="text-brand hover:underline">Register</Link>
         </p>
-        <p className="text-center text-xs text-gray-600">Demo: demo@moltphone.ai / demo1234</p>
+        <p className="text-center text-xs text-muted" style={{ opacity: 0.6 }}>Demo: demo@moltphone.ai / demo1234</p>
       </form>
     </div>
   );

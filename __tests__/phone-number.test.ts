@@ -7,12 +7,13 @@ import {
   CROCKFORD_ALPHABET,
 } from '../lib/phone-number';
 
-describe('Phone Numbering Plan', () => {
-  it('generates valid phone numbers', () => {
+describe('Phone Numbering Plan (MoltNumber format)', () => {
+  it('generates valid phone numbers without + prefix', () => {
     for (let i = 0; i < 20; i++) {
       const num = generatePhoneNumber('MOLT');
       expect(validatePhoneNumber(num)).toBe(true);
-      expect(num).toMatch(/^\+MOLT-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]$/);
+      // MoltNumber format: NATION-AAAA-BBBB-CCCC-D (no + prefix)
+      expect(num).toMatch(/^MOLT-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]$/);
     }
   });
 
@@ -28,10 +29,14 @@ describe('Phone Numbering Plan', () => {
   });
 
   it('rejects invalid format', () => {
-    expect(validatePhoneNumber('+MOLT-XXXX-YYYY-ZZZZ-0')).toBe(false);
-    expect(validatePhoneNumber('MOLT-1234-5678-9012-3')).toBe(false);
-    expect(validatePhoneNumber('+MOL-1234-5678-9012-3')).toBe(false);
-    expect(validatePhoneNumber('+MOLT-1234-5678-9012')).toBe(false);
+    // X, Y, Z are not in Crockford Base32
+    expect(validatePhoneNumber('MOLT-XXXX-YYYY-ZZZZ-0')).toBe(false);
+    // + prefix is no longer valid
+    expect(validatePhoneNumber('+MOLT-1234-5678-9012-3')).toBe(false);
+    // Nation code must be exactly 4 uppercase letters
+    expect(validatePhoneNumber('MOL-1234-5678-9012-3')).toBe(false);
+    // Missing check digit segment
+    expect(validatePhoneNumber('MOLT-1234-5678-9012')).toBe(false);
   });
 
   it('rejects wrong check digit', () => {
@@ -42,8 +47,8 @@ describe('Phone Numbering Plan', () => {
     expect(validatePhoneNumber(tampered)).toBe(false);
   });
 
-  it('normalizes phone numbers', () => {
-    expect(normalizePhoneNumber('  +molt-1234-5678-9012-3  ')).toBe('+MOLT-1234-5678-9012-3');
+  it('normalizes phone numbers (uppercase, trimmed)', () => {
+    expect(normalizePhoneNumber('  molt-1234-5678-9012-3  ')).toBe('MOLT-1234-5678-9012-3');
   });
 
   it('parses phone number components', () => {
@@ -53,12 +58,13 @@ describe('Phone Numbering Plan', () => {
     expect(parsed!.nation).toBe('CLAW');
     expect(parsed!.subscriber).toHaveLength(12);
     expect(parsed!.checkDigit).toHaveLength(1);
+    expect(parsed!.formatted).toBe(num);
   });
 
   it('excludes ambiguous characters (I, L, O)', () => {
     for (let i = 0; i < 200; i++) {
       const num = generatePhoneNumber('MOLT');
-      const subscriber = num.replace(/\+MOLT-/, '').replace(/-/g, '');
+      const subscriber = num.replace(/^MOLT-/, '').replace(/-/g, '');
       expect(subscriber).not.toMatch(/[ILO]/);
     }
   });
@@ -67,5 +73,13 @@ describe('Phone Numbering Plan', () => {
     expect(() => generatePhoneNumber('MOL')).toThrow();
     expect(() => generatePhoneNumber('molt')).toThrow();
     expect(() => generatePhoneNumber('12AB')).toThrow();
+  });
+
+  it('is URL-safe (no + or special chars)', () => {
+    for (let i = 0; i < 20; i++) {
+      const num = generatePhoneNumber('AION');
+      expect(num).not.toContain('+');
+      expect(encodeURIComponent(num)).toBe(num);
+    }
   });
 });
