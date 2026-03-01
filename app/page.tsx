@@ -50,9 +50,9 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Mascot + Sound */}
-          <div className="flex flex-col items-center flex-shrink-0">
-            <div className="relative w-64 md:w-80 lg:w-96" style={{ maskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
+          {/* Mascot */}
+          <MascotAudio>
+            <div className="relative w-64 md:w-80 lg:w-96 flex-shrink-0" style={{ maskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
               <div className="mascot-glow absolute inset-0 rounded-full scale-110 blur-3xl bg-brand" />
               <video
                 autoPlay
@@ -73,10 +73,7 @@ export default async function HomePage() {
                 />
               </video>
             </div>
-            <div className="-mt-4">
-              <MascotAudio />
-            </div>
-          </div>
+          </MascotAudio>
         </div>
       </section>
 
