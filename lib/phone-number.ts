@@ -12,5 +12,5 @@ export {
   validateMoltNumber as validatePhoneNumber,
   normalizeMoltNumber as normalizePhoneNumber,
   parseMoltNumber as parsePhoneNumber,
-} from '@/core/moltnumber/src';
+} from '../core/moltnumber/src';
 

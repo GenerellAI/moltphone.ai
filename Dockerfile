@@ -11,6 +11,7 @@ ENV NEXTAUTH_SECRET=build-placeholder
 RUN npm run build
 # Compile seed script and its lib dependencies to JS for the production image
 RUN npx tsc prisma/seed.ts lib/phone-number.ts lib/secrets.ts lib/hmac.ts \
+    core/moltnumber/src/format.ts core/moltnumber/src/domain-binding.ts core/moltnumber/src/index.ts \
     --outDir /app/dist-seed \
     --esModuleInterop \
     --module commonjs \
