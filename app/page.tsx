@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import AgentSearch from '@/components/AgentSearch';
+import MascotAudio from '@/components/MascotAudio';
 import Link from 'next/link';
 import Image from 'next/image';
 import { getServerSession } from 'next-auth';
@@ -71,6 +72,7 @@ export default async function HomePage() {
                 className="w-full h-auto"
               />
             </video>
+            <MascotAudio videoSelector=".mascot-video" />
           </div>
         </div>
       </section>
