@@ -27,6 +27,7 @@ RUN apk add --no-cache openssl
 COPY --from=builder /app/package*.json ./
 RUN npm ci --only=production
 COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/next.config.mjs ./
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/lib ./lib
