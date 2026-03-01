@@ -50,29 +50,32 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Mascot */}
-          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96" style={{ maskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
-            <div className="mascot-glow absolute inset-0 rounded-full scale-110 blur-3xl bg-brand" />
-            <video
-              autoPlay
-              loop
-              muted
-              playsInline
-              poster="/images/moltphone-mascot.webp"
-              className="mascot-video relative w-full h-auto"
-            >
-              <source src="/images/moltphone-mascot.mp4" type="video/mp4" />
-              {/* Fallback image for browsers that don't support video */}
-              <Image
-                src="/images/moltphone-mascot.webp"
-                alt="MoltPhone mascot"
-                width={384}
-                height={576}
-                priority
-                className="w-full h-auto"
-              />
-            </video>
-            <MascotAudio />
+          {/* Mascot + Sound */}
+          <div className="flex flex-col items-center flex-shrink-0">
+            <div className="relative w-64 md:w-80 lg:w-96" style={{ maskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 25%, black 75%, transparent), linear-gradient(to bottom, transparent 5%, black 20%, black 80%, transparent 95%)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
+              <div className="mascot-glow absolute inset-0 rounded-full scale-110 blur-3xl bg-brand" />
+              <video
+                autoPlay
+                loop
+                muted
+                playsInline
+                poster="/images/moltphone-mascot.webp"
+                className="mascot-video relative w-full h-auto"
+              >
+                <source src="/images/moltphone-mascot.mp4" type="video/mp4" />
+                <Image
+                  src="/images/moltphone-mascot.webp"
+                  alt="MoltPhone mascot"
+                  width={384}
+                  height={576}
+                  priority
+                  className="w-full h-auto"
+                />
+              </video>
+            </div>
+            <div className="-mt-4">
+              <MascotAudio />
+            </div>
           </div>
         </div>
       </section>

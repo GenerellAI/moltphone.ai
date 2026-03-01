@@ -50,6 +50,22 @@ const config: Config = {
           '0%, 100%': { opacity: '1', transform: 'scale(1)' },
           '50%': { opacity: '0.8', transform: 'scale(1.05)' },
         },
+        'bar1': {
+          '0%, 100%': { height: '4px' },
+          '50%': { height: '12px' },
+        },
+        'bar2': {
+          '0%, 100%': { height: '8px' },
+          '50%': { height: '4px' },
+        },
+        'bar3': {
+          '0%, 100%': { height: '6px' },
+          '50%': { height: '12px' },
+        },
+        'bar4': {
+          '0%, 100%': { height: '10px' },
+          '50%': { height: '4px' },
+        },
       },
     },
   },
