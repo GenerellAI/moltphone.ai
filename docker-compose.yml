@@ -51,7 +51,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "apt-get update && apt-get install -y openssl && npm install && npx prisma generate && npx prisma db push --skip-generate && npx --yes tsx prisma/seed.ts && npm run dev"
+    command: sh -c "apt-get update -qq && apt-get install -yqq openssl > /dev/null 2>&1 && npm install && npx prisma generate && npx prisma db push --skip-generate && npx --yes tsx prisma/seed.ts && exec npx next dev"
 
 volumes:
   postgres_data:
