@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 
 function phoneSlug(phoneNumber: string): string {
-  return phoneNumber.replace(/^\+/, '');
+  return phoneNumber; // MoltNumbers are URL-safe, no plus sign
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -6,7 +6,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const secret = req.headers.get('x-voicemail-secret') || req.headers.get('x-call-secret') || '';
   
   const { phoneNumber } = await params;
-  const agent = await prisma.agent.findUnique({ where: { phoneNumber: `+${phoneNumber}`, isActive: true } });
+  const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   
   let valid = false;

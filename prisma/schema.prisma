@@ -92,6 +92,8 @@ model Agent {
   forwardedFrom        Agent[]       @relation("ForwardedTo")
   forwardTo            Agent?        @relation("ForwardedTo", fields: [forwardToAgentId], references: [id])
   voicemails           VoicemailMessage[]
+  socialVerifications  SocialVerification[]
+  domainClaims         DomainClaim[]
 }
 
 enum CallStatus {
@@ -179,4 +181,58 @@ model NonceUsed {
   nonce     String   @id
   usedAt    DateTime @default(now())
   expiresAt DateTime
+}
+
+// ── Social Verification ─────────────────────────────────
+
+enum VerificationProvider {
+  domain
+  x
+  github
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  revoked
+  expired
+}
+
+model SocialVerification {
+  id              String              @id @default(cuid())
+  agentId         String
+  agent           Agent               @relation(fields: [agentId], references: [id])
+  provider        VerificationProvider
+  handleOrDomain  String
+  proofUrl        String?
+  status          VerificationStatus  @default(pending)
+  verifiedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([agentId, provider, handleOrDomain])
+}
+
+// ── Domain Claim (MoltNumber spec) ──────────────────────
+
+enum DomainClaimStatus {
+  pending
+  verified
+  failed
+  expired
+}
+
+model DomainClaim {
+  id           String            @id @default(cuid())
+  agentId      String
+  agent        Agent             @relation(fields: [agentId], references: [id])
+  domain       String
+  token        String
+  status       DomainClaimStatus @default(pending)
+  verifiedAt   DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([agentId, domain])
 }

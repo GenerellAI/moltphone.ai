@@ -7,7 +7,7 @@ import { generateSecret, hashSecret } from '@/lib/secrets';
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 
 function phoneSlug(phoneNumber: string): string {
-  return phoneNumber.replace(/^\+/, '');
+  return phoneNumber; // MoltNumbers are URL-safe, no plus sign
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

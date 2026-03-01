@@ -72,10 +72,10 @@ async function main() {
   const callSecret1 = generateSecret();
   
   await prisma.agent.upsert({
-    where: { phoneNumber: '+MOLT-0001-0001-0001-0' },
+    where: { phoneNumber: 'MOLT-0001-0001-0001-0' },
     update: {},
     create: {
-      phoneNumber: '+MOLT-0001-0001-0001-0',
+      phoneNumber: 'MOLT-0001-0001-0001-0',
       nationCode: 'MOLT',
       ownerId: systemUser.id,
       displayName: 'MoltPhone Operator',
@@ -92,10 +92,10 @@ async function main() {
   const callSecret2 = generateSecret();
   
   const agent2 = await prisma.agent.upsert({
-    where: { phoneNumber: '+AION-0001-0001-0001-0' },
+    where: { phoneNumber: 'AION-0001-0001-0001-0' },
     update: {},
     create: {
-      phoneNumber: '+AION-0001-0001-0001-0',
+      phoneNumber: 'AION-0001-0001-0001-0',
       nationCode: 'AION',
       ownerId: demoUser.id,
       displayName: 'AION Gateway Agent',
@@ -113,10 +113,10 @@ async function main() {
   const callSecret3 = generateSecret();
   
   await prisma.agent.upsert({
-    where: { phoneNumber: '+CLAW-0001-0001-0001-0' },
+    where: { phoneNumber: 'CLAW-0001-0001-0001-0' },
     update: {},
     create: {
-      phoneNumber: '+CLAW-0001-0001-0001-0',
+      phoneNumber: 'CLAW-0001-0001-0001-0',
       nationCode: 'CLAW',
       ownerId: demoUser.id,
       displayName: 'OpenClaw Protocol Agent',
@@ -133,10 +133,10 @@ async function main() {
   const callSecret4 = generateSecret();
   
   await prisma.agent.upsert({
-    where: { phoneNumber: '+AION-0001-0001-0002-0' },
+    where: { phoneNumber: 'AION-0001-0001-0002-0' },
     update: {},
     create: {
-      phoneNumber: '+AION-0001-0001-0002-0',
+      phoneNumber: 'AION-0001-0001-0002-0',
       nationCode: 'AION',
       ownerId: demoUser.id,
       displayName: 'AION Deep Think',
@@ -154,10 +154,10 @@ async function main() {
   const callSecret5 = generateSecret();
   
   await prisma.agent.upsert({
-    where: { phoneNumber: '+MOLT-0001-0001-0002-0' },
+    where: { phoneNumber: 'MOLT-0001-0001-0002-0' },
     update: {},
     create: {
-      phoneNumber: '+MOLT-0001-0001-0002-0',
+      phoneNumber: 'MOLT-0001-0001-0002-0',
       nationCode: 'MOLT',
       ownerId: systemUser.id,
       displayName: 'MoltPhone Relay',

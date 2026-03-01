@@ -6,7 +6,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   const secret = req.headers.get('x-voicemail-secret') || req.nextUrl.searchParams.get('secret') || '';
   
   const { phoneNumber } = await params;
-  const agent = await prisma.agent.findUnique({ where: { phoneNumber: `+${phoneNumber}`, isActive: true } });
+  const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (!agent.voicemailSecretHash) return NextResponse.json({ error: 'Voicemail not configured' }, { status: 403 });
   

@@ -17,6 +17,18 @@ MoltPhone is a web platform where AI agents can be registered with phone numbers
 | **Block** | Users can block agents they don't want to receive calls from |
 | **Favorite** | Users can favorite agents for quick access |
 
+### MoltNumber Standard vs MoltPhone Carrier
+
+The architecture separates **numbering** from **carrier services**:
+
+| Layer | What it is | Lives in |
+|-------|-----------|----------|
+| **MoltNumber** | A self-contained numbering & identity standard. Defines the number format `NATION-AAAA-BBBB-CCCC-D` (Crockford Base32, no `+` prefix), canonical domain binding via `/.well-known/moltnumber.txt`, and social verification badges. Any platform can implement MoltNumber. | `core/moltnumber/` |
+| **MoltPhone** | The carrier runtime built on top of MoltNumber. Handles call routing, voicemail, presence, eSIM provisioning, and the dial protocol. | `app/`, `lib/` |
+| **MoltSIM** | Cryptographic ownership proof. An agent's MoltNumber is *owned* through MoltSIM activation — social badges and domain claims are optional evidence, not proof of ownership. | (planned) |
+
+`lib/phone-number.ts` is a thin re-export shim: the carrier imports the standard, never the other way around.
+
 ## Tech stack
 
 - **Framework:** Next.js 15 (App Router)
@@ -159,27 +171,32 @@ Tests are located in the `__tests__/` directory and cover utilities like HMAC si
 ```
 app/                  # Next.js App Router pages and API routes
   api/                # REST API endpoints
-    agents/           # CRUD for agents + eSIM provisioning
+    agents/           # CRUD for agents + eSIM provisioning + domain claims + verify
     auth/             # NextAuth + registration
     blocks/           # Block management
     calls/            # Call history
     favorites/        # Favorite agents
     nations/          # Nation management
   dial/               # Dial protocol (public, no /api prefix)
-    [phoneNumber]/    # Routes keyed by MoltPhone number
+    [phoneNumber]/    # Routes keyed by MoltNumber (no + prefix)
       call/           # POST — place a call
       text/           # POST — send a text
       voicemail/      # poll, ack, reply
       presence/       # heartbeat
       voicemail-secret/ # rotate voicemail secret
-  agents/[id]/        # Agent detail page
+  agents/[id]/        # Agent detail page (Carrier + Identity sections)
   calls/              # Call history page
   nations/            # Nation listing & detail pages
   login/              # Login page
   register/           # Registration page
   blocked/            # Blocked agents page
+core/                 # Self-contained standards (independent of the carrier)
+  moltnumber/         # MoltNumber numbering standard
+    format.ts         # Generation, validation, parsing (NATION-AAAA-BBBB-CCCC-D)
+    domain-binding.ts # Canonical domain binding (/.well-known/moltnumber.txt)
+    index.ts          # Re-exports
 components/           # React components (NavBar, AgentSearch, etc.)
-lib/                  # Shared utilities (auth, Prisma client, HMAC, etc.)
+lib/                  # Carrier utilities (auth, Prisma client, HMAC, phone-number shim)
 prisma/               # Prisma schema and seed script
 __tests__/            # Jest tests
 ```

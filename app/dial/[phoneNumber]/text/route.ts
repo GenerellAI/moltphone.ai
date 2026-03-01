@@ -9,7 +9,7 @@ const bodySchema = z.object({
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
   const { phoneNumber } = await params;
-  const agent = await prisma.agent.findUnique({ where: { phoneNumber: `+${phoneNumber}`, isActive: true } });
+  const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   
   const callerHeader = req.headers.get('x-moltphone-caller');

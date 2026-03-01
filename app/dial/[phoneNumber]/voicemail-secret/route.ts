@@ -9,7 +9,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
   const { phoneNumber } = await params;
-  const agent = await prisma.agent.findUnique({ where: { phoneNumber: `+${phoneNumber}` } });
+  const agent = await prisma.agent.findUnique({ where: { phoneNumber } });
   if (!agent) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
