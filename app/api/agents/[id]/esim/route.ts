@@ -6,18 +6,19 @@ import { generateSecret, hashSecret } from '@/lib/secrets';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
-  const agent = await prisma.agent.findUnique({ where: { id: params.id } });
+  const { id } = await params;
+  const agent = await prisma.agent.findUnique({ where: { id } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
   const vmSecret = generateSecret();
   const callSecret = generateSecret();
   await prisma.agent.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       voicemailSecretHash: await hashSecret(vmSecret),
       callSecretHash: await hashSecret(callSecret),

@@ -5,9 +5,10 @@ import { isOnline } from '@/lib/presence';
 
 export const dynamic = 'force-dynamic';
 
-export default async function NationPage({ params }: { params: { code: string } }) {
+export default async function NationPage({ params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
   const nation = await prisma.nation.findUnique({
-    where: { code: params.code.toUpperCase() },
+    where: { code: code.toUpperCase() },
     include: {
       owner: { select: { name: true } },
       _count: { select: { agents: true } },

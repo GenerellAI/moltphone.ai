@@ -5,9 +5,10 @@ import { z } from 'zod';
 
 const schema = z.object({ voicemail_id: z.string(), reply: z.string().min(1) });
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const secret = req.headers.get('x-voicemail-secret') || '';
-  const agent = await prisma.agent.findUnique({ where: { id: params.id, isActive: true } });
+  const { id } = await params;
+  const agent = await prisma.agent.findUnique({ where: { id, isActive: true } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (!agent.voicemailSecretHash) return NextResponse.json({ error: 'Not configured' }, { status: 403 });
   
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { voicemail_id, reply } = schema.parse(await req.json());
   
   const vm = await prisma.voicemailMessage.update({
-    where: { id: voicemail_id, agentId: params.id },
+    where: { id: voicemail_id, agentId: id },
     data: { reply, repliedAt: new Date(), isAcked: true, isRead: true },
   });
   

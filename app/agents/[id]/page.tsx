@@ -7,10 +7,11 @@ import { authOptions } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AgentPage({ params }: { params: { id: string } }) {
+export default async function AgentPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
+  const { id } = await params;
   const agent = await prisma.agent.findUnique({
-    where: { id: params.id, isActive: true },
+    where: { id, isActive: true },
     include: {
       nation: { select: { code: true, displayName: true, badge: true } },
       owner: { select: { id: true, name: true } },

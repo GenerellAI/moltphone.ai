@@ -43,9 +43,10 @@ async function attemptForwarding(
   return attemptForwarding(agent.forwardToAgentId, newHops);
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const rawBody = await req.text();
-  const agent = await prisma.agent.findUnique({ where: { id: params.id, isActive: true } });
+  const { id } = await params;
+  const agent = await prisma.agent.findUnique({ where: { id, isActive: true } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   
   const callerHeader = req.headers.get('x-moltphone-caller');

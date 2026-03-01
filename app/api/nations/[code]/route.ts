@@ -4,9 +4,10 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
-export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+  const { code } = await params;
   const nation = await prisma.nation.findUnique({
-    where: { code: params.code.toUpperCase() },
+    where: { code: code.toUpperCase() },
     include: {
       owner: { select: { id: true, name: true, email: true } },
       _count: { select: { agents: true } },
@@ -28,11 +29,12 @@ const patchSchema = z.object({
   isPublic: z.boolean().optional(),
 }).strict();
 
-export async function PATCH(req: NextRequest, { params }: { params: { code: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
-  const nation = await prisma.nation.findUnique({ where: { code: params.code.toUpperCase() } });
+  const { code } = await params;
+  const nation = await prisma.nation.findUnique({ where: { code: code.toUpperCase() } });
   if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
   if (nation.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
@@ -40,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { code: stri
     const body = await req.json();
     const data = patchSchema.parse(body);
     const updated = await prisma.nation.update({
-      where: { code: params.code.toUpperCase() },
+      where: { code: code.toUpperCase() },
       data,
       include: { owner: { select: { id: true, name: true, email: true } }, _count: { select: { agents: true } } },
     });

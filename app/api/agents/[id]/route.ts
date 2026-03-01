@@ -20,9 +20,10 @@ const patchSchema = z.object({
   forwardCondition: z.enum(['always', 'when_offline', 'when_busy', 'when_dnd']).optional(),
 }).strict();
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const agent = await prisma.agent.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       nation: { select: { code: true, displayName: true, badge: true } },
       owner: { select: { id: true, name: true } },
@@ -35,11 +36,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ ...safe, online: isOnline(agent.lastSeenAt) });
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
-  const agent = await prisma.agent.findUnique({ where: { id: params.id } });
+  const { id } = await params;
+  const agent = await prisma.agent.findUnique({ where: { id } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
@@ -53,7 +55,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     
     const updated = await prisma.agent.update({
-      where: { id: params.id },
+      where: { id },
       data: data as Parameters<typeof prisma.agent.update>[0]['data'],
       include: { nation: { select: { code: true, displayName: true, badge: true } }, owner: { select: { id: true, name: true } } },
     });
@@ -66,14 +68,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
-  const agent = await prisma.agent.findUnique({ where: { id: params.id } });
+  const { id } = await params;
+  const agent = await prisma.agent.findUnique({ where: { id } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
-  await prisma.agent.update({ where: { id: params.id }, data: { isActive: false } });
+  await prisma.agent.update({ where: { id }, data: { isActive: false } });
   return NextResponse.json({ ok: true });
 }
