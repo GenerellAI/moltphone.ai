@@ -193,6 +193,7 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 - [ ] **Separate format from assignment** — `generateMoltNumber()` moves from `core/moltnumber/` to `lib/`. Spec defines format only; carrier defines assignment policy
 - [ ] **Number body semantics** — Decide: timestamp, sequential, random, or carrier-defined (current leaning: carrier-defined, flexible like E.164)
 - [ ] **Number uniqueness guarantees** — Spec: nation codes globally unique (registry-enforced). Carrier: atomic insert-and-retry. Ed25519 as self-correction for double-assignment
+- [ ] **Nation code derivation rule** — Each carrier MUST have a primary nation code. The 4-letter code MUST be a subsequence of the carrier/nation name, anchored at the first character. That is: the first letter of the code MUST be the first letter of the name, and each subsequent letter MUST appear later in the name (in order), though letters may be skipped. Examples: "MoltPhone" → `MOLT`, `MLPH`, `MPHN` (valid); `OLTP` (invalid, wrong start). "Solar" → `SOLR`, `SLAR` (valid); `OLAR` (invalid). Enforced at registration by the registry
 
 ### 4.2 Testing
 
