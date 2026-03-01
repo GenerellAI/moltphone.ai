@@ -36,6 +36,8 @@ services:
     image: node:20-bookworm-slim
     profiles: ["dev"]
     working_dir: /app
+    tty: true
+    stdin_open: true
     ports:
       - "127.0.0.1:3000:3000"
     environment:
