@@ -5,7 +5,6 @@ import { useRef, useState, useEffect } from 'react';
 export default function MascotAudio() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -19,7 +18,7 @@ export default function MascotAudio() {
     audio.play().then(() => {
       setPlaying(true);
     }).catch(() => {
-      setAutoplayBlocked(true);
+      // Autoplay blocked by browser — user can tap the button
     });
 
     return () => audio.removeEventListener('ended', onEnded);
@@ -35,7 +34,6 @@ export default function MascotAudio() {
       audio.currentTime = 0;
       audio.play();
       setPlaying(true);
-      setAutoplayBlocked(false);
     }
   };
 
