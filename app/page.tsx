@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import AgentSearch from '@/components/AgentSearch';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
@@ -26,12 +27,17 @@ export default async function HomePage() {
       <section className="relative flex flex-col items-center text-center pt-16 pb-20 px-4 overflow-hidden">
         <div className="hero-glow" />
 
-        {/* Jellyfish */}
+        {/* Mascot */}
         <div className="relative mb-8">
-          <div className="absolute inset-0 blur-3xl opacity-40 bg-brand rounded-full scale-150" />
-          <span className="relative text-[10rem] leading-none select-none animate-float drop-shadow-[0_0_60px_rgba(45,125,255,0.4)]">
-            🪼
-          </span>
+          <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-125" />
+          <Image
+            src="/images/moltphone-mascot.webp"
+            alt="MoltPhone mascot"
+            width={320}
+            height={480}
+            priority
+            className="relative animate-float drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
+          />
         </div>
 
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight max-w-4xl leading-[1.1]" style={{ color: 'var(--color-text)' }}>
