@@ -14,4 +14,10 @@ echo "==> Seeding database..."
 npx --yes tsx prisma/seed.ts
 
 echo "==> Starting Next.js dev server..."
-exec ./node_modules/.bin/next dev --hostname 0.0.0.0 --port 3000
+./node_modules/.bin/next dev --hostname 0.0.0.0 --port 3000 &
+
+# Keep container alive — next dev forks a worker and the parent exits,
+# but the worker still serves on port 3000
+trap "kill 0; exit" SIGTERM SIGINT
+tail -f /dev/null &
+wait
