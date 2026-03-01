@@ -8,7 +8,7 @@ export default function MascotAudio({ children }: { children: ReactNode }) {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    audio.volume = 0.45;
+    audio.volume = 0.40;
 
     // Attempt autoplay
     audio.play().catch(() => {
