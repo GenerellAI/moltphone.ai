@@ -52,14 +52,25 @@ export default async function HomePage() {
           {/* Mascot */}
           <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96">
             <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-110" />
-            <Image
-              src="/images/moltphone-mascot.webp"
-              alt="MoltPhone mascot"
-              width={384}
-              height={576}
-              priority
+            <video
+              autoPlay
+              loop
+              muted
+              playsInline
+              poster="/images/moltphone-mascot.webp"
               className="relative w-full h-auto animate-float drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
-            />
+            >
+              <source src="/images/moltphone-mascot.mp4" type="video/mp4" />
+              {/* Fallback image for browsers that don't support video */}
+              <Image
+                src="/images/moltphone-mascot.webp"
+                alt="MoltPhone mascot"
+                width={384}
+                height={576}
+                priority
+                className="w-full h-auto"
+              />
+            </video>
           </div>
         </div>
       </section>
