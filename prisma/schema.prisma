@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  nations       Nation[]
+  agents        Agent[]
+  favorites     Favorite[]
+  blocks        Block[]
+}
+
+model Nation {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  displayName  String
+  description  String?
+  badge        String?
+  isPublic     Boolean  @default(true)
+  ownerId      String
+  owner        User     @relation(fields: [ownerId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  agents       Agent[]
+}
+
+enum InboundPolicy {
+  public
+  registered_only
+  allowlist
+}
+
+enum ForwardCondition {
+  always
+  when_offline
+  when_busy
+  when_dnd
+}
+
+model Agent {
+  id                   String        @id @default(cuid())
+  phoneNumber          String        @unique
+  nationCode           String
+  nation               Nation        @relation(fields: [nationCode], references: [code])
+  ownerId              String
+  owner                User          @relation(fields: [ownerId], references: [id])
+  
+  displayName          String
+  description          String?
+  avatarUrl            String?
+  
+  endpointUrl          String?
+  dialEnabled          Boolean       @default(true)
+  
+  voicemailGreeting    String?       @db.VarChar(500)
+  voicemailSecretHash  String?
+  callSecretHash       String?
+  
+  lastSeenAt           DateTime?
+  
+  inboundPolicy        InboundPolicy @default(public)
+  allowlistAgentIds    String[]      @default([])
+  
+  dndEnabled           Boolean       @default(false)
+  
+  maxConcurrentCalls   Int           @default(3)
+  
+  callForwardingEnabled Boolean       @default(false)
+  forwardToAgentId     String?
+  forwardCondition     ForwardCondition @default(when_offline)
+  
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  
+  callsAsCallee        Call[]        @relation("CalleeAgent")
+  callsAsCaller        Call[]        @relation("CallerAgent")
+  favorites            Favorite[]
+  blocksAsTarget       Block[]       @relation("BlockedAgent")
+  forwardedFrom        Agent[]       @relation("ForwardedTo")
+  forwardTo            Agent?        @relation("ForwardedTo", fields: [forwardToAgentId], references: [id])
+  voicemails           VoicemailMessage[]
+}
+
+enum CallStatus {
+  ringing
+  connected
+  voicemail
+  busy
+  blocked
+  missed
+  failed_forward
+}
+
+enum CallType {
+  call
+  text
+}
+
+model Call {
+  id              String     @id @default(cuid())
+  callerId        String?
+  caller          Agent?     @relation("CallerAgent", fields: [callerId], references: [id])
+  calleeId        String
+  callee          Agent      @relation("CalleeAgent", fields: [calleeId], references: [id])
+  type            CallType   @default(call)
+  status          CallStatus
+  forwardingHops  String[]   @default([])
+  body            String?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  messages        CallMessage[]
+  voicemails      VoicemailMessage[]
+}
+
+model CallMessage {
+  id        String   @id @default(cuid())
+  callId    String
+  call      Call     @relation(fields: [callId], references: [id])
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model VoicemailMessage {
+  id           String    @id @default(cuid())
+  callId       String?
+  call         Call?     @relation(fields: [callId], references: [id])
+  agentId      String
+  agent        Agent     @relation(fields: [agentId], references: [id])
+  fromNumber   String?
+  body         String
+  greeting     String?
+  isRead       Boolean   @default(false)
+  isAcked      Boolean   @default(false)
+  reply        String?
+  repliedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id])
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, agentId])
+}
+
+model Block {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  blockedAgentId  String
+  blockedAgent    Agent    @relation("BlockedAgent", fields: [blockedAgentId], references: [id])
+  reason          String?
+  createdAt       DateTime @default(now())
+  
+  @@unique([userId, blockedAgentId])
+}
+
+model NonceUsed {
+  nonce     String   @id
+  usedAt    DateTime @default(now())
+  expiresAt DateTime
+}
