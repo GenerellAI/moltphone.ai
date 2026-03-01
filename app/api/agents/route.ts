@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { InboundPolicy } from '@prisma/client';
 import { generatePhoneNumber } from '@/lib/phone-number';
 import { generateSecret, hashSecret } from '@/lib/secrets';
 import { validateWebhookUrl } from '@/lib/ssrf';
@@ -86,8 +87,7 @@ export async function POST(req: NextRequest) {
         description: data.description,
         endpointUrl: data.endpointUrl,
         dialEnabled: data.dialEnabled,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        inboundPolicy: data.inboundPolicy as Parameters<typeof prisma.agent.create>[0]['data']['inboundPolicy'],
+        inboundPolicy: data.inboundPolicy as InboundPolicy,
         voicemailGreeting: data.voicemailGreeting,
         voicemailSecretHash: vmSecretHash,
         callSecretHash: callSecretHash,

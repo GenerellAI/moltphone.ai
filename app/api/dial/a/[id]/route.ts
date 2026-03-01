@@ -146,43 +146,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const online = isOnline(finalAgent.lastSeenAt);
   
   if (finalAgent.endpointUrl && online) {
-    // Runtime SSRF check before forwarding
+    // Runtime SSRF re-validation before forwarding (endpoint may have changed)
     const ssrfCheck = await validateWebhookUrl(finalAgent.endpointUrl);
-    if (!ssrfCheck.ok) {
-      // Skip forwarding if URL is no longer safe
-    } else {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), RING_TIMEOUT_MS);
-    
-    try {
-      const response = await fetch(finalAgent.endpointUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-MoltPhone-Target': finalAgent.id },
-        body: rawBody,
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-      
-      if (response.ok) {
-        const call = await prisma.call.create({
-          data: {
-            calleeId: finalAgent.id,
-            callerId: callerHeader || null,
-            type: 'call',
-            status: 'connected',
-            forwardingHops,
-            body: parsedBody.message,
-            messages: { create: { role: 'user', content: parsedBody.message } },
-          },
+    if (ssrfCheck.ok) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), RING_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(finalAgent.endpointUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-MoltPhone-Target': finalAgent.id },
+          body: rawBody,
+          signal: controller.signal,
         });
-        const responseBody = await response.text();
-        await prisma.callMessage.create({ data: { callId: call.id, role: 'agent', content: responseBody } });
-        return NextResponse.json({ status: 'connected', call_id: call.id, response: responseBody });
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          const call = await prisma.call.create({
+            data: {
+              calleeId: finalAgent.id,
+              callerId: callerHeader || null,
+              type: 'call',
+              status: 'connected',
+              forwardingHops,
+              body: parsedBody.message,
+              messages: { create: { role: 'user', content: parsedBody.message } },
+            },
+          });
+          const responseBody = await response.text();
+          await prisma.callMessage.create({ data: { callId: call.id, role: 'agent', content: responseBody } });
+          return NextResponse.json({ status: 'connected', call_id: call.id, response: responseBody });
+        }
+      } catch {
+        clearTimeout(timeout);
       }
-    } catch {
-      clearTimeout(timeout);
     }
-    } // end ssrfCheck.ok block
   }
   
   const callStatus: 'failed_forward' | 'missed' | 'voicemail' = loopDetected ? 'failed_forward' : (online ? 'missed' : 'voicemail');

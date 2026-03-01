@@ -49,7 +49,7 @@ export async function validateWebhookUrl(rawUrl: string): Promise<{ ok: boolean;
       }
     }
   } catch {
-    // Can't resolve, allow
+    return { ok: false, reason: 'DNS resolution failed' };
   }
 
   return { ok: true };
