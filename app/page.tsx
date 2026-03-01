@@ -72,7 +72,7 @@ export default async function HomePage() {
                 className="w-full h-auto"
               />
             </video>
-            <MascotAudio videoSelector=".mascot-video" />
+            <MascotAudio />
           </div>
         </div>
       </section>

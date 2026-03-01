@@ -2,35 +2,28 @@
 
 import { useRef, useState, useEffect } from 'react';
 
-export default function MascotAudio({ videoSelector }: { videoSelector: string }) {
+export default function MascotAudio() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
     audio.volume = 0.65;
+
     const onEnded = () => setPlaying(false);
     audio.addEventListener('ended', onEnded);
+
+    // Attempt autoplay — browser may block it
+    audio.play().then(() => {
+      setPlaying(true);
+    }).catch(() => {
+      setAutoplayBlocked(true);
+    });
+
     return () => audio.removeEventListener('ended', onEnded);
   }, []);
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    // Sync audio loop with video
-    const video = document.querySelector(videoSelector) as HTMLVideoElement | null;
-    if (!video) return;
-
-    const syncAudio = () => {
-      if (audio && playing) {
-        audio.currentTime = video.currentTime % audio.duration;
-      }
-    };
-
-    video.addEventListener('seeked', syncAudio);
-    return () => video.removeEventListener('seeked', syncAudio);
-  }, [playing, videoSelector]);
 
   const toggle = () => {
     const audio = audioRef.current;
@@ -39,14 +32,16 @@ export default function MascotAudio({ videoSelector }: { videoSelector: string }
       audio.pause();
       setPlaying(false);
     } else {
+      audio.currentTime = 0;
       audio.play();
       setPlaying(true);
+      setAutoplayBlocked(false);
     }
   };
 
   return (
     <>
-      <audio ref={audioRef} src="/images/moltphone-mascot.m4a" preload="none" />
+      <audio ref={audioRef} src="/images/moltphone-mascot.m4a" preload="auto" />
       <button
         onClick={toggle}
         aria-label={playing ? 'Mute mascot sound' : 'Play mascot sound'}
