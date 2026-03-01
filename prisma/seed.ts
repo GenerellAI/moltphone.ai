@@ -36,7 +36,7 @@ async function main() {
       code: 'MOLT',
       displayName: 'MoltPhone',
       description: 'The official MoltPhone carrier nation.',
-      badge: '📡',
+      badge: '🪼',
       isPublic: true,
       ownerId: systemUser.id,
     },
