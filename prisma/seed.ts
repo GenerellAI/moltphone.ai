@@ -1,7 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { generatePhoneNumber } from '../lib/phone-number';
-import { generateSecret, hashSecret } from '../lib/secrets';
+import { generateKeyPair } from '../core/moltprotocol/src/ed25519';
 
 const prisma = new PrismaClient();
 
@@ -68,8 +67,7 @@ async function main() {
     },
   });
   
-  const vmSecret1 = generateSecret();
-  const callSecret1 = generateSecret();
+  const kp1 = generateKeyPair();
   
   await prisma.agent.upsert({
     where: { phoneNumber: 'MOLT-0001-0001-0001-0' },
@@ -82,14 +80,13 @@ async function main() {
       description: 'The MoltPhone system operator agent.',
       dialEnabled: true,
       inboundPolicy: 'public',
-      voicemailGreeting: "You've reached the MoltPhone Operator. Please leave a message.",
-      voicemailSecretHash: await hashSecret(vmSecret1),
-      callSecretHash: await hashSecret(callSecret1),
+      awayMessage: "You've reached the MoltPhone Operator. Please leave a task.",
+      publicKey: kp1.publicKey,
+      skills: ['call', 'text'],
     },
   });
   
-  const vmSecret2 = generateSecret();
-  const callSecret2 = generateSecret();
+  const kp2 = generateKeyPair();
   
   const agent2 = await prisma.agent.upsert({
     where: { phoneNumber: 'AION-0001-0001-0001-0' },
@@ -103,14 +100,13 @@ async function main() {
       endpointUrl: 'https://example.com/a2a/aion-gateway',
       dialEnabled: true,
       inboundPolicy: 'public',
-      voicemailGreeting: "AION Gateway here. If I missed your call, I'll process your message shortly.",
-      voicemailSecretHash: await hashSecret(vmSecret2),
-      callSecretHash: await hashSecret(callSecret2),
+      awayMessage: "AION Gateway here. If I missed your call, I'll process your task shortly.",
+      publicKey: kp2.publicKey,
+      skills: ['call', 'text'],
     },
   });
   
-  const vmSecret3 = generateSecret();
-  const callSecret3 = generateSecret();
+  const kp3 = generateKeyPair();
   
   await prisma.agent.upsert({
     where: { phoneNumber: 'CLAW-0001-0001-0001-0' },
@@ -123,14 +119,13 @@ async function main() {
       description: 'Certified OpenClaw agent. Requires registered caller authentication.',
       dialEnabled: true,
       inboundPolicy: 'registered_only',
-      voicemailGreeting: "OpenClaw Protocol Agent. Only registered agents may call.",
-      voicemailSecretHash: await hashSecret(vmSecret3),
-      callSecretHash: await hashSecret(callSecret3),
+      awayMessage: "OpenClaw Protocol Agent. Only registered agents may call.",
+      publicKey: kp3.publicKey,
+      skills: ['call'],
     },
   });
   
-  const vmSecret4 = generateSecret();
-  const callSecret4 = generateSecret();
+  const kp4 = generateKeyPair();
   
   await prisma.agent.upsert({
     where: { phoneNumber: 'AION-0001-0001-0002-0' },
@@ -144,14 +139,13 @@ async function main() {
       dialEnabled: true,
       dndEnabled: true,
       inboundPolicy: 'public',
-      voicemailGreeting: "AION Deep Think is currently in deep computation mode (DND).",
-      voicemailSecretHash: await hashSecret(vmSecret4),
-      callSecretHash: await hashSecret(callSecret4),
+      awayMessage: "AION Deep Think is currently in deep computation mode (DND).",
+      publicKey: kp4.publicKey,
+      skills: ['call'],
     },
   });
   
-  const vmSecret5 = generateSecret();
-  const callSecret5 = generateSecret();
+  const kp5 = generateKeyPair();
   
   await prisma.agent.upsert({
     where: { phoneNumber: 'MOLT-0001-0001-0002-0' },
@@ -161,15 +155,15 @@ async function main() {
       nationCode: 'MOLT',
       ownerId: systemUser.id,
       displayName: 'MoltPhone Relay',
-      description: 'A relay agent that forwards calls to AION Gateway when offline.',
+      description: 'A relay agent that forwards tasks to AION Gateway when offline.',
       dialEnabled: true,
       callForwardingEnabled: true,
       forwardToAgentId: agent2.id,
       forwardCondition: 'when_offline',
       inboundPolicy: 'public',
-      voicemailGreeting: "MoltPhone Relay. I'm forwarding your call to AION Gateway.",
-      voicemailSecretHash: await hashSecret(vmSecret5),
-      callSecretHash: await hashSecret(callSecret5),
+      awayMessage: "MoltPhone Relay. Forwarding your task to AION Gateway.",
+      publicKey: kp5.publicKey,
+      skills: ['call', 'text'],
     },
   });
   

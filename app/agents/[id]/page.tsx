@@ -69,6 +69,14 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
 
         {agent.description && <p className="text-muted mb-4">{agent.description}</p>}
 
+        {agent.skills.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-4">
+            {agent.skills.map(skill => (
+              <span key={skill} className="badge text-xs">{skill}</span>
+            ))}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-lg p-3 border" style={{ background: 'var(--color-surface)' }}>
             <div className="text-muted text-xs mb-1">Inbound Policy</div>
@@ -84,10 +92,10 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
               <div style={{ color: 'var(--color-text)' }}>⏩ {agent.forwardCondition}</div>
             </div>
           )}
-          {agent.voicemailGreeting && (
+          {agent.awayMessage && (
             <div className="rounded-lg p-3 border col-span-2" style={{ background: 'var(--color-surface)' }}>
-              <div className="text-muted text-xs mb-1">Voicemail Greeting</div>
-              <div className="italic" style={{ color: 'var(--color-text-secondary)' }}>&quot;{agent.voicemailGreeting}&quot;</div>
+              <div className="text-muted text-xs mb-1">Away Message</div>
+              <div className="italic" style={{ color: 'var(--color-text-secondary)' }}>&quot;{agent.awayMessage}&quot;</div>
             </div>
           )}
         </div>
@@ -129,21 +137,21 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
         </p>
       </div>
 
-      {/* ── Dial URLs ───────────────────────────────────── */}
+      {/* ── Dial URLs (A2A) ──────────────────────────────── */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-text)' }}>Dial This Agent</h2>
         <div className="space-y-2">
           <div className="rounded-lg p-3 border" style={{ background: 'var(--color-surface)' }}>
-            <div className="text-xs text-muted mb-1">Call URL (POST)</div>
-            <code className="text-brand text-xs break-all font-mono">/dial/{agent.phoneNumber}/call</code>
+            <div className="text-xs text-muted mb-1">Task Send URL (POST)</div>
+            <code className="text-brand text-xs break-all font-mono">/dial/{agent.phoneNumber}/tasks/send</code>
           </div>
           <div className="rounded-lg p-3 border" style={{ background: 'var(--color-surface)' }}>
-            <div className="text-xs text-muted mb-1">Text URL (POST)</div>
-            <code className="text-brand text-xs break-all font-mono">/dial/{agent.phoneNumber}/text</code>
+            <div className="text-xs text-muted mb-1">Agent Card (GET)</div>
+            <code className="text-brand text-xs break-all font-mono">/dial/{agent.phoneNumber}/agent.json</code>
           </div>
         </div>
         <p className="text-xs text-muted mt-3">
-          Send <code className="text-brand font-mono">{'{\"message\": \"...\"}'}</code> to dial this agent.
+          Send an A2A task with <code className="text-brand font-mono">{'{\"message\":{\"parts\":[{\"type\":\"text\",\"text\":\"...\"}]}}'}</code>
         </p>
       </div>
     </div>

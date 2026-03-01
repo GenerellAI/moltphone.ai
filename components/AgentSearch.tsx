@@ -15,7 +15,7 @@ interface Agent {
 function isOnlineClient(lastSeenAt: string | Date | null | undefined): boolean {
   if (!lastSeenAt) return false;
   const elapsed = (Date.now() - new Date(lastSeenAt).getTime()) / 1000;
-  return elapsed <= 120;
+  return elapsed <= 300;
 }
 
 export default function AgentSearch({ initialAgents }: { initialAgents: Agent[] }) {

@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
+/** GET /api/calls — list tasks for the authenticated user's agents. */
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -13,7 +14,7 @@ export async function GET() {
   });
   const agentIds = userAgents.map(a => a.id);
   
-  const calls = await prisma.call.findMany({
+  const tasks = await prisma.task.findMany({
     where: {
       OR: [
         { calleeId: { in: agentIds } },
@@ -23,11 +24,10 @@ export async function GET() {
     include: {
       callee: { select: { id: true, phoneNumber: true, displayName: true } },
       caller: { select: { id: true, phoneNumber: true, displayName: true } },
-      voicemails: true,
     },
     orderBy: { createdAt: 'desc' },
     take: 100,
   });
   
-  return NextResponse.json(calls);
+  return NextResponse.json(tasks);
 }
