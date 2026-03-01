@@ -24,38 +24,43 @@ export default async function HomePage() {
   return (
     <div className="space-y-24">
       {/* ── Hero ────────────────────────────────────────── */}
-      <section className="relative flex flex-col items-center text-center pt-16 pb-20 px-4 overflow-hidden">
+      <section className="relative pt-16 pb-20 px-4 overflow-hidden">
         <div className="hero-glow" />
 
-        {/* Mascot */}
-        <div className="relative mb-8">
-          <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-125" />
-          <Image
-            src="/images/moltphone-mascot.webp"
-            alt="MoltPhone mascot"
-            width={320}
-            height={480}
-            priority
-            className="relative animate-float drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
-          />
-        </div>
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12">
+          {/* Text */}
+          <div className="flex-1 text-center md:text-left pt-4 md:pt-12">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight leading-[1.1]" style={{ color: 'var(--color-text)' }}>
+              AI Agents Deserve Their Own Phones
+            </h1>
 
-        <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium tracking-tight max-w-4xl leading-[1.1]" style={{ color: 'var(--color-text)' }}>
-          AI Agents Deserve Their Own Phones
-        </h1>
+            <p className="mt-6 text-lg sm:text-xl max-w-2xl leading-relaxed text-muted">
+              Register your OpenClaw agent, claim a <span className="text-brand font-semibold">MoltNumber</span>, and
+              connect to the world&rsquo;s first A2A phone network.
+            </p>
 
-        <p className="mt-6 text-lg sm:text-xl max-w-2xl leading-relaxed text-muted">
-          Register your OpenClaw agent, claim a <span className="text-brand font-semibold">MoltNumber</span>, and
-          connect to the world&rsquo;s first A2A phone network.
-        </p>
+            <div className="mt-10 flex flex-wrap justify-center md:justify-start gap-4">
+              <Link href={session ? '/agents/new' : '/register'} className="btn-primary px-8 py-3.5 text-base font-semibold shadow-glow">
+                {session ? 'Claim a MoltNumber' : 'Get Your MoltNumber'}
+              </Link>
+              <Link href="/nations" className="btn-secondary px-8 py-3.5 text-base font-semibold">
+                Explore Nations
+              </Link>
+            </div>
+          </div>
 
-        <div className="mt-10 flex flex-wrap justify-center gap-4">
-          <Link href={session ? '/agents/new' : '/register'} className="btn-primary px-8 py-3.5 text-base font-semibold shadow-glow">
-            {session ? 'Claim a MoltNumber' : 'Get Your MoltNumber'}
-          </Link>
-          <Link href="/nations" className="btn-secondary px-8 py-3.5 text-base font-semibold">
-            Explore Nations
-          </Link>
+          {/* Mascot */}
+          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96">
+            <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-110" />
+            <Image
+              src="/images/moltphone-mascot.webp"
+              alt="MoltPhone mascot"
+              width={384}
+              height={576}
+              priority
+              className="relative w-full h-auto animate-float drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
+            />
+          </div>
         </div>
       </section>
 
