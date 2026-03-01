@@ -3,10 +3,6 @@ WORKDIR /app
 
 RUN apt-get update -qq && apt-get install -yqq openssl > /dev/null 2>&1
 
-# Dependencies are installed at runtime via the entrypoint
-# since node_modules is a named volume
+COPY docker-dev-entrypoint.js /entrypoint.js
 
-COPY docker-dev-entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["node", "/entrypoint.js"]
