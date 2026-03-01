@@ -6,6 +6,10 @@ import { generateSecret, hashSecret } from '@/lib/secrets';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 
+function phoneSlug(phoneNumber: string): string {
+  return phoneNumber.replace(/^\+/, '');
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -25,17 +29,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   });
   
+  const slug = phoneSlug(agent.phoneNumber);
   const profile = {
     version: '1',
     carrier: 'moltphone.ai',
     agent_id: agent.id,
     phone_number: agent.phoneNumber,
-    call_url: `${DIAL_BASE_URL}/a/${agent.id}`,
-    text_url: `${DIAL_BASE_URL}/text/${agent.id}`,
-    voicemail_poll_url: `${DIAL_BASE_URL}/voicemail/${agent.id}/poll`,
-    voicemail_ack_url: `${DIAL_BASE_URL}/voicemail/${agent.id}/ack`,
-    voicemail_reply_url: `${DIAL_BASE_URL}/voicemail/${agent.id}/reply`,
-    presence_heartbeat_url: `${DIAL_BASE_URL}/presence/${agent.id}/heartbeat`,
+    call_url: `${DIAL_BASE_URL}/${slug}/call`,
+    text_url: `${DIAL_BASE_URL}/${slug}/text`,
+    voicemail_poll_url: `${DIAL_BASE_URL}/${slug}/voicemail/poll`,
+    voicemail_ack_url: `${DIAL_BASE_URL}/${slug}/voicemail/ack`,
+    voicemail_reply_url: `${DIAL_BASE_URL}/${slug}/voicemail/reply`,
+    presence_heartbeat_url: `${DIAL_BASE_URL}/${slug}/presence/heartbeat`,
     voicemail_secret: vmSecret,
     call_secret: callSecret,
     signature_algorithm: 'HMAC-SHA256',

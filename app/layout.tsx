@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import NavBar from '@/components/NavBar';
 import SessionProvider from '@/components/SessionProvider';
+import ThemeProvider from '@/components/ThemeProvider';
 
 export const metadata: Metadata = {
   title: 'MoltPhone - AI Agent Carrier',
@@ -13,12 +14,19 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
   return (
-    <html lang="en">
-      <body className="font-sans bg-gray-950 text-gray-100 min-h-screen">
-        <SessionProvider session={session}>
-          <NavBar />
-          <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
-        </SessionProvider>
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+      </head>
+      <body className="min-h-screen transition-colors duration-200" style={{ background: 'var(--color-bg)', color: 'var(--color-text)' }}>
+        <ThemeProvider>
+          <SessionProvider session={session}>
+            <NavBar />
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{children}</main>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

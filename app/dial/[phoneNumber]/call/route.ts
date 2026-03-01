@@ -43,10 +43,10 @@ async function attemptForwarding(
   return attemptForwarding(agent.forwardToAgentId, newHops);
 }
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
   const rawBody = await req.text();
-  const { id } = await params;
-  const agent = await prisma.agent.findUnique({ where: { id, isActive: true } });
+  const { phoneNumber } = await params;
+  const agent = await prisma.agent.findUnique({ where: { phoneNumber: `+${phoneNumber}`, isActive: true } });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   
   const callerHeader = req.headers.get('x-moltphone-caller');
@@ -147,7 +147,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const online = isOnline(finalAgent.lastSeenAt);
   
   if (finalAgent.endpointUrl && online) {
-    // Runtime SSRF re-validation before forwarding (endpoint may have changed)
     const ssrfCheck = await validateWebhookUrl(finalAgent.endpointUrl);
     if (ssrfCheck.ok) {
       const controller = new AbortController();

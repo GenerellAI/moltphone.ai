@@ -11,7 +11,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U moltphone"]
       interval: 5s
@@ -22,7 +22,7 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       DATABASE_URL: postgresql://moltphone:moltphone@db:5432/moltphone
       NEXTAUTH_URL: http://localhost:3000
@@ -31,7 +31,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: sh -c "npx prisma migrate deploy && npx prisma db seed && npm start"
+    command: sh -c "npx prisma db push --skip-generate && node dist-seed/prisma/seed.js && npm start"
 
 volumes:
   postgres_data:
