@@ -50,7 +50,7 @@ export default async function HomePage() {
           </div>
 
           {/* Mascot */}
-          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96">
+          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96" style={{ maskImage: 'radial-gradient(ellipse 70% 65% at center, black 40%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 70% 65% at center, black 40%, transparent 100%)' }}>
             <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-110" />
             <video
               autoPlay
@@ -58,7 +58,7 @@ export default async function HomePage() {
               muted
               playsInline
               poster="/images/moltphone-mascot.webp"
-              className="relative w-full h-auto animate-float drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
+              className="relative w-full h-auto drop-shadow-[0_0_60px_rgba(45,125,255,0.3)]"
             >
               <source src="/images/moltphone-mascot.mp4" type="video/mp4" />
               {/* Fallback image for browsers that don't support video */}
