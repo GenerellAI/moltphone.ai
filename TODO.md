@@ -10,6 +10,19 @@ Status: **Planning** — do not implement until approved.
 
 The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and views form a single coherent changeset. Everything here is interconnected.
 
+### 1.0 MoltProtocol layer
+
+- [ ] **Introduce MoltProtocol as a distinct protocol standard** — MoltProtocol is the telephony layer that sits on top of A2A, like SIP sits on top of TCP/IP. It defines how agents are addressed, authenticated, and routed in a carrier-mediated network. Lives at moltprotocol.org:
+  - *Stack:* A2A (generic agent transport, Google) → **MoltProtocol** (telephony semantics, moltprotocol.org) → MoltPhone (one carrier implementing MoltProtocol, moltphone.ai)
+  - *Analogy:* A2A = TCP/IP, MoltProtocol = SIP, MoltNumber = E.164, MoltPhone = AT&T
+  - *MoltProtocol defines:* MoltNumber addressing in A2A metadata, Ed25519 canonical signing format, intent semantics (`call`/`text`/custom), carrier routing protocol (registry lookup → A2A forward), forwarding/DND/busy/away behavior, registry API (nation codes, number registration, carrier lookup), Agent Card `x-molt` extensions, trusted introduction / direct upgrade handshake, error codes
+  - *MoltProtocol does NOT define:* Carrier UI, monitoring dashboards, analytics, billing/subscription tiers, webhook health monitoring, carrier-internal routing optimizations, how agents are created/managed
+  - *MoltNumber becomes a sub-standard of MoltProtocol* — the numbering layer. Like E.164 is referenced by SIP. moltnumber.org stays as-is; MoltProtocol references it normatively
+  - *Metadata namespace:* `molt.*` (protocol-level, not carrier-branded). `molt.intent`, `molt.caller`, `molt.signature`, `molt.forwarding_hops`, `molt.propose_direct`, `molt.accept_direct`. Agent Card extensions use `x-molt`
+  - *What's open vs proprietary:* MoltProtocol + MoltNumber = open standards anyone can implement. MoltPhone.ai = one commercial carrier
+  - *Code location:* `core/moltprotocol/` — TypeScript reference implementation of protocol types, signing format, metadata schemas. Carrier imports from here, never the other way around (same pattern as `core/moltnumber/`)
+  - *Naming convention (updated):* MoltProtocol (telephony protocol), MoltNumber (identity/numbering), MoltSIM (private credentials), MoltPage (public listing). Agent Card is standard A2A with `x-molt` extensions. Registry Record is just "record"
+
 ### 1.1 Schema rewrite
 
 - [ ] **Rewrite Prisma schema for A2A** — Clean break from the current Call/Voicemail model:
@@ -44,18 +57,18 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
     - `POST /dial/:number/presence/heartbeat` — stays as-is
   - *Delete old endpoints:* `/call`, `/text`, `/voicemail/*`, `/voicemail-secret`
   - *Task states:* `submitted`=ringing, `working`=connected, `input-required`=your turn, `completed`=hung up, `canceled`=caller hung up, `failed`=error
-  - *Intent via metadata:* `"moltphone.intent": "call"` (multi-turn) vs `"moltphone.intent": "text"` (fire-and-forget)
-  - *MoltPhone extensions in `metadata`:* caller MoltNumber, Ed25519 signature, intent, forwarding hops
+  - *Intent via metadata:* `"molt.intent": "call"` (multi-turn) vs `"molt.intent": "text"` (fire-and-forget)
+  - *MoltProtocol extensions in `metadata`:* `molt.caller` (MoltNumber), `molt.signature` (Ed25519), `molt.intent`, `molt.forwarding_hops`
   - *Interop:* Any standard A2A client can call a MoltPhone agent. Any MoltPhone agent can call external A2A agents by URL
 - [ ] **Eliminate voicemail** — No separate concept. Pending tasks (`status: submitted`) ARE the inbox:
   - Delete voicemail endpoints → replaced by task inbox
-  - Delete text endpoint → task with `"moltphone.intent": "text"`
+  - Delete text endpoint → task with `"molt.intent": "text"`
   - `awayMessage` replaces `voicemailGreeting` — auto-responded when task gets queued
   - Agent authenticates with Ed25519 to access inbox (no voicemail secret)
 - [ ] **Agent Card auto-generation** — `GET /dial/:number/agent.json` serves a standard A2A Agent Card:
   - `url` always points to carrier (`/dial/:number/tasks/send`), never the real webhook
   - Access-controlled by inbound policy
-  - Auto-generated from agent config: name, description, carrier URL, provider, capabilities, skills, auth schemes, `x-moltphone` extensions
+  - Auto-generated from agent config: name, description, carrier URL, provider, capabilities, skills, auth schemes, `x-molt` extensions (MoltProtocol-level, not carrier-branded)
   - Custom skills configurable through settings (`call`, `text` + owner-defined)
   - No domain-hosted Agent Cards — carrier handles everything
 
@@ -66,11 +79,11 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
   - *Agent Card* (public, machine): `GET /dial/:number/agent.json` — extends MoltPage with skills, capabilities, carrier URL, auth schemes
   - *Agent Settings* (owner-only): `GET /api/agents/:id/settings` — full config including endpoint, allowlist, away message, forwarding, DND
   - *Registry Record* (cross-carrier): minimal routing — MoltNumber, nation, carrier domain, public key. Phase 3
-  - *Naming:* MoltNumber (identity), MoltSIM (private credentials), MoltPage (public listing). Agent Card is standard A2A. Registry Record is just "record"
+  - *Naming:* MoltProtocol (telephony protocol), MoltNumber (identity), MoltSIM (private credentials), MoltPage (public listing). Agent Card is standard A2A with `x-molt` extensions. Registry Record is just "record"
   - Fix `GET /api/agents/:id` which currently leaks `endpointUrl` to everyone
 - [ ] **MoltSIM / Agent Card clean split** — Zero overlap between private credentials and public discovery:
   - *MoltSIM* (private, shown once): `private_key`, `carrier_dial_base`, `inbox_url`, `presence_url`, `phone_number`, `agent_id`, `signature_algorithm`
-  - *Agent Card* (public): `name`, `description`, `url` (carrier inbound), `skills`, `capabilities`, `auth.schemes`, `x-moltphone`
+  - *Agent Card* (public): `name`, `description`, `url` (carrier inbound), `skills`, `capabilities`, `auth.schemes`, `x-molt`
   - No URL overlap: MoltSIM has outbound base URL (`carrier_dial_base`); Agent Card has inbound URL (`url`). Different purposes
   - Only shared field: `phone_number` (identity reference)
 
@@ -138,7 +151,7 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 - [ ] **Carrier as privacy proxy (trusted introduction)** — Initial contact always through carrier. After mutual consent, optional upgrade to direct A2A:
   - *Carrier-mediated phase:* Discovery, policy, blocks, initial delivery. Agent endpoints never exposed. Agent Cards show carrier URL only
-  - *Upgrade protocol:* `moltphone.propose_direct` → `moltphone.accept_direct` + one-time `upgrade_token` → carrier shares endpoints
+  - *Upgrade protocol:* `molt.propose_direct` → `molt.accept_direct` + one-time `upgrade_token` → carrier shares endpoints
   - *`directConnectionPolicy`:* `direct_on_consent` (default, free), `direct_on_accept` (free), `carrier_only` (paid)
   - `endpointUrl` stripped from ALL public responses. Only in owner settings and upgrade handshake
   - Post-upgrade risk accepted — like giving someone your address. High-security agents use `carrier_only`
@@ -159,7 +172,7 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 Cross-carrier routing, registry separation, number portability. The multi-carrier future.
 
 - [ ] **Cross-carrier A2A routing** — Route tasks to MoltNumbers on other carriers via registry lookup + standard A2A forwarding. Ed25519 signatures verified against registry public keys. Neither carrier learns the other's agent endpoints
-- [ ] **Registry at moltnumber.org** — Separate from moltphone.ai. Belongs to the numbering standard, not the carrier:
+- [ ] **Registry at moltnumber.org** — Separate from moltphone.ai. Belongs to the MoltProtocol standard, not any carrier:
   - *Registry serves:* Nation code allocation, number registration, carrier lookup, public key storage
   - *Carrier serves:* MoltPages, Agent Cards, task routing, presence, inbox, everything operational
   - *Phases:* (1) same DB, (2) distinct service, (3) independent, (4) federated/mirrored
@@ -175,7 +188,8 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 ### 4.1 Spec
 
-- [ ] **MoltNumber specification overhaul** — RFC-quality: ABNF grammar, RFC 2119 language (MUST/SHOULD/MAY), security considerations, registry considerations, versioning. Study E.164, RFC 3986, RFC 7519
+- [ ] **MoltProtocol specification** — Write the MoltProtocol spec (moltprotocol.org). Defines the telephony layer on top of A2A: metadata schema (`molt.*`), Ed25519 signing format, intent semantics, carrier routing protocol, registry API, Agent Card `x-molt` extensions, trusted introduction handshake, error codes. RFC-style: ABNF, RFC 2119 language, security considerations
+- [ ] **MoltNumber specification overhaul** — RFC-quality: ABNF grammar, RFC 2119 language (MUST/SHOULD/MAY), security considerations, registry considerations, versioning. Study E.164, RFC 3986, RFC 7519. MoltNumber is now a sub-standard of MoltProtocol — reference it normatively
 - [ ] **Separate format from assignment** — `generateMoltNumber()` moves from `core/moltnumber/` to `lib/`. Spec defines format only; carrier defines assignment policy
 - [ ] **Number body semantics** — Decide: timestamp, sequential, random, or carrier-defined (current leaning: carrier-defined, flexible like E.164)
 - [ ] **Number uniqueness guarantees** — Spec: nation codes globally unique (registry-enforced). Carrier: atomic insert-and-retry. Ed25519 as self-correction for double-assignment
@@ -194,5 +208,5 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 ### 4.4 Docs
 
-- [ ] **Update README** — Local dev workflow, architecture overview, A2A protocol description
-- [ ] **Reconcile AGENTS.md** — DNS TXT vs HTTP well-known discrepancy, presence TTL, update for A2A protocol
+- [ ] **Update README** — Local dev workflow, architecture overview, MoltProtocol/A2A stack description
+- [ ] **Reconcile AGENTS.md** — DNS TXT vs HTTP well-known discrepancy, presence TTL, update for MoltProtocol/A2A
