@@ -12,7 +12,7 @@ interface Nation {
 }
 
 export default function NewAgentPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [nations, setNations] = useState<Nation[]>([]);
   const [form, setForm] = useState({
