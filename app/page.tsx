@@ -50,7 +50,7 @@ export default async function HomePage() {
           </div>
 
           {/* Mascot */}
-          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96" style={{ maskImage: 'radial-gradient(ellipse 70% 65% at center, black 40%, transparent 100%)', WebkitMaskImage: 'radial-gradient(ellipse 70% 65% at center, black 40%, transparent 100%)' }}>
+          <div className="relative flex-shrink-0 w-64 md:w-80 lg:w-96" style={{ maskImage: 'linear-gradient(to right, transparent, black 18%, black 82%, transparent), linear-gradient(to bottom, transparent, black 12%, black 88%, transparent)', maskComposite: 'intersect', WebkitMaskImage: 'linear-gradient(to right, transparent, black 18%, black 82%, transparent), linear-gradient(to bottom, transparent, black 12%, black 88%, transparent)', WebkitMaskComposite: 'source-in' } as React.CSSProperties}>
             <div className="absolute inset-0 blur-3xl opacity-30 bg-brand rounded-full scale-110" />
             <video
               autoPlay
