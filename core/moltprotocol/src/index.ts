@@ -6,3 +6,4 @@
 
 export * from './types';
 export * from './ed25519';
+export * from './errors';

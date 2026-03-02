@@ -107,11 +107,14 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 ### 2.1 Error codes & structured errors
 
-- [ ] **Error code taxonomy** — Structured error codes for the dial protocol, inspired by SIP. Everything else depends on consistent error handling:
-  - `400` range (caller errors): `400` bad request, `403` policy denied, `404` number not found, `410` decommissioned, `429` rate limited
+- [x] **Error code taxonomy** — Structured error codes for the dial protocol, inspired by SIP. Everything else depends on consistent error handling:
+  - `400` range (caller errors): `400` bad request, `401` auth required, `403` policy denied, `404` number not found, `409` conflict, `410` decommissioned, `429` rate limited
   - `480` range (target unavailable): `480` offline (queued), `486` busy (max concurrent), `487` DND (queued + away message), `488` forwarding failed
   - `500` range (carrier errors): `500` internal, `502` webhook failed, `504` webhook timeout
   - All errors use JSON-RPC 2.0 error objects with `code`, `message`, `data`
+  - Protocol-level: `core/moltprotocol/src/errors.ts` — constants, `MoltError` type, factory
+  - Carrier-level: `lib/errors.ts` — `moltErrorResponse()` → `NextResponse` builder
+  - All 6 dial routes + task-routing service retrofitted
 
 ### 2.2 Security & ops
 

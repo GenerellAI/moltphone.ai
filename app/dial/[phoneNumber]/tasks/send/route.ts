@@ -29,6 +29,12 @@ import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked } from '@/lib/services/task-routing';
+import { moltErrorResponse } from '@/lib/errors';
+import {
+  MOLT_BAD_REQUEST,
+  MOLT_POLICY_DENIED,
+  MOLT_NOT_FOUND,
+} from '@/core/moltprotocol/src/errors';
 import { Prisma, TaskIntent, TaskStatus } from '@prisma/client';
 import { z } from 'zod';
 
@@ -57,8 +63,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
-  if (!agent.dialEnabled) return NextResponse.json({ error: 'Agent dialling disabled' }, { status: 403 });
+  if (!agent) return moltErrorResponse(MOLT_NOT_FOUND, 'Agent not found', { phone_number: phoneNumber });
+  if (!agent.dialEnabled) return moltErrorResponse(MOLT_POLICY_DENIED, 'Agent dialling disabled');
 
   const callerNumber = req.headers.get('x-molt-caller');
 
@@ -66,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   if (callerNumber) {
     const callerAgent = await prisma.agent.findFirst({ where: { phoneNumber: callerNumber, isActive: true } });
     if (callerAgent && await isCallerBlocked(agent.ownerId, callerAgent.id)) {
-      return NextResponse.json({ error: 'Blocked' }, { status: 403 });
+      return moltErrorResponse(MOLT_POLICY_DENIED, 'Blocked');
     }
   }
 
@@ -81,13 +87,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     nonce: req.headers.get('x-molt-nonce'),
     signature: req.headers.get('x-molt-signature'),
   });
-  if (!policy.ok) return NextResponse.json({ error: policy.error }, { status: policy.status });
+  if (!policy.ok) return moltErrorResponse(policy.code!, policy.error);
 
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(JSON.parse(rawBody));
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    return moltErrorResponse(MOLT_BAD_REQUEST, 'Invalid request body');
   }
 
   const meta = (parsed.metadata || {}) as Record<string, unknown>;

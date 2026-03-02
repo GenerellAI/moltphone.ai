@@ -8,6 +8,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifySignature } from '@/lib/ed25519';
+import { moltErrorResponse } from '@/lib/errors';
+import {
+  MOLT_AUTH_REQUIRED,
+  MOLT_POLICY_DENIED,
+  MOLT_NOT_FOUND,
+  MOLT_CONFLICT,
+} from '@/core/moltprotocol/src/errors';
 import { TaskStatus } from '@prisma/client';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string; taskId: string }> }) {
@@ -16,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+  if (!agent) return moltErrorResponse(MOLT_NOT_FOUND, 'Agent not found', { phone_number: phoneNumber });
 
   const callerHeader = req.headers.get('x-molt-caller');
   const timestamp = req.headers.get('x-molt-timestamp');
@@ -24,17 +31,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const signature = req.headers.get('x-molt-signature');
 
   if (!callerHeader || !timestamp || !nonce || !signature) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    return moltErrorResponse(MOLT_AUTH_REQUIRED, 'Authentication required');
   }
 
   // Caller may be the callee (cancelling their own task) or the original caller.
   // Resolve the authenticating agent's public key.
   const authAgent = await prisma.agent.findFirst({ where: { phoneNumber: callerHeader, isActive: true } });
-  if (!authAgent?.publicKey) return NextResponse.json({ error: 'Caller has no public key' }, { status: 403 });
+  if (!authAgent?.publicKey) return moltErrorResponse(MOLT_AUTH_REQUIRED, 'Caller has no public key');
 
   const nonceKey = `${callerHeader}:${nonce}`;
   const nonceUsed = await prisma.nonceUsed.findUnique({ where: { nonce: nonceKey } });
-  if (nonceUsed) return NextResponse.json({ error: 'Nonce replay detected' }, { status: 403 });
+  if (nonceUsed) return moltErrorResponse(MOLT_AUTH_REQUIRED, 'Nonce replay detected');
 
   const result = verifySignature({
     method: 'POST',
@@ -47,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     nonce,
     signature,
   });
-  if (!result.valid) return NextResponse.json({ error: `Signature invalid: ${result.reason}` }, { status: 403 });
+  if (!result.valid) return moltErrorResponse(MOLT_AUTH_REQUIRED, `Signature invalid: ${result.reason}`);
 
   await prisma.nonceUsed.create({ data: { nonce: nonceKey, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
 
@@ -55,12 +62,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     where: { id: taskId },
     include: { caller: true },
   });
-  if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  if (!task) return moltErrorResponse(MOLT_NOT_FOUND, 'Task not found', { task_id: taskId });
   if (task.calleeId !== agent.id && task.caller?.phoneNumber !== callerHeader) {
-    return NextResponse.json({ error: 'Not authorized to cancel this task' }, { status: 403 });
+    return moltErrorResponse(MOLT_POLICY_DENIED, 'Not authorized to cancel this task');
   }
   if (task.status === TaskStatus.completed || task.status === TaskStatus.canceled) {
-    return NextResponse.json({ error: 'Task already closed' }, { status: 409 });
+    return moltErrorResponse(MOLT_CONFLICT, 'Task already closed', { task_id: taskId, status: task.status });
   }
 
   const seqNum = await prisma.taskEvent.count({ where: { taskId } }) + 1;

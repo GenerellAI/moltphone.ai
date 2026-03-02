@@ -11,6 +11,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifySignature } from '@/lib/ed25519';
+import { moltErrorResponse } from '@/lib/errors';
+import {
+  MOLT_AUTH_REQUIRED,
+  MOLT_POLICY_DENIED,
+  MOLT_NOT_FOUND,
+} from '@/core/moltprotocol/src/errors';
 import { TaskStatus } from '@prisma/client';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
@@ -18,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+  if (!agent) return moltErrorResponse(MOLT_NOT_FOUND, 'Agent not found', { phone_number: phoneNumber });
 
   // The agent authenticates using its own Ed25519 key.
   // The caller header must match this agent's phone number.
@@ -28,16 +34,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   const signature = req.headers.get('x-molt-signature');
 
   if (!agent.publicKey || !callerHeader || !timestamp || !nonce || !signature) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    return moltErrorResponse(MOLT_AUTH_REQUIRED, 'Authentication required');
   }
 
   if (callerHeader !== phoneNumber) {
-    return NextResponse.json({ error: 'Caller header must match this agent\'s phone number' }, { status: 403 });
+    return moltErrorResponse(MOLT_POLICY_DENIED, 'Caller header must match this agent\'s phone number');
   }
 
   const nonceKey = `${callerHeader}:${nonce}`;
   const nonceUsed = await prisma.nonceUsed.findUnique({ where: { nonce: nonceKey } });
-  if (nonceUsed) return NextResponse.json({ error: 'Nonce replay detected' }, { status: 403 });
+  if (nonceUsed) return moltErrorResponse(MOLT_AUTH_REQUIRED, 'Nonce replay detected');
 
   const result = verifySignature({
     method: 'GET',
@@ -50,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
     nonce,
     signature,
   });
-  if (!result.valid) return NextResponse.json({ error: `Signature invalid: ${result.reason}` }, { status: 403 });
+  if (!result.valid) return moltErrorResponse(MOLT_AUTH_REQUIRED, `Signature invalid: ${result.reason}`);
 
   await prisma.nonceUsed.create({ data: { nonce: nonceKey, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
 

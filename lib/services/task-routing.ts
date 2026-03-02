@@ -9,6 +9,10 @@ import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { verifySignature } from '@/lib/ed25519';
 import { MAX_FORWARDING_HOPS } from '@/core/moltprotocol/src/types';
+import {
+  MOLT_AUTH_REQUIRED,
+  MOLT_POLICY_DENIED,
+} from '@/core/moltprotocol/src/errors';
 import type { Agent } from '@prisma/client';
 
 // ── Forward resolution ───────────────────────────────────
@@ -58,7 +62,8 @@ export interface PolicyCheckParams {
 
 export interface PolicyCheckResult {
   ok: boolean;
-  status?: number;
+  /** MoltProtocol error code (MOLT_* constant). */
+  code?: number;
   error?: string;
 }
 
@@ -66,22 +71,22 @@ export async function enforcePolicyAndAuth(params: PolicyCheckParams): Promise<P
   const { agent, callerNumber, rawBody, method, path, timestamp, nonce, signature } = params;
 
   if (agent.inboundPolicy !== 'public') {
-    if (!callerNumber) return { ok: false, status: 403, error: 'Caller number required' };
+    if (!callerNumber) return { ok: false, code: MOLT_POLICY_DENIED, error: 'Caller number required' };
 
     const callerAgent = await prisma.agent.findFirst({
       where: { phoneNumber: callerNumber, isActive: true },
     });
-    if (!callerAgent) return { ok: false, status: 403, error: 'Caller not found' };
+    if (!callerAgent) return { ok: false, code: MOLT_POLICY_DENIED, error: 'Caller not found' };
 
     // Verify Ed25519 signature
-    if (!callerAgent.publicKey) return { ok: false, status: 403, error: 'Caller has no public key' };
+    if (!callerAgent.publicKey) return { ok: false, code: MOLT_AUTH_REQUIRED, error: 'Caller has no public key' };
     if (!timestamp || !nonce || !signature) {
-      return { ok: false, status: 403, error: 'Missing signature headers (x-molt-timestamp, x-molt-nonce, x-molt-signature)' };
+      return { ok: false, code: MOLT_AUTH_REQUIRED, error: 'Missing signature headers (x-molt-timestamp, x-molt-nonce, x-molt-signature)' };
     }
 
     const nonceKey = `${callerNumber}:${nonce}`;
     const nonceUsed = await prisma.nonceUsed.findUnique({ where: { nonce: nonceKey } });
-    if (nonceUsed) return { ok: false, status: 403, error: 'Nonce replay detected' };
+    if (nonceUsed) return { ok: false, code: MOLT_AUTH_REQUIRED, error: 'Nonce replay detected' };
 
     const result = verifySignature({
       method,
@@ -94,7 +99,7 @@ export async function enforcePolicyAndAuth(params: PolicyCheckParams): Promise<P
       nonce,
       signature,
     });
-    if (!result.valid) return { ok: false, status: 403, error: `Signature invalid: ${result.reason}` };
+    if (!result.valid) return { ok: false, code: MOLT_AUTH_REQUIRED, error: `Signature invalid: ${result.reason}` };
 
     await prisma.nonceUsed.create({
       data: { nonce: nonceKey, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
@@ -102,7 +107,7 @@ export async function enforcePolicyAndAuth(params: PolicyCheckParams): Promise<P
 
     if (agent.inboundPolicy === 'allowlist') {
       if (!agent.allowlistAgentIds.includes(callerAgent.id)) {
-        return { ok: false, status: 403, error: 'Caller not in allowlist' };
+        return { ok: false, code: MOLT_POLICY_DENIED, error: 'Caller not in allowlist' };
       }
     }
   }
