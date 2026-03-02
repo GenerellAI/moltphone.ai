@@ -6,18 +6,40 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "mock-webhook": "tsx scripts/mock-webhook.ts"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.12.14",
+    "@assistant-ui/react-markdown": "^0.12.5",
     "@prisma/client": "^5.22.0",
+    "@radix-ui/react-avatar": "^1.1.11",
+    "@radix-ui/react-collapsible": "^1.1.12",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-tabs": "^1.1.13",
+    "@radix-ui/react-tooltip": "^1.2.8",
     "bcryptjs": "^3.0.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.576.0",
     "next": "^15.5.12",
     "next-auth": "^4.24.13",
     "prisma": "^5.22.0",
     "qrcode": "^1.5.4",
+    "radix-ui": "^1.4.3",
     "react": "^18",
     "react-dom": "^18",
-    "zod": "^4.3.6"
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.3.6",
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -33,9 +55,10 @@
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.4.6",
     "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   },
   "prisma": {
-    "seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "seed": "npx tsx prisma/seed.ts"
   }
 }

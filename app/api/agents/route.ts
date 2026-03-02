@@ -6,6 +6,7 @@ import { InboundPolicy } from '@prisma/client';
 import { generatePhoneNumber } from '@/lib/phone-number';
 import { generateKeyPair } from '@/lib/ed25519';
 import { validateWebhookUrl } from '@/lib/ssrf';
+import { requireHttps } from '@/lib/require-https';
 import { issueRegistrationCertificate } from '@/lib/carrier-identity';
 import { z } from 'zod';
 
@@ -51,12 +52,20 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  // Private key is returned in the response — require encrypted transport
+  const httpsCheck = requireHttps(req);
+  if (httpsCheck) return httpsCheck;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
   try {
     const body = await req.json();
     const data = createSchema.parse(body);
+
+    // Verify the session user still exists (e.g. after a re-seed)
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user) return NextResponse.json({ error: 'Session expired — please log out and log back in' }, { status: 401 });
     
     const nation = await prisma.nation.findUnique({ where: { code: data.nationCode } });
     if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
@@ -125,7 +134,8 @@ export async function POST(req: NextRequest) {
     }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.issues }, { status: 400 });
-    console.error(e);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    console.error('[POST /api/agents] Internal error:', e);
+    const message = e instanceof Error ? e.message : 'Internal error';
+    return NextResponse.json({ error: `Internal error: ${message}` }, { status: 500 });
   }
 }

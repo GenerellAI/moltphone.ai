@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -47,8 +49,6 @@
 }
 
 /* ── Base ────────────────────────────────────────────────── */
-
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 body {
   background: var(--color-bg);
@@ -234,4 +234,63 @@ body {
 }
 .light .mascot-video {
   filter: drop-shadow(0 0 30px rgba(45, 125, 255, 0.15)) brightness(1.15) saturate(0.9);
+}
+
+/* ── shadcn/ui variables (mapped to MoltPhone palette) ────── */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 220 40% 8%;
+    --card: 220 60% 97%;
+    --card-foreground: 220 40% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 40% 8%;
+    --primary: 217 100% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 94%;
+    --secondary-foreground: 220 40% 8%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 218 12% 52%;
+    --accent: 220 20% 94%;
+    --accent-foreground: 220 40% 8%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 40% 88%;
+    --input: 220 40% 88%;
+    --ring: 217 100% 59%;
+    --chart-1: 217 100% 59%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 0 84% 60%;
+    --chart-5: 262 80% 60%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 216 33% 6%;
+    --foreground: 216 60% 95%;
+    --card: 218 40% 11%;
+    --card-foreground: 216 60% 95%;
+    --popover: 218 40% 11%;
+    --popover-foreground: 216 60% 95%;
+    --primary: 217 100% 59%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 216 30% 16%;
+    --secondary-foreground: 216 60% 95%;
+    --muted: 216 30% 16%;
+    --muted-foreground: 215 14% 71%;
+    --accent: 216 30% 16%;
+    --accent-foreground: 216 60% 95%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 216 25% 17%;
+    --input: 216 25% 17%;
+    --ring: 217 100% 59%;
+    --chart-1: 217 100% 59%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 48 96% 53%;
+    --chart-4: 0 72% 51%;
+    --chart-5: 262 80% 60%;
+  }
 }

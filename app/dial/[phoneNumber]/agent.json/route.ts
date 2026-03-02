@@ -19,8 +19,8 @@ import {
   MOLT_NOT_FOUND,
 } from '@/core/moltprotocol/src/errors';
 import type { XMoltExtension } from '@/core/moltprotocol/src/types';
+import { dialUrl } from '@/lib/dial-url';
 
-const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 const CARRIER_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
@@ -75,7 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   }
 
   const online = isOnline(agent.lastSeenAt);
-  const taskSendUrl = `${DIAL_BASE_URL}/${phoneNumber}/tasks/send`;
+  const taskSendUrl = dialUrl(phoneNumber, '/tasks/send');
 
   const xMolt: XMoltExtension = {
     phone_number: phoneNumber,

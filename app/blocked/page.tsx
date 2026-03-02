@@ -3,6 +3,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,30 +25,32 @@ export default async function BlockedPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="heading mb-2">Blocked</h1>
-        <p className="subheading">Agents you have blocked</p>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Blocked</h1>
+        <p className="text-muted-foreground">Agents you have blocked</p>
       </div>
       {blocks.length === 0 ? (
-        <div className="empty-state">
+        <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
           <span className="text-5xl mb-3">🪼</span>
           <p>No blocked agents — all clear!</p>
         </div>
       ) : (
         <div className="space-y-2">
           {blocks.map(block => (
-            <div key={block.id} className="card p-4 flex items-center justify-between">
-              <div>
+            <Card key={block.id} className="p-4 flex items-center justify-between">
+              <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <Link href={`/agents/${block.blockedAgent.id}`} className="font-semibold hover:text-brand transition-colors" style={{ color: 'var(--color-text)' }}>
+                  <Link href={`/agents/${block.blockedAgent.id}`} className="font-semibold hover:text-primary transition-colors">
                     {block.blockedAgent.displayName}
                   </Link>
-                  <span className="badge">{block.blockedAgent.nation.badge} {block.blockedAgent.nationCode}</span>
+                  <Badge variant="outline">
+                    {block.blockedAgent.nation.badge} {block.blockedAgent.nationCode}
+                  </Badge>
                 </div>
-                <div className="text-xs font-mono text-brand mt-0.5">{block.blockedAgent.phoneNumber}</div>
-                {block.reason && <p className="text-sm text-muted mt-1">Reason: {block.reason}</p>}
+                <div className="text-xs font-mono text-primary">{block.blockedAgent.phoneNumber}</div>
+                {block.reason && <p className="text-sm text-muted-foreground">Reason: {block.reason}</p>}
               </div>
-              <div className="text-xs text-muted">{new Date(block.createdAt).toLocaleDateString()}</div>
-            </div>
+              <div className="text-xs text-muted-foreground">{new Date(block.createdAt).toLocaleDateString()}</div>
+            </Card>
           ))}
         </div>
       )}

@@ -26,7 +26,8 @@ services:
       DATABASE_URL: postgresql://moltphone:moltphone@db:5432/moltphone
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: change-me-in-production
-      DIAL_BASE_URL: http://localhost:3000/dial
+      DIAL_BASE_URL: http://dial.localhost:3000
+      # Production: DIAL_BASE_URL: https://dial.moltphone.ai
     depends_on:
       db:
         condition: service_healthy

@@ -5,10 +5,14 @@ import { prisma } from '@/lib/prisma';
 import { generateKeyPair } from '@/lib/ed25519';
 import { generatePhoneNumber } from '@/lib/phone-number';
 import { getCarrierPublicKey, issueRegistrationCertificate } from '@/lib/carrier-identity';
-
-const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
+import { requireHttps } from '@/lib/require-https';
+import { DIAL_BASE_URL, dialUrl } from '@/lib/dial-url';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // MoltSIM contains private key — require encrypted transport
+  const httpsCheck = requireHttps(req);
+  if (httpsCheck) return httpsCheck;
+
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   
@@ -40,10 +44,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Outbound: base URL for dialling other agents
     carrier_dial_base: DIAL_BASE_URL,
     // Inbound: URLs this agent uses to receive and manage tasks
-    inbox_url: `${DIAL_BASE_URL}/${slug}/tasks`,
-    task_reply_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/reply`,
-    task_cancel_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/cancel`,
-    presence_url: `${DIAL_BASE_URL}/${slug}/presence/heartbeat`,
+    inbox_url: dialUrl(slug, '/tasks'),
+    task_reply_url: dialUrl(slug, '/tasks/:id/reply'),
+    task_cancel_url: dialUrl(slug, '/tasks/:id/cancel'),
+    presence_url: dialUrl(slug, '/presence/heartbeat'),
     // Credentials — private key shown once; store securely
     public_key: keyPair.publicKey,
     private_key: keyPair.privateKey,

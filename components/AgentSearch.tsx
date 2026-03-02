@@ -1,6 +1,10 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Search, Wifi, WifiOff, BellOff } from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -37,40 +41,49 @@ export default function AgentSearch({ initialAgents }: { initialAgents: Agent[] 
 
   return (
     <div>
-      <input
-        type="search"
-        placeholder="Search agents by name or phone number..."
-        value={query}
-        onChange={e => search(e.target.value)}
-        className="input mb-6"
-      />
-      {loading && <p className="text-muted text-sm mb-4">Searching...</p>}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder="Search agents by name or phone number..."
+          value={query}
+          onChange={e => search(e.target.value)}
+          className="pl-10 h-11"
+        />
+      </div>
+      {loading && <p className="text-muted-foreground text-sm mb-4">Searching...</p>}
       <div className="grid gap-3">
         {agents.map(agent => {
           const online = isOnlineClient(agent.lastSeenAt);
           return (
-            <Link key={agent.id} href={`/agents/${agent.id}`} className="block card-hover p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold" style={{ color: 'var(--color-text)' }}>{agent.displayName}</span>
-                    {agent.dndEnabled && <span className="badge-warning">DND</span>}
-                    <span className={online ? 'badge-success' : 'badge'}>
-                      {online ? '● Online' : '○ Offline'}
-                    </span>
+            <Link key={agent.id} href={`/agents/${agent.id}`}>
+              <Card className="p-4 hover:border-primary transition-colors cursor-pointer">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">{agent.displayName}</span>
+                      {agent.dndEnabled && (
+                        <Badge variant="secondary" className="text-xs bg-yellow-600/20 text-yellow-500">
+                          <BellOff className="h-3 w-3 mr-0.5" /> DND
+                        </Badge>
+                      )}
+                      <Badge variant={online ? 'default' : 'secondary'} className={`text-xs ${online ? 'bg-green-600' : ''}`}>
+                        {online ? <><Wifi className="h-3 w-3 mr-1" /> Online</> : <><WifiOff className="h-3 w-3 mr-1" /> Offline</>}
+                      </Badge>
+                    </div>
+                    <div className="text-xs font-mono text-primary">{agent.phoneNumber}</div>
+                    {agent.description && <p className="text-sm text-muted-foreground line-clamp-2">{agent.description}</p>}
                   </div>
-                  <div className="text-xs font-mono mb-1 text-brand">{agent.phoneNumber}</div>
-                  {agent.description && <p className="text-sm text-muted line-clamp-2">{agent.description}</p>}
+                  <Badge variant="outline">
+                    {agent.nation.badge} {agent.nation.code}
+                  </Badge>
                 </div>
-                <div className="text-right ml-4 flex-shrink-0">
-                  <span className="badge">{agent.nation.badge} {agent.nation.code}</span>
-                </div>
-              </div>
+              </Card>
             </Link>
           );
         })}
         {agents.length === 0 && !loading && (
-          <div className="empty-state">
+          <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
             <span className="text-5xl mb-3">🪼</span>
             <p>No agents found</p>
           </div>

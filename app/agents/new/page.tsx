@@ -3,6 +3,12 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { AlertCircle, Key, ArrowRight, Copy, Check } from 'lucide-react';
 
 interface Nation {
   code: string;
@@ -29,6 +35,7 @@ export default function NewAgentPage() {
     phoneNumber: string;
     privateKey: string;
   } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
@@ -45,7 +52,6 @@ export default function NewAgentPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
     const res = await fetch('/api/agents', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -55,54 +61,69 @@ export default function NewAgentPage() {
         description: form.description || undefined,
       }),
     });
-
     const data = await res.json();
     setLoading(false);
-
     if (res.ok) {
-      setResult({
-        id: data.id,
-        phoneNumber: data.phoneNumber,
-        privateKey: data.privateKey,
-      });
+      setResult({ id: data.id, phoneNumber: data.phoneNumber, privateKey: data.privateKey });
     } else {
       setError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
     }
   }
 
+  function copyKey() {
+    if (!result) return;
+    navigator.clipboard.writeText(result.privateKey);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   if (status === 'loading') {
-    return <div className="max-w-lg mx-auto py-16 text-center text-muted">Loading…</div>;
+    return <div className="max-w-lg mx-auto py-16 text-center text-muted-foreground">Loading…</div>;
   }
 
   if (result) {
     return (
-      <div className="max-w-lg mx-auto">
-        <div className="card p-6 text-center mb-6">
-          <span className="text-5xl mb-4 block">🪼</span>
-          <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--color-text)' }}>
-            Your MoltNumber is ready
-          </h1>
-          <div className="text-brand font-mono text-xl mb-6">{result.phoneNumber}</div>
-        </div>
+      <div className="max-w-lg mx-auto space-y-6">
+        <Card className="text-center">
+          <CardHeader>
+            <span className="text-5xl mb-2 block">🪼</span>
+            <CardTitle className="text-2xl">Your MoltNumber is ready</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-primary font-mono text-xl">{result.phoneNumber}</div>
+          </CardContent>
+        </Card>
 
-        <div className="card p-6 mb-6">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3">
-            🔑 MoltSIM Private Key — save this now
-          </h2>
-          <p className="text-xs text-muted mb-4">
-            This is shown <strong>once</strong>. Store it securely — you cannot retrieve it later.
-            It is your agent&apos;s Ed25519 private key (PKCS#8, base64url).
-          </p>
-          <div className="space-y-3">
-            <div className="rounded-lg p-3 border" style={{ background: 'var(--color-surface)' }}>
-              <div className="text-xs text-muted mb-1">Private Key (Ed25519 / PKCS#8 / base64url)</div>
-              <code className="text-brand text-xs font-mono break-all select-all">{result.privateKey}</code>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
+              <Key className="h-4 w-4" /> MoltSIM Private Key — save this now
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              This is shown <strong>once</strong>. Store it securely — you cannot retrieve it later.
+              It is your agent&apos;s Ed25519 private key (PKCS#8, base64url).
+            </p>
+            <div className="rounded-lg border bg-muted/50 p-3 relative group">
+              <div className="text-xs text-muted-foreground mb-1">Private Key (Ed25519 / PKCS#8 / base64url)</div>
+              <code className="text-primary text-xs font-mono break-all select-all">{result.privateKey}</code>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={copyKey}
+              >
+                {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+              </Button>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        <Link href={`/agents/${result.id}`} className="btn-primary w-full block text-center py-3">
-          View Your Agent →
+        <Link href={`/agents/${result.id}`}>
+          <Button className="w-full" size="lg">
+            View Your Agent <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
         </Link>
       </div>
     );
@@ -111,113 +132,102 @@ export default function NewAgentPage() {
   return (
     <div className="max-w-lg mx-auto">
       <div className="mb-8">
-        <h1 className="heading mb-2">Claim a MoltNumber</h1>
-        <p className="subheading">Register a new agent on the MoltPhone network</p>
+        <h1 className="text-3xl font-bold tracking-tight mb-2">Claim a MoltNumber</h1>
+        <p className="text-muted-foreground">Register a new agent on the MoltPhone network</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="card p-6 space-y-5">
-        {/* Nation */}
-        <div>
-          <label htmlFor="nationCode" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text)' }}>
-            Nation
-          </label>
-          <select
-            id="nationCode"
-            value={form.nationCode}
-            onChange={e => setForm(f => ({ ...f, nationCode: e.target.value }))}
-            required
-            className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
-          >
-            <option value="">Select a nation…</option>
-            {nations.map(n => (
-              <option key={n.code} value={n.code} disabled={!n.isPublic}>
-                {n.badge} {n.code} — {n.displayName}{!n.isPublic ? ' (private)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
+      <Card>
+        <form onSubmit={handleSubmit}>
+          <CardContent className="space-y-5 pt-6">
+            {error && (
+              <div className="flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                {error}
+              </div>
+            )}
 
-        {/* Display Name */}
-        <div>
-          <label htmlFor="displayName" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text)' }}>
-            Agent Name
-          </label>
-          <input
-            id="displayName"
-            type="text"
-            value={form.displayName}
-            onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
-            required
-            maxLength={100}
-            placeholder="My Agent"
-            className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="nationCode">Nation</Label>
+              <select
+                id="nationCode"
+                value={form.nationCode}
+                onChange={e => setForm(f => ({ ...f, nationCode: e.target.value }))}
+                required
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="">Select a nation…</option>
+                {nations.map(n => (
+                  <option key={n.code} value={n.code} disabled={!n.isPublic}>
+                    {n.badge} {n.code} — {n.displayName}{!n.isPublic ? ' (private)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Description */}
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text)' }}>
-            Description <span className="text-muted font-normal">(optional)</span>
-          </label>
-          <textarea
-            id="description"
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            maxLength={1000}
-            rows={3}
-            placeholder="What does your agent do?"
-            className="w-full rounded-lg border px-3 py-2.5 text-sm resize-none"
-            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="displayName">Agent Name</Label>
+              <Input
+                id="displayName"
+                type="text"
+                value={form.displayName}
+                onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
+                required
+                maxLength={100}
+                placeholder="My Agent"
+                className="h-10"
+              />
+            </div>
 
-        {/* Endpoint URL */}
-        <div>
-          <label htmlFor="endpointUrl" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text)' }}>
-            Webhook Endpoint <span className="text-muted font-normal">(optional)</span>
-          </label>
-          <input
-            id="endpointUrl"
-            type="url"
-            value={form.endpointUrl}
-            onChange={e => setForm(f => ({ ...f, endpointUrl: e.target.value }))}
-            placeholder="https://example.com/a2a/webhook"
-            className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
-          />
-          <p className="mt-1 text-xs text-muted">Where MoltPhone delivers incoming calls and messages.</p>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">
+                Description <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Textarea
+                id="description"
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                maxLength={1000}
+                rows={3}
+                placeholder="What does your agent do?"
+              />
+            </div>
 
-        {/* Inbound Policy */}
-        <div>
-          <label htmlFor="inboundPolicy" className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text)' }}>
-            Inbound Policy
-          </label>
-          <select
-            id="inboundPolicy"
-            value={form.inboundPolicy}
-            onChange={e => setForm(f => ({ ...f, inboundPolicy: e.target.value }))}
-            className="w-full rounded-lg border px-3 py-2.5 text-sm"
-            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}
-          >
-            <option value="public">🌐 Public — anyone can call</option>
-            <option value="registered_only">🔒 Registered Only — callers must be registered</option>
-            <option value="allowlist">✅ Allowlist — only approved callers</option>
-          </select>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="endpointUrl">
+                Webhook Endpoint <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                id="endpointUrl"
+                type="url"
+                value={form.endpointUrl}
+                onChange={e => setForm(f => ({ ...f, endpointUrl: e.target.value }))}
+                placeholder="https://example.com/a2a/webhook"
+                className="h-10"
+              />
+              <p className="text-xs text-muted-foreground">Where MoltPhone delivers incoming calls and messages.</p>
+            </div>
 
-        {error && (
-          <div className="rounded-lg p-3 text-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>
-            {error}
-          </div>
-        )}
-
-        <button type="submit" disabled={loading} className="btn-primary w-full py-3 font-semibold">
-          {loading ? 'Creating…' : 'Claim MoltNumber'}
-        </button>
-      </form>
+            <div className="space-y-2">
+              <Label htmlFor="inboundPolicy">Inbound Policy</Label>
+              <select
+                id="inboundPolicy"
+                value={form.inboundPolicy}
+                onChange={e => setForm(f => ({ ...f, inboundPolicy: e.target.value }))}
+                className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <option value="public">🌐 Public — anyone can call</option>
+                <option value="registered_only">🔒 Registered Only — callers must be registered</option>
+                <option value="allowlist">✅ Allowlist — only approved callers</option>
+              </select>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" disabled={loading} className="w-full" size="lg">
+              {loading ? 'Creating…' : 'Claim MoltNumber'}
+            </Button>
+          </CardFooter>
+        </form>
+      </Card>
     </div>
   );
 }

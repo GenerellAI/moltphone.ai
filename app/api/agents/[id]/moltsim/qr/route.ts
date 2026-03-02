@@ -4,8 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { getCarrierPublicKey } from '@/lib/carrier-identity';
 import QRCode from 'qrcode';
-
-const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
+import { DIAL_BASE_URL, dialUrl } from '@/lib/dial-url';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -24,10 +23,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     agent_id: agent.id,
     phone_number: agent.phoneNumber,
     carrier_dial_base: DIAL_BASE_URL,
-    inbox_url: `${DIAL_BASE_URL}/${slug}/tasks`,
-    task_reply_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/reply`,
-    task_cancel_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/cancel`,
-    presence_url: `${DIAL_BASE_URL}/${slug}/presence/heartbeat`,
+    inbox_url: dialUrl(slug, '/tasks'),
+    task_reply_url: dialUrl(slug, '/tasks/:id/reply'),
+    task_cancel_url: dialUrl(slug, '/tasks/:id/cancel'),
+    presence_url: dialUrl(slug, '/presence/heartbeat'),
     public_key: agent.publicKey,
     // Carrier identity — for verifying X-Molt-Identity on inbound deliveries (MoltUA Level 1)
     carrier_public_key: getCarrierPublicKey(),

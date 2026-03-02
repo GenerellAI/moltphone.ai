@@ -1,6 +1,8 @@
 import { URL } from 'url';
 import dns from 'dns/promises';
 
+const IS_DEV = process.env.NODE_ENV !== 'production';
+
 const BLOCKED_PATTERNS = [
   /^127\./,
   /^10\./,
@@ -24,6 +26,11 @@ export async function validateWebhookUrl(rawUrl: string): Promise<{ ok: boolean;
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     return { ok: false, reason: 'Only http/https allowed' };
+  }
+
+  // In development, allow localhost / private IPs for local testing
+  if (IS_DEV) {
+    return { ok: true };
   }
 
   const hostname = parsed.hostname;

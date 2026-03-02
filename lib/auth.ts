@@ -3,6 +3,8 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { prisma } from './prisma';
 import bcrypt from 'bcryptjs';
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
@@ -38,7 +40,22 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/login',
   },
-  secret: process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'production'
+  // In production: Secure cookies (HTTPS-only), strict SameSite, HttpOnly
+  // Prevents session hijacking on public WiFi / MitM
+  ...(IS_PROD ? {
+    cookies: {
+      sessionToken: {
+        name: '__Secure-next-auth.session-token',
+        options: {
+          httpOnly: true,
+          sameSite: 'lax' as const,
+          path: '/',
+          secure: true,
+        },
+      },
+    },
+  } : {}),
+  secret: process.env.NEXTAUTH_SECRET || (IS_PROD
     ? (() => { throw new Error('NEXTAUTH_SECRET must be set in production'); })()
     : 'dev-secret-change-me'),
 };
