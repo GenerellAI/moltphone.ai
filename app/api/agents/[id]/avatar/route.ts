@@ -5,7 +5,7 @@
  * Accepts multipart/form-data with a "file" field.
  * Stores the image to /public/avatars/<agentId>.<ext> and updates avatarUrl.
  *
- * Max 2 MB, supports JPEG, PNG, WebP, GIF.
+ * Max 256 KB, supports JPEG, PNG, WebP, GIF.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,7 +15,7 @@ import { prisma } from '@/lib/prisma';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 
-const MAX_SIZE = 2 * 1024 * 1024; // 2 MB
+const MAX_SIZE = 256 * 1024; // 256 KB
 const ALLOWED_TYPES: Record<string, string> = {
   'image/jpeg': '.jpg',
   'image/png': '.png',
@@ -43,7 +43,7 @@ export async function POST(
   }
 
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: 'File too large (max 2 MB)' }, { status: 400 });
+    return NextResponse.json({ error: 'File too large (max 256 KB)' }, { status: 400 });
   }
 
   const ext = ALLOWED_TYPES[file.type];

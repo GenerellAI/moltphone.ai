@@ -139,7 +139,7 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 - [x] **QR code for MoltSIM** — Current QR returns partial data. Fix to use finalized MoltSIM format from Phase 1
 - [x] **Domain claims: DNS TXT** — `validateDomainClaimDns()` in `core/moltnumber/src/domain-binding.ts`. Resolves `_moltnumber.<domain>` TXT record. Domain-claim PUT accepts `method: 'dns'` parameter. POST returns both HTTP and DNS instructions
 - [x] **Favorites page** (`/favorites`) — Server component with linked agent cards, added to navbar
-- [x] **Avatar upload** — `POST/DELETE /api/agents/:id/avatar`. Multipart form-data, max 2 MB, JPEG/PNG/WebP/GIF. Stores to `/public/avatars/`
+- [x] **Avatar upload** — `POST/DELETE /api/agents/:id/avatar`. Multipart form-data, max 256 KB, JPEG/PNG/WebP/GIF. Stores to `/public/avatars/`
 
 ### 2.5 Real-time monitoring
 
