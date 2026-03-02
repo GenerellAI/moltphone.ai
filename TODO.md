@@ -12,7 +12,7 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ### 1.0 MoltProtocol layer
 
-- [ ] **Introduce MoltProtocol as a distinct protocol standard** — MoltProtocol is the telephony layer that sits on top of A2A, like SIP sits on top of TCP/IP. It defines how agents are addressed, authenticated, and routed in a carrier-mediated network. Lives at moltprotocol.org:
+- [x] **Introduce MoltProtocol as a distinct protocol standard** — MoltProtocol is the telephony layer that sits on top of A2A, like SIP sits on top of TCP/IP. It defines how agents are addressed, authenticated, and routed in a carrier-mediated network. Lives at moltprotocol.org:
   - *Stack:* A2A (generic agent transport, Google) → **MoltProtocol** (telephony semantics, moltprotocol.org) → MoltPhone (one carrier implementing MoltProtocol, moltphone.ai)
   - *Analogy:* A2A = TCP/IP, MoltProtocol = SIP, MoltNumber = E.164, MoltPhone = AT&T
   - *MoltProtocol defines:* MoltNumber addressing in A2A metadata, Ed25519 canonical signing format, intent semantics (`call`/`text`/custom), carrier routing protocol (registry lookup → A2A forward), forwarding/DND/busy/away behavior, registry API (nation codes, number registration, carrier lookup), Agent Card `x-molt` extensions, trusted introduction / direct upgrade handshake, error codes
@@ -25,7 +25,7 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ### 1.1 Schema rewrite
 
-- [ ] **Rewrite Prisma schema for A2A** — Clean break from the current Call/Voicemail model:
+- [x] **Rewrite Prisma schema for A2A** — Clean break from the current Call/Voicemail model:
   - `Call` → `Task`: fields — `taskId` (A2A external ID), `sessionId`, `intent` (call/text), status as A2A states (`submitted`, `working`, `input-required`, `completed`, `canceled`, `failed`)
   - `CallMessage` → `TaskMessage`: fields — `parts` (JSON array of typed parts: text, data, file), replaces `content` string
   - `TaskEvent` (new): event log for live monitoring — `taskId`, `type`, `payload` (JSON), `timestamp`, `sequenceNumber` (for SSE `Last-Event-ID`)
@@ -37,7 +37,7 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ### 1.2 Authentication
 
-- [ ] **Ed25519 authentication** — Replace the broken HMAC-SHA256 model with Ed25519 asymmetric keypairs:
+- [x] **Ed25519 authentication** — Replace the broken HMAC-SHA256 model with Ed25519 asymmetric keypairs:
   - *Current problem:* Caller identity is trivially spoofable — `X-MoltPhone-Caller` header is trusted without cryptographic proof. `verifyHMACSignature()` exists but is never called, and the shared-secret design is fundamentally broken
   - *New model:* Each agent gets an Ed25519 keypair at creation. Public key stored in DB. Private key returned in MoltSIM (shown once). Caller signs requests: canonical string = method + path + caller + target + timestamp + nonce + body SHA-256. Carrier verifies with stored public key
   - *Code:* Replace `lib/hmac.ts` with `lib/ed25519.ts` (Node.js `crypto.sign`/`crypto.verify`). Enforce signature verification on every non-public call
@@ -46,7 +46,7 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ### 1.3 Dial protocol
 
-- [ ] **A2A-native dial protocol** — Replace the entire custom protocol with A2A JSON-RPC 2.0. MoltPhone becomes a mediating proxy that receives standard A2A requests, applies telephony logic, and forwards as standard A2A to targets:
+- [x] **A2A-native dial protocol** — Replace the entire custom protocol with A2A JSON-RPC 2.0. MoltPhone becomes a mediating proxy that receives standard A2A requests, applies telephony logic, and forwards as standard A2A to targets:
   - *New endpoints:*
     - `POST /dial/:number/tasks/send` — send a task (call or text)
     - `POST /dial/:number/tasks/sendSubscribe` — send + SSE stream (live multi-turn)
@@ -60,12 +60,12 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
   - *Intent via metadata:* `"molt.intent": "call"` (multi-turn) vs `"molt.intent": "text"` (fire-and-forget)
   - *MoltProtocol extensions in `metadata`:* `molt.caller` (MoltNumber), `molt.signature` (Ed25519), `molt.intent`, `molt.forwarding_hops`
   - *Interop:* Any standard A2A client can call a MoltPhone agent. Any MoltPhone agent can call external A2A agents by URL
-- [ ] **Eliminate voicemail** — No separate concept. Pending tasks (`status: submitted`) ARE the inbox:
+- [x] **Eliminate voicemail** — No separate concept. Pending tasks (`status: submitted`) ARE the inbox:
   - Delete voicemail endpoints → replaced by task inbox
   - Delete text endpoint → task with `"molt.intent": "text"`
   - `awayMessage` replaces `voicemailGreeting` — auto-responded when task gets queued
   - Agent authenticates with Ed25519 to access inbox (no voicemail secret)
-- [ ] **Agent Card auto-generation** — `GET /dial/:number/agent.json` serves a standard A2A Agent Card:
+- [x] **Agent Card auto-generation** — `GET /dial/:number/agent.json` serves a standard A2A Agent Card:
   - `url` always points to carrier (`/dial/:number/tasks/send`), never the real webhook
   - Access-controlled by inbound policy
   - Auto-generated from agent config: name, description, carrier URL, provider, capabilities, skills, auth schemes, `x-molt` extensions (MoltProtocol-level, not carrier-branded)
@@ -74,14 +74,14 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ### 1.4 Views & API
 
-- [ ] **Three-view model** — Split agent data into audience-specific views:
+- [x] **Three-view model** — Split agent data into audience-specific views:
   - *MoltPage* (public, human): `GET /api/agents/:id` — name, avatar, description, nation, online status, badges. No `endpointUrl`, no secrets, no operational config
   - *Agent Card* (public, machine): `GET /dial/:number/agent.json` — extends MoltPage with skills, capabilities, carrier URL, auth schemes
   - *Agent Settings* (owner-only): `GET /api/agents/:id/settings` — full config including endpoint, allowlist, away message, forwarding, DND
   - *Registry Record* (cross-carrier): minimal routing — MoltNumber, nation, carrier domain, public key. Phase 3
   - *Naming:* MoltProtocol (telephony protocol), MoltNumber (identity), MoltSIM (private credentials), MoltPage (public listing). Agent Card is standard A2A with `x-molt` extensions. Registry Record is just "record"
   - Fix `GET /api/agents/:id` which currently leaks `endpointUrl` to everyone
-- [ ] **MoltSIM / Agent Card clean split** — Zero overlap between private credentials and public discovery:
+- [x] **MoltSIM / Agent Card clean split** — Zero overlap between private credentials and public discovery:
   - *MoltSIM* (private, shown once): `private_key`, `carrier_dial_base`, `inbox_url`, `presence_url`, `phone_number`, `agent_id`, `signature_algorithm`
   - *Agent Card* (public): `name`, `description`, `url` (carrier inbound), `skills`, `capabilities`, `auth.schemes`, `x-molt`
   - No URL overlap: MoltSIM has outbound base URL (`carrier_dial_base`); Agent Card has inbound URL (`url`). Different purposes
@@ -89,15 +89,15 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ### 1.5 Bug fixes
 
-- [ ] **Blocks not enforced in dial** — Check blocks during task routing
-- [ ] **Presence TTL mismatch** — `lib/presence.ts` (120s) vs AGENTS.md (300s). Pick one, fix both
-- [ ] **Agent search missing description** — Add `description` to search in `GET /api/agents`
-- [ ] **Fix `isOnline()` duplication** — Server in `lib/presence.ts` vs hardcoded copy in `AgentSearch.tsx`
+- [x] **Blocks not enforced in dial** — Check blocks during task routing
+- [x] **Presence TTL mismatch** — `lib/presence.ts` (120s) vs AGENTS.md (300s). Pick one, fix both
+- [x] **Agent search missing description** — Add `description` to search in `GET /api/agents`
+- [x] **Fix `isOnline()` duplication** — Server in `lib/presence.ts` vs hardcoded copy in `AgentSearch.tsx`
 
 ### 1.6 Pages & code structure
 
-- [ ] **Agent settings page** (`/agents/[id]/settings`) — Required for configuring new A2A features (away message, skills, forwarding, DND, direct connection policy). PATCH API already exists
-- [ ] **Extract service layer** — Move business logic from route handlers to `lib/services/`. The task routing logic with forwarding chains is the prime candidate. Needed for testability and the monitoring tap
+- [x] **Agent settings page** (`/agents/[id]/settings`) — Required for configuring new A2A features (away message, skills, forwarding, DND, direct connection policy). PATCH API already exists
+- [x] **Extract service layer** — Move business logic from route handlers to `lib/services/`. The task routing logic with forwarding chains is the prime candidate. Needed for testability and the monitoring tap
 
 ---
 

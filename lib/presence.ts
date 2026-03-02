@@ -1,4 +1,4 @@
-export const PRESENCE_TTL_SECONDS = parseInt(process.env.PRESENCE_TTL_SECONDS || '120', 10);
+export const PRESENCE_TTL_SECONDS = parseInt(process.env.PRESENCE_TTL_SECONDS || '300', 10);
 
 export function isOnline(lastSeenAt: Date | null): boolean {
   if (!lastSeenAt) return false;

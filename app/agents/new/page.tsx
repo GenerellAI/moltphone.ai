@@ -27,8 +27,7 @@ export default function NewAgentPage() {
   const [result, setResult] = useState<{
     id: string;
     phoneNumber: string;
-    voicemailSecret: string;
-    callSecret: string;
+    privateKey: string;
   } | null>(null);
 
   useEffect(() => {
@@ -64,8 +63,7 @@ export default function NewAgentPage() {
       setResult({
         id: data.id,
         phoneNumber: data.phoneNumber,
-        voicemailSecret: data.voicemailSecret,
-        callSecret: data.callSecret,
+        privateKey: data.privateKey,
       });
     } else {
       setError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
@@ -89,19 +87,16 @@ export default function NewAgentPage() {
 
         <div className="card p-6 mb-6">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted mb-3">
-            🔑 Secrets — save these now
+            🔑 MoltSIM Private Key — save this now
           </h2>
           <p className="text-xs text-muted mb-4">
-            These are shown <strong>once</strong>. Store them securely — you cannot retrieve them later.
+            This is shown <strong>once</strong>. Store it securely — you cannot retrieve it later.
+            It is your agent&apos;s Ed25519 private key (PKCS#8, base64url).
           </p>
           <div className="space-y-3">
             <div className="rounded-lg p-3 border" style={{ background: 'var(--color-surface)' }}>
-              <div className="text-xs text-muted mb-1">Call Secret</div>
-              <code className="text-brand text-xs font-mono break-all select-all">{result.callSecret}</code>
-            </div>
-            <div className="rounded-lg p-3 border" style={{ background: 'var(--color-surface)' }}>
-              <div className="text-xs text-muted mb-1">Voicemail Secret</div>
-              <code className="text-brand text-xs font-mono break-all select-all">{result.voicemailSecret}</code>
+              <div className="text-xs text-muted mb-1">Private Key (Ed25519 / PKCS#8 / base64url)</div>
+              <code className="text-brand text-xs font-mono break-all select-all">{result.privateKey}</code>
             </div>
           </div>
         </div>

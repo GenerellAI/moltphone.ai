@@ -49,6 +49,14 @@ enum ForwardCondition {
   when_dnd
 }
 
+enum DirectConnectionPolicy {
+  direct_on_consent
+  direct_on_accept
+  carrier_only
+}
+
+// ── Agent ────────────────────────────────────────────────
+
 model Agent {
   id                   String        @id @default(cuid())
   phoneNumber          String        @unique
@@ -60,13 +68,17 @@ model Agent {
   displayName          String
   description          String?
   avatarUrl            String?
+  skills               String[]      @default([])
   
   endpointUrl          String?
   dialEnabled          Boolean       @default(true)
   
-  voicemailGreeting    String?       @db.VarChar(500)
-  voicemailSecretHash  String?
-  callSecretHash       String?
+  // Ed25519 public key (SPKI DER, base64url).  Private key lives in the MoltSIM.
+  publicKey            String?
+  
+  awayMessage          String?       @db.VarChar(500)
+  
+  directConnectionPolicy DirectConnectionPolicy @default(direct_on_consent)
   
   lastSeenAt           DateTime?
   
@@ -85,73 +97,71 @@ model Agent {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
   
-  callsAsCallee        Call[]        @relation("CalleeAgent")
-  callsAsCaller        Call[]        @relation("CallerAgent")
+  tasksAsCallee        Task[]        @relation("CalleeAgent")
+  tasksAsCaller        Task[]        @relation("CallerAgent")
   favorites            Favorite[]
   blocksAsTarget       Block[]       @relation("BlockedAgent")
   forwardedFrom        Agent[]       @relation("ForwardedTo")
   forwardTo            Agent?        @relation("ForwardedTo", fields: [forwardToAgentId], references: [id])
-  voicemails           VoicemailMessage[]
   socialVerifications  SocialVerification[]
   domainClaims         DomainClaim[]
 }
 
-enum CallStatus {
-  ringing
-  connected
-  voicemail
-  busy
-  blocked
-  missed
-  failed_forward
-}
+// ── Task (replaces Call) — A2A states ────────────────────
 
-enum CallType {
+enum TaskIntent {
   call
   text
 }
 
-model Call {
-  id              String     @id @default(cuid())
-  callerId        String?
-  caller          Agent?     @relation("CallerAgent", fields: [callerId], references: [id])
-  calleeId        String
-  callee          Agent      @relation("CalleeAgent", fields: [calleeId], references: [id])
-  type            CallType   @default(call)
-  status          CallStatus
-  forwardingHops  String[]   @default([])
-  body            String?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
-  
-  messages        CallMessage[]
-  voicemails      VoicemailMessage[]
+enum TaskStatus {
+  submitted
+  working
+  input_required
+  completed
+  canceled
+  failed
 }
 
-model CallMessage {
+model Task {
+  id             String     @id @default(cuid())
+  taskId         String?    // A2A external task ID (set by caller)
+  sessionId      String?    // A2A session ID for multi-turn
+  callerId       String?
+  caller         Agent?     @relation("CallerAgent", fields: [callerId], references: [id])
+  calleeId       String
+  callee         Agent      @relation("CalleeAgent", fields: [calleeId], references: [id])
+  intent         TaskIntent @default(call)
+  status         TaskStatus @default(submitted)
+  forwardingHops String[]   @default([])
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  messages       TaskMessage[]
+  events         TaskEvent[]
+}
+
+model TaskMessage {
   id        String   @id @default(cuid())
-  callId    String
-  call      Call     @relation(fields: [callId], references: [id])
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id])
   role      String
-  content   String
+  // JSON array of typed parts: TextPart | DataPart | FilePart
+  parts     Json     @default("[]")
   createdAt DateTime @default(now())
 }
 
-model VoicemailMessage {
-  id           String    @id @default(cuid())
-  callId       String?
-  call         Call?     @relation(fields: [callId], references: [id])
-  agentId      String
-  agent        Agent     @relation(fields: [agentId], references: [id])
-  fromNumber   String?
-  body         String
-  greeting     String?
-  isRead       Boolean   @default(false)
-  isAcked      Boolean   @default(false)
-  reply        String?
-  repliedAt    DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+// TaskEvent: event log for live monitoring / SSE reconnect
+model TaskEvent {
+  id             String   @id @default(cuid())
+  taskId         String
+  task           Task     @relation(fields: [taskId], references: [id])
+  type           String
+  payload        Json     @default("{}")
+  sequenceNumber Int
+  timestamp      DateTime @default(now())
+  
+  @@index([taskId, sequenceNumber])
 }
 
 model Favorite {

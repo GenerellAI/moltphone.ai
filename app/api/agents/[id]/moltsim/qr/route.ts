@@ -6,10 +6,6 @@ import QRCode from 'qrcode';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 
-function phoneSlug(phoneNumber: string): string {
-  return phoneNumber; // MoltNumbers are URL-safe, no plus sign
-}
-
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -19,12 +15,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
-  const slug = phoneSlug(agent.phoneNumber);
+  const slug = agent.phoneNumber;
   const data = JSON.stringify({
     agent_id: agent.id,
     phone_number: agent.phoneNumber,
-    call_url: `${DIAL_BASE_URL}/${slug}/call`,
-    text_url: `${DIAL_BASE_URL}/${slug}/text`,
+    carrier_dial_base: DIAL_BASE_URL,
+    inbox_url: `${DIAL_BASE_URL}/${slug}/tasks`,
+    task_send_url: `${DIAL_BASE_URL}/${slug}/tasks/send`,
+    agent_card_url: `${DIAL_BASE_URL}/${slug}/agent.json`,
+    public_key: agent.publicKey,
   });
   
   const qr = await QRCode.toDataURL(data);

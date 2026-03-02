@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { InboundPolicy } from '@prisma/client';
 import { generatePhoneNumber } from '@/lib/phone-number';
-import { generateSecret, hashSecret } from '@/lib/secrets';
+import { generateKeyPair } from '@/lib/ed25519';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { z } from 'zod';
 
@@ -15,7 +15,8 @@ const createSchema = z.object({
   endpointUrl: z.string().url().optional().nullable(),
   dialEnabled: z.boolean().default(true),
   inboundPolicy: z.enum(['public', 'registered_only', 'allowlist']).default('public'),
-  voicemailGreeting: z.string().max(500).optional().nullable(),
+  awayMessage: z.string().max(500).optional().nullable(),
+  skills: z.array(z.string()).default(['call', 'text']),
 });
 
 export async function GET(req: NextRequest) {
@@ -30,6 +31,7 @@ export async function GET(req: NextRequest) {
         OR: [
           { displayName: { contains: q, mode: 'insensitive' } },
           { phoneNumber: { contains: q.toUpperCase() } },
+          { description: { contains: q, mode: 'insensitive' } },
         ]
       } : {}),
       ...(nation ? { nationCode: nation.toUpperCase() } : {}),
@@ -42,7 +44,9 @@ export async function GET(req: NextRequest) {
     take: 50,
   });
   
-  return NextResponse.json(agents);
+  // Strip sensitive fields from list response
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  return NextResponse.json(agents.map(({ endpointUrl: _eu, publicKey: _pk, ...rest }) => rest));
 }
 
 export async function POST(req: NextRequest) {
@@ -73,10 +77,7 @@ export async function POST(req: NextRequest) {
     }
     if (!phoneNumber) return NextResponse.json({ error: 'Failed to generate unique phone number' }, { status: 500 });
     
-    const vmSecret = generateSecret();
-    const callSecret = generateSecret();
-    const vmSecretHash = await hashSecret(vmSecret);
-    const callSecretHash = await hashSecret(callSecret);
+    const keyPair = generateKeyPair();
     
     const agent = await prisma.agent.create({
       data: {
@@ -88,9 +89,9 @@ export async function POST(req: NextRequest) {
         endpointUrl: data.endpointUrl,
         dialEnabled: data.dialEnabled,
         inboundPolicy: data.inboundPolicy as InboundPolicy,
-        voicemailGreeting: data.voicemailGreeting,
-        voicemailSecretHash: vmSecretHash,
-        callSecretHash: callSecretHash,
+        awayMessage: data.awayMessage,
+        publicKey: keyPair.publicKey,
+        skills: data.skills,
       },
       include: {
         nation: { select: { code: true, displayName: true, badge: true } },
@@ -98,7 +99,10 @@ export async function POST(req: NextRequest) {
       },
     });
     
-    return NextResponse.json({ ...agent, voicemailSecret: vmSecret, callSecret }, { status: 201 });
+    // Return MoltPage fields + private key (shown once)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { endpointUrl: _eu, publicKey: _pk, ...moltPage } = agent;
+    return NextResponse.json({ ...moltPage, privateKey: keyPair.privateKey }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.issues }, { status: 400 });
     console.error(e);

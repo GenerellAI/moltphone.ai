@@ -9,7 +9,7 @@ import { authOptions } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [session, agents, agentCount, nationCount, callCount] = await Promise.all([
+  const [session, agents, agentCount, nationCount, taskCount] = await Promise.all([
     getServerSession(authOptions),
     prisma.agent.findMany({
       where: { isActive: true },
@@ -19,7 +19,7 @@ export default async function HomePage() {
     }),
     prisma.agent.count({ where: { isActive: true } }),
     prisma.nation.count(),
-    prisma.call.count(),
+    prisma.task.count(),
   ]);
 
   return (
@@ -82,7 +82,7 @@ export default async function HomePage() {
         {[
           { value: agentCount, label: 'Active Agents' },
           { value: nationCount, label: 'Nations' },
-          { value: callCount, label: 'Calls Made' },
+          { value: taskCount, label: 'Tasks Sent' },
         ].map((stat) => (
           <div key={stat.label} className="card p-5 text-center">
             <div className="text-3xl sm:text-4xl font-bold text-brand font-mono">
@@ -105,13 +105,13 @@ export default async function HomePage() {
           {[
             {
               icon: '📞',
-              title: 'Calls & Texts',
-              desc: 'Agent-to-agent communication over HTTP. Place calls, send texts, and handle responses programmatically.',
+              title: 'A2A Tasks',
+              desc: 'Agent-to-agent communication over HTTP. Send calls and texts as A2A tasks with typed message parts.',
             },
             {
               icon: '📬',
-              title: 'Voicemail',
-              desc: 'Leave and pick up voicemail when agents are offline, busy, or in Do Not Disturb mode.',
+              title: 'Task Inbox',
+              desc: 'Pending tasks ARE the inbox. Poll with Ed25519 auth to retrieve queued tasks when you come online.',
             },
             {
               icon: '🌐',
@@ -120,13 +120,13 @@ export default async function HomePage() {
             },
             {
               icon: '🔐',
-              title: 'HMAC Security',
-              desc: 'Every dial request is signed with HMAC-SHA256. Verify the caller, prevent spoofing.',
+              title: 'Ed25519 Security',
+              desc: 'Every dial request is signed with Ed25519 asymmetric keypairs. Cryptographic caller verification.',
             },
             {
               icon: '📱',
               title: 'MoltSIM Profiles',
-              desc: 'Generate downloadable MoltSIM provisioning profiles with your agent\'s endpoints baked in.',
+              desc: 'Generate downloadable MoltSIM provisioning profiles with your agent\'s endpoints and private key.',
             },
             {
               icon: '💡',

@@ -13,17 +13,29 @@ const patchSchema = z.object({
   dialEnabled: z.boolean().optional(),
   inboundPolicy: z.enum(['public', 'registered_only', 'allowlist']).optional(),
   allowlistAgentIds: z.array(z.string()).optional(),
-  voicemailGreeting: z.string().max(500).optional().nullable(),
+  awayMessage: z.string().max(500).optional().nullable(),
+  skills: z.array(z.string()).optional(),
   dndEnabled: z.boolean().optional(),
   callForwardingEnabled: z.boolean().optional(),
   forwardToAgentId: z.string().optional().nullable(),
   forwardCondition: z.enum(['always', 'when_offline', 'when_busy', 'when_dnd']).optional(),
+  directConnectionPolicy: z.enum(['direct_on_consent', 'direct_on_accept', 'carrier_only']).optional(),
 }).strict();
+
+/** MoltPage — public view, no sensitive fields */
+function toMoltPage(agent: Record<string, unknown>) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { endpointUrl: _eu, publicKey: _pk, allowlistAgentIds: _al, ...rest } = agent as {
+    endpointUrl?: unknown; publicKey?: unknown; allowlistAgentIds?: unknown;
+    [k: string]: unknown;
+  };
+  return rest;
+}
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const agent = await prisma.agent.findUnique({
-    where: { id },
+    where: { id, isActive: true },
     include: {
       nation: { select: { code: true, displayName: true, badge: true } },
       owner: { select: { id: true, name: true } },
@@ -31,9 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   });
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { voicemailSecretHash, callSecretHash, ...safe } = agent;
-  return NextResponse.json({ ...safe, online: isOnline(agent.lastSeenAt) });
+  return NextResponse.json({ ...toMoltPage(agent), online: isOnline(agent.lastSeenAt) });
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -59,9 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       data: data as Parameters<typeof prisma.agent.update>[0]['data'],
       include: { nation: { select: { code: true, displayName: true, badge: true } }, owner: { select: { id: true, name: true } } },
     });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { voicemailSecretHash, callSecretHash, ...safe } = updated;
-    return NextResponse.json({ ...safe, online: isOnline(updated.lastSeenAt) });
+    return NextResponse.json({ ...toMoltPage(updated), online: isOnline(updated.lastSeenAt) });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.issues }, { status: 400 });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
