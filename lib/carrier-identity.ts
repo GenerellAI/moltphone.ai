@@ -24,8 +24,12 @@ import {
   type RegistrationCertificate,
 } from '@/core/moltprotocol/src/certificates';
 import { generateKeyPair } from '@/core/moltprotocol/src/ed25519';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // ── Carrier keypair ──────────────────────────────────────
+
+const DEV_KEYPAIR_FILE = path.join(process.cwd(), '.carrier-keypair.json');
 
 let _carrierPrivateKey: string;
 let _carrierPublicKey: string;
@@ -37,14 +41,33 @@ function ensureCarrierKeys() {
     _carrierPrivateKey = process.env.CARRIER_PRIVATE_KEY;
     _carrierPublicKey = process.env.CARRIER_PUBLIC_KEY;
   } else {
-    // Development: generate ephemeral keypair (not suitable for production)
-    console.warn(
-      '[carrier-identity] CARRIER_PRIVATE_KEY / CARRIER_PUBLIC_KEY not set. ' +
-      'Generating ephemeral keypair (MoltSIM carrier_public_key will change on restart).',
-    );
-    const kp = generateKeyPair();
-    _carrierPrivateKey = kp.privateKey;
-    _carrierPublicKey = kp.publicKey;
+    // Development: persist keypair to disk so it survives server restarts.
+    // Without this, every restart generates a new key and invalidates all
+    // existing MoltSIMs (carrier_public_key no longer matches).
+    try {
+      const saved = JSON.parse(fs.readFileSync(DEV_KEYPAIR_FILE, 'utf-8'));
+      _carrierPrivateKey = saved.privateKey;
+      _carrierPublicKey = saved.publicKey;
+      console.log(
+        '[carrier-identity] Loaded dev carrier keypair from .carrier-keypair.json',
+      );
+    } catch {
+      console.warn(
+        '[carrier-identity] CARRIER_PRIVATE_KEY / CARRIER_PUBLIC_KEY not set. ' +
+        'Generating dev carrier keypair (persisted to .carrier-keypair.json).',
+      );
+      const kp = generateKeyPair();
+      _carrierPrivateKey = kp.privateKey;
+      _carrierPublicKey = kp.publicKey;
+      try {
+        fs.writeFileSync(
+          DEV_KEYPAIR_FILE,
+          JSON.stringify({ privateKey: _carrierPrivateKey, publicKey: _carrierPublicKey }, null, 2) + '\n',
+        );
+      } catch (writeErr) {
+        console.warn('[carrier-identity] Could not persist dev keypair:', writeErr);
+      }
+    }
   }
 }
 

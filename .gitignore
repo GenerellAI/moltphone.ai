@@ -32,6 +32,9 @@ yarn-error.log*
 # MoltSIM profiles (contain private keys)
 moltsim*.json
 
+# Dev carrier keypair (contains private key)
+.carrier-keypair.json
+
 # vercel
 .vercel
 

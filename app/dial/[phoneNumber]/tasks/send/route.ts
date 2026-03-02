@@ -279,8 +279,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
           let responseParts: unknown[];
           try {
             const parsed2 = JSON.parse(responseBody);
-            responseParts = Array.isArray(parsed2?.message?.parts)
-              ? parsed2.message.parts
+            // Support both flat A2A and JSON-RPC wrapped responses:
+            //   flat:     { message: { parts: [...] } }
+            //   json-rpc: { jsonrpc: "2.0", result: { message: { parts: [...] } } }
+            const msgParts =
+              parsed2?.message?.parts ??
+              parsed2?.result?.message?.parts;
+            responseParts = Array.isArray(msgParts)
+              ? msgParts
               : [{ type: 'text', text: responseBody }];
           } catch {
             responseParts = [{ type: 'text', text: responseBody }];

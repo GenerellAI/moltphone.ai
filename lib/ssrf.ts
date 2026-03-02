@@ -17,6 +17,14 @@ const BLOCKED_PATTERNS = [
 ];
 
 export async function validateWebhookUrl(rawUrl: string): Promise<{ ok: boolean; reason?: string }> {
+  // In development, allow any URL (localhost, private IPs, etc.)
+  if (IS_DEV) {
+    try { new URL(rawUrl); } catch {
+      return { ok: false, reason: 'Invalid URL' };
+    }
+    return { ok: true };
+  }
+
   let parsed: URL;
   try {
     parsed = new URL(rawUrl);
@@ -26,11 +34,6 @@ export async function validateWebhookUrl(rawUrl: string): Promise<{ ok: boolean;
 
   if (!['http:', 'https:'].includes(parsed.protocol)) {
     return { ok: false, reason: 'Only http/https allowed' };
-  }
-
-  // In development, allow localhost / private IPs for local testing
-  if (IS_DEV) {
-    return { ok: true };
   }
 
   const hostname = parsed.hostname;
