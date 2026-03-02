@@ -29,6 +29,8 @@ import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked } from '@/lib/services/task-routing';
+import { dialError } from '@/lib/dial-error';
+import { DialErrorCode } from '@/core/moltprotocol/src/types';
 import { Prisma, TaskIntent, TaskStatus } from '@prisma/client';
 import { z } from 'zod';
 
@@ -57,8 +59,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
-  if (!agent.dialEnabled) return NextResponse.json({ error: 'Agent dialling disabled' }, { status: 403 });
+  if (!agent) return dialError(DialErrorCode.NOT_FOUND, 'Number not found');
+  if (!agent.dialEnabled) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'dialling_disabled' });
 
   const callerNumber = req.headers.get('x-molt-caller');
 
@@ -66,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   if (callerNumber) {
     const callerAgent = await prisma.agent.findFirst({ where: { phoneNumber: callerNumber, isActive: true } });
     if (callerAgent && await isCallerBlocked(agent.ownerId, callerAgent.id)) {
-      return NextResponse.json({ error: 'Blocked' }, { status: 403 });
+      return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'blocked' });
     }
   }
 
@@ -81,13 +83,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     nonce: req.headers.get('x-molt-nonce'),
     signature: req.headers.get('x-molt-signature'),
   });
-  if (!policy.ok) return NextResponse.json({ error: policy.error }, { status: policy.status });
+  if (!policy.ok) return dialError(policy.status ?? DialErrorCode.POLICY_DENIED, policy.error ?? 'Policy denied');
 
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(JSON.parse(rawBody));
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    return dialError(DialErrorCode.BAD_REQUEST, 'Bad request', { reason: 'invalid_body' });
   }
 
   const meta = (parsed.metadata || {}) as Record<string, unknown>;
@@ -111,25 +113,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     ? agent
     : (await prisma.agent.findUnique({ where: { id: targetAgentId, isActive: true } }) ?? agent);
 
-  // DND → queue as submitted (pending task / away-message)
-  if (finalAgent.dndEnabled) {
-    const task = await prisma.task.create({
+  // Helper: create and persist a task record
+  const createTask = (reason: string, status: TaskStatus = TaskStatus.submitted) =>
+    prisma.task.create({
       data: {
         taskId: parsed.id,
         sessionId: parsed.sessionId,
         calleeId: finalAgent.id,
         callerId: callerAgentId,
         intent,
-        status: TaskStatus.submitted,
+        status,
         forwardingHops,
         messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
-        events: { create: { type: 'task.created', payload: { reason: 'dnd' }, sequenceNumber: 1 } },
+        events: { create: { type: 'task.created', payload: { reason }, sequenceNumber: 1 } },
       },
     });
-    return NextResponse.json({
-      id: task.id,
-      status: 'submitted',
-      reason: 'dnd',
+
+  // DND → queue as submitted (pending task / away-message)
+  if (finalAgent.dndEnabled) {
+    const task = await createTask('dnd');
+    return dialError(DialErrorCode.DND, 'DND', {
+      task_id: task.id,
       away_message: finalAgent.awayMessage ?? null,
     });
   }
@@ -139,23 +143,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     where: { calleeId: finalAgent.id, status: TaskStatus.working },
   });
   if (activeTasks >= finalAgent.maxConcurrentCalls) {
-    const task = await prisma.task.create({
-      data: {
-        taskId: parsed.id,
-        sessionId: parsed.sessionId,
-        calleeId: finalAgent.id,
-        callerId: callerAgentId,
-        intent,
-        status: TaskStatus.submitted,
-        forwardingHops,
-        messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
-        events: { create: { type: 'task.created', payload: { reason: 'busy' }, sequenceNumber: 1 } },
-      },
-    });
-    return NextResponse.json({
-      id: task.id,
-      status: 'submitted',
-      reason: 'busy',
+    const task = await createTask('busy');
+    return dialError(DialErrorCode.BUSY, 'Busy', {
+      task_id: task.id,
       away_message: finalAgent.awayMessage ?? null,
     });
   }
@@ -168,6 +158,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     if (ssrfCheck.ok) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), RING_TIMEOUT_MS);
+      let webhookErrorType: 'timeout' | 'failed' | null = null;
       try {
         const response = await fetch(finalAgent.endpointUrl, {
           method: 'POST',
@@ -211,39 +202,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
             status: intent === 'text' ? 'completed' : 'working',
             message: { parts: responseParts },
           });
+        } else {
+          webhookErrorType = 'failed';
         }
-      } catch {
+      } catch (e) {
         clearTimeout(timeout);
+        webhookErrorType = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'failed';
       }
+
+      // Webhook failed or timed out — return structured error with queued task
+      const reason = webhookErrorType === 'timeout' ? 'webhook_timeout' : 'webhook_failed';
+      const task = await createTask(reason);
+      const errorCode = webhookErrorType === 'timeout' ? DialErrorCode.WEBHOOK_TIMEOUT : DialErrorCode.WEBHOOK_FAILED;
+      const errorMsg = webhookErrorType === 'timeout' ? 'Webhook timeout' : 'Webhook failed';
+      return dialError(errorCode, errorMsg, { task_id: task.id });
     }
   }
 
-  // Offline or webhook failed → queue
-  const queueStatus: TaskStatus = loopDetected ? TaskStatus.failed : TaskStatus.submitted;
-  const task = await prisma.task.create({
-    data: {
-      taskId: parsed.id,
-      sessionId: parsed.sessionId,
-      calleeId: finalAgent.id,
-      callerId: callerAgentId,
-      intent,
-      status: queueStatus,
-      forwardingHops,
-      messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
-      events: {
-        create: {
-          type: 'task.created',
-          payload: { reason: loopDetected ? 'forwarding_loop' : (online ? 'webhook_failed' : 'offline') },
-          sequenceNumber: 1,
-        },
-      },
-    },
-  });
+  // Forwarding loop → fail
+  if (loopDetected) {
+    const task = await createTask('forwarding_loop', TaskStatus.failed);
+    return dialError(DialErrorCode.FORWARDING_FAILED, 'Forwarding failed', { task_id: task.id });
+  }
 
-  // For text intent always treat as submitted (async delivery)
-  return NextResponse.json({
-    id: task.id,
-    status: queueStatus,
-    away_message: queueStatus === TaskStatus.submitted ? (finalAgent.awayMessage ?? null) : null,
+  // Offline → queue as submitted
+  const task = await createTask('offline');
+  return dialError(DialErrorCode.OFFLINE, 'Offline', {
+    task_id: task.id,
+    away_message: finalAgent.awayMessage ?? null,
   });
 }

@@ -109,3 +109,35 @@ export const MAX_FORWARDING_HOPS = 3;
 
 /** Timestamp tolerance window for signature verification (seconds). */
 export const TIMESTAMP_WINDOW_SECONDS = 300;
+
+// ── Dial error codes (SIP-inspired) ─────────────────────
+
+/**
+ * Structured error codes for the MoltProtocol dial protocol.
+ *
+ * Inspired by SIP response codes.  All dial errors are returned as
+ * JSON-RPC 2.0 error objects: `{ error: { code, message, data? } }`.
+ *
+ * 400 range — caller errors.
+ * 480 range — target unavailable (task accepted + queued).
+ * 500 range — carrier errors.
+ */
+export const DialErrorCode = {
+  // 400 range — caller errors
+  BAD_REQUEST: 400,
+  POLICY_DENIED: 403,
+  NOT_FOUND: 404,
+  DECOMMISSIONED: 410,
+  RATE_LIMITED: 429,
+  // 480 range — target unavailable (task queued)
+  OFFLINE: 480,
+  BUSY: 486,
+  DND: 487,
+  FORWARDING_FAILED: 488,
+  // 500 range — carrier errors
+  INTERNAL_ERROR: 500,
+  WEBHOOK_FAILED: 502,
+  WEBHOOK_TIMEOUT: 504,
+} as const;
+
+export type DialErrorCodeValue = (typeof DialErrorCode)[keyof typeof DialErrorCode];

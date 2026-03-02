@@ -11,6 +11,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { verifySignature } from '@/lib/ed25519';
+import { dialError } from '@/lib/dial-error';
+import { DialErrorCode } from '@/core/moltprotocol/src/types';
 import type { XMoltExtension } from '@/core/moltprotocol/src/types';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+  if (!agent) return dialError(DialErrorCode.NOT_FOUND, 'Number not found');
 
   // Access control for non-public agents
   if (agent.inboundPolicy !== 'public') {
@@ -31,17 +33,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
     const signature = req.headers.get('x-molt-signature');
 
     if (!callerHeader || !timestamp || !nonce || !signature) {
-      return NextResponse.json({ error: 'Caller authentication required' }, { status: 403 });
+      return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'authentication_required' });
     }
 
     const callerAgent = await prisma.agent.findFirst({ where: { phoneNumber: callerHeader, isActive: true } });
     if (!callerAgent?.publicKey) {
-      return NextResponse.json({ error: 'Caller not found or has no public key' }, { status: 403 });
+      return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'caller_not_found' });
     }
 
     const nonceKey = `${callerHeader}:${nonce}`;
     const nonceUsed = await prisma.nonceUsed.findUnique({ where: { nonce: nonceKey } });
-    if (nonceUsed) return NextResponse.json({ error: 'Nonce replay detected' }, { status: 403 });
+    if (nonceUsed) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'nonce_replay' });
 
     const result = verifySignature({
       method: 'GET',
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
       nonce,
       signature,
     });
-    if (!result.valid) return NextResponse.json({ error: `Signature invalid: ${result.reason}` }, { status: 403 });
+    if (!result.valid) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'signature_invalid', detail: result.reason });
 
     await prisma.nonceUsed.create({
       data: { nonce: nonceKey, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
@@ -62,7 +64,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
 
     if (agent.inboundPolicy === 'allowlist') {
       if (!agent.allowlistAgentIds.includes(callerAgent.id)) {
-        return NextResponse.json({ error: 'Caller not in allowlist' }, { status: 403 });
+        return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'not_in_allowlist' });
       }
     }
   }

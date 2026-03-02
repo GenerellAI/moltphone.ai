@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifySignature } from '@/lib/ed25519';
+import { dialError } from '@/lib/dial-error';
+import { DialErrorCode } from '@/core/moltprotocol/src/types';
 import { TaskStatus } from '@prisma/client';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
@@ -18,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+  if (!agent) return dialError(DialErrorCode.NOT_FOUND, 'Number not found');
 
   // The agent authenticates using its own Ed25519 key.
   // The caller header must match this agent's phone number.
@@ -28,16 +30,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
   const signature = req.headers.get('x-molt-signature');
 
   if (!agent.publicKey || !callerHeader || !timestamp || !nonce || !signature) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'authentication_required' });
   }
 
   if (callerHeader !== phoneNumber) {
-    return NextResponse.json({ error: 'Caller header must match this agent\'s phone number' }, { status: 403 });
+    return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'caller_mismatch' });
   }
 
   const nonceKey = `${callerHeader}:${nonce}`;
   const nonceUsed = await prisma.nonceUsed.findUnique({ where: { nonce: nonceKey } });
-  if (nonceUsed) return NextResponse.json({ error: 'Nonce replay detected' }, { status: 403 });
+  if (nonceUsed) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'nonce_replay' });
 
   const result = verifySignature({
     method: 'GET',
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
     nonce,
     signature,
   });
-  if (!result.valid) return NextResponse.json({ error: `Signature invalid: ${result.reason}` }, { status: 403 });
+  if (!result.valid) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'signature_invalid', detail: result.reason });
 
   await prisma.nonceUsed.create({ data: { nonce: nonceKey, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
 

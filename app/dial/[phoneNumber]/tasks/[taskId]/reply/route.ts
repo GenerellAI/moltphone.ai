@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifySignature } from '@/lib/ed25519';
+import { dialError } from '@/lib/dial-error';
+import { DialErrorCode } from '@/core/moltprotocol/src/types';
 import { Prisma, TaskStatus } from '@prisma/client';
 import { z } from 'zod';
 
@@ -29,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const url = new URL(req.url);
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
-  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+  if (!agent) return dialError(DialErrorCode.NOT_FOUND, 'Number not found');
 
   const callerHeader = req.headers.get('x-molt-caller');
   const timestamp = req.headers.get('x-molt-timestamp');
@@ -37,15 +39,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const signature = req.headers.get('x-molt-signature');
 
   if (!agent.publicKey || !callerHeader || !timestamp || !nonce || !signature) {
-    return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'authentication_required' });
   }
   if (callerHeader !== phoneNumber) {
-    return NextResponse.json({ error: 'Only the callee may reply to their own tasks' }, { status: 403 });
+    return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'only_callee_may_reply' });
   }
 
   const nonceKey = `${callerHeader}:${nonce}`;
   const nonceUsed = await prisma.nonceUsed.findUnique({ where: { nonce: nonceKey } });
-  if (nonceUsed) return NextResponse.json({ error: 'Nonce replay detected' }, { status: 403 });
+  if (nonceUsed) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'nonce_replay' });
 
   const result = verifySignature({
     method: 'POST',
@@ -58,21 +60,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     nonce,
     signature,
   });
-  if (!result.valid) return NextResponse.json({ error: `Signature invalid: ${result.reason}` }, { status: 403 });
+  if (!result.valid) return dialError(DialErrorCode.POLICY_DENIED, 'Policy denied', { reason: 'signature_invalid', detail: result.reason });
 
   await prisma.nonceUsed.create({ data: { nonce: nonceKey, expiresAt: new Date(Date.now() + 10 * 60 * 1000) } });
 
   const task = await prisma.task.findUnique({ where: { id: taskId, calleeId: agent.id } });
-  if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  if (!task) return dialError(DialErrorCode.NOT_FOUND, 'Task not found');
   if (task.status === TaskStatus.completed || task.status === TaskStatus.canceled) {
-    return NextResponse.json({ error: 'Task already closed' }, { status: 409 });
+    return dialError(DialErrorCode.BAD_REQUEST, 'Bad request', { reason: 'task_already_closed' });
   }
 
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(JSON.parse(rawBody));
   } catch {
-    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    return dialError(DialErrorCode.BAD_REQUEST, 'Bad request', { reason: 'invalid_body' });
   }
 
   const newStatus = parsed.final ? TaskStatus.completed : TaskStatus.input_required;

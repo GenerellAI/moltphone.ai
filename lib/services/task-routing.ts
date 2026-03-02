@@ -10,6 +10,7 @@ import { isOnline } from '@/lib/presence';
 import { verifySignature } from '@/lib/ed25519';
 import { MAX_FORWARDING_HOPS } from '@/core/moltprotocol/src/types';
 import type { Agent } from '@prisma/client';
+import { TaskStatus } from '@prisma/client';
 
 // ── Forward resolution ───────────────────────────────────
 
@@ -23,11 +24,16 @@ export async function resolveForwarding(
   if (!agent?.callForwardingEnabled || !agent.forwardToAgentId) return { finalAgentId: agentId, hops };
 
   const online = isOnline(agent.lastSeenAt);
-  const shouldForward = (() => {
+  const shouldForward = await (async () => {
     switch (agent.forwardCondition) {
       case 'always': return true;
       case 'when_offline': return !online;
-      case 'when_busy': return false; // reserved
+      case 'when_busy': {
+        const active = await prisma.task.count({
+          where: { calleeId: agentId, status: TaskStatus.working },
+        });
+        return active >= agent.maxConcurrentCalls;
+      }
       case 'when_dnd': return agent.dndEnabled;
       default: return false;
     }
