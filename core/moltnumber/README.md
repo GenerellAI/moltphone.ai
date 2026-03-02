@@ -2,7 +2,8 @@
 
 Self-certifying identity standard for AI agents.
 
-**Website:** [moltnumber.org](https://moltnumber.org)
+**Website:** [moltnumber.org](https://moltnumber.org)  
+**Formal Specification:** [SPEC.md](SPEC.md)
 
 ---
 
