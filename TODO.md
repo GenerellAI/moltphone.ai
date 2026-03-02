@@ -103,11 +103,44 @@ The minimum to make MoltPhone an A2A-native carrier. Schema, auth, protocol, and
 
 ## Phase 2 — Carrier Features
 
-Real-time monitoring, reliability, security hardening, admin tools. Builds on the A2A foundation.
+Real-time monitoring, reliability, security hardening, admin tools. Builds on the A2A foundation. Ordered by dependency.
 
-### 2.1 Real-time
+### 2.1 Error codes & structured errors
 
-- [ ] **Live monitoring UI** — Agent owners watch conversations in real-time from the browser. The carrier already relays SSE between caller and callee — mirror events to owner's browser (third tap, zero extra load):
+- [ ] **Error code taxonomy** — Structured error codes for the dial protocol, inspired by SIP. Everything else depends on consistent error handling:
+  - `400` range (caller errors): `400` bad request, `403` policy denied, `404` number not found, `410` decommissioned, `429` rate limited
+  - `480` range (target unavailable): `480` offline (queued), `486` busy (max concurrent), `487` DND (queued + away message), `488` forwarding failed
+  - `500` range (carrier errors): `500` internal, `502` webhook failed, `504` webhook timeout
+  - All errors use JSON-RPC 2.0 error objects with `code`, `message`, `data`
+
+### 2.2 Security & ops
+
+- [ ] **Admin role** — No admin concept exists. Needed for carrier blocks, moderation, platform management. Must come before carrier-wide blocking/policies
+- [ ] **Carrier-wide blocking** — Admin-level blocks by agentId, phone number pattern, or nation code. `CarrierBlock` model, enforcement before per-agent policy
+- [ ] **Carrier-wide allow policies** — Trust requirements (verified domain, social verification, minimum age). `CarrierPolicy` model, checked before per-agent policies
+- [ ] **Rate limiting** — Per-IP and per-agent limits on dial, auth, and API endpoints
+- [ ] **Nonce cleanup** — Scheduled task to prune expired `NonceUsed` rows
+
+### 2.3 Reliability
+
+- [ ] **Webhook reliability** — What happens when an agent's endpoint is down or slow. Depends on error codes (2.1) for structured failure responses:
+  - *Retry policy:* Exponential backoff (1s, 5s, 30s, 5m). Max 3 attempts for sync calls, 5 for async (text/queued)
+  - *Dead letter queue:* Tasks that exhaust retries → `failed` with `retries_exhausted`. Visible in monitoring UI, manually retryable
+  - *Timeout escalation:* Ring timeout (5s default) → no response → task queued as `submitted`. Background worker retries
+  - *Health monitoring:* Track endpoint success rate per agent. Mark as `degraded` after N consecutive failures (visible in MoltPage/Agent Card). Auto-recover on next success
+  - *Circuit breaker:* Stop hammering failing endpoints. Back off to periodic health checks (5 min). Resume on recovery
+
+### 2.4 Quick wins
+
+- [ ] **`when_busy` forwarding** — Enum value exists, returns false. Implement using concurrent task count
+- [ ] **QR code for MoltSIM** — Current QR returns partial data. Fix to use finalized MoltSIM format from Phase 1
+- [ ] **Domain claims: DNS TXT** — Only HTTP well-known implemented. Add DNS TXT per AGENTS.md
+- [ ] **Favorites page** (`/favorites`) — API exists, no UI
+- [ ] **Avatar upload** — `avatarUrl` field exists, no upload mechanism
+
+### 2.5 Real-time monitoring
+
+- [ ] **Live monitoring UI** — Agent owners watch conversations in real-time from the browser. Depends on error codes (2.1) and task routing service (Phase 1). The carrier already relays SSE between caller and callee — mirror events to owner's browser (third tap, zero extra load):
   - *SSE endpoints (session-authenticated):*
     - `GET /api/tasks/stream` — all task events across all of the user's agents
     - `GET /api/tasks/stream?agentId=X` — filter to one agent
@@ -125,29 +158,7 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - Agent then fetches full task via inbox endpoint
   - Fallback: polling via `GET /dial/:number/tasks` (always available)
 
-### 2.2 Reliability
-
-- [ ] **Webhook reliability** — What happens when an agent's endpoint is down or slow:
-  - *Retry policy:* Exponential backoff (1s, 5s, 30s, 5m). Max 3 attempts for sync calls, 5 for async (text/queued)
-  - *Dead letter queue:* Tasks that exhaust retries → `failed` with `retries_exhausted`. Visible in monitoring UI, manually retryable
-  - *Timeout escalation:* Ring timeout (5s default) → no response → task queued as `submitted`. Background worker retries
-  - *Health monitoring:* Track endpoint success rate per agent. Mark as `degraded` after N consecutive failures (visible in MoltPage/Agent Card). Auto-recover on next success
-  - *Circuit breaker:* Stop hammering failing endpoints. Back off to periodic health checks (5 min). Resume on recovery
-- [ ] **Error code taxonomy** — Structured error codes for the dial protocol, inspired by SIP:
-  - `400` range (caller errors): `400` bad request, `403` policy denied, `404` number not found, `410` decommissioned, `429` rate limited
-  - `480` range (target unavailable): `480` offline (queued), `486` busy (max concurrent), `487` DND (queued + away message), `488` forwarding failed
-  - `500` range (carrier errors): `500` internal, `502` webhook failed, `504` webhook timeout
-  - All errors use JSON-RPC 2.0 error objects with `code`, `message`, `data`
-
-### 2.3 Security & ops
-
-- [ ] **Rate limiting** — Per-IP and per-agent limits on dial, auth, and API endpoints
-- [ ] **Nonce cleanup** — Scheduled task to prune expired `NonceUsed` rows
-- [ ] **Carrier-wide blocking** — Admin-level blocks by agentId, phone number pattern, or nation code. `CarrierBlock` model, enforcement before per-agent policy
-- [ ] **Carrier-wide allow policies** — Trust requirements (verified domain, social verification, minimum age). `CarrierPolicy` model, checked before per-agent policies
-- [ ] **Admin role** — No admin concept exists. Needed for carrier blocks, moderation, platform management
-
-### 2.4 Privacy & monetization
+### 2.6 Privacy & monetization
 
 - [ ] **Carrier as privacy proxy (trusted introduction)** — Initial contact always through carrier. After mutual consent, optional upgrade to direct A2A:
   - *Carrier-mediated phase:* Discovery, policy, blocks, initial delivery. Agent endpoints never exposed. Agent Cards show carrier URL only
@@ -156,14 +167,6 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - `endpointUrl` stripped from ALL public responses. Only in owner settings and upgrade handshake
   - Post-upgrade risk accepted — like giving someone your address. High-security agents use `carrier_only`
 - [ ] **Monetization: paid carrier relay** — Free: carrier-mediated intro + upgrade to direct (~2 messages/call). Paid: full relay with audit trail, abuse detection, analytics, SLA. Billing model TBD
-
-### 2.5 Pages & features
-
-- [ ] **Favorites page** (`/favorites`) — API exists, no UI
-- [ ] **Avatar upload** — `avatarUrl` field exists, no upload mechanism
-- [ ] **`when_busy` forwarding** — Enum value exists, returns false. Implement using concurrent task count
-- [ ] **Domain claims: DNS TXT** — Only HTTP well-known implemented. Add DNS TXT per AGENTS.md
-- [ ] **QR code for MoltSIM** — Current QR returns partial data. Fix once MoltSIM format is finalized (Phase 1)
 
 ---
 
