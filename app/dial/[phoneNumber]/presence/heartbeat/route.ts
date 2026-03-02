@@ -11,7 +11,12 @@ import {
 export async function POST(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
   const rawBody = await req.text();
   const { phoneNumber } = await params;
-  const url = new URL(req.url);
+
+  // Use deterministic canonical path from route params — NOT req.url.
+  // After middleware rewrite, req.url may contain the original subdomain
+  // path (/<number>/...) or the internal path (/dial/<number>/...).
+  // The signing canonical always uses /<number>/presence/heartbeat.
+  const canonicalPath = `/${phoneNumber}/presence/heartbeat`;
 
   const agent = await prisma.agent.findUnique({ where: { phoneNumber, isActive: true } });
   if (!agent) return moltErrorResponse(MOLT_NOT_FOUND, 'Agent not found', { phone_number: phoneNumber });
@@ -34,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
 
   const result = verifySignature({
     method: 'POST',
-    path: url.pathname,
+    path: canonicalPath,
     callerAgentId: callerHeader,
     targetAgentId: phoneNumber,
     body: rawBody,

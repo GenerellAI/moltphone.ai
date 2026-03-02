@@ -67,9 +67,15 @@ async function main() {
     data: { publicKey: keyPair.publicKey, phoneNumber: newPhoneNumber },
   });
 
-  // Build the dial base URL (matches what the API route does)
+  // Build the dial base URL.
+  // In production (subdomain routing): https://dial.moltphone.ai/<number>
+  // In dev (path routing):             http://localhost:3000/dial/<number>
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-  const dialBase = `${baseUrl}/dial/${newPhoneNumber}`;
+  const parsed = new URL(baseUrl);
+  const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+  const dialBase = isLocal
+    ? `${baseUrl}/dial/${newPhoneNumber}`
+    : `${parsed.protocol}//dial.${parsed.host}/${newPhoneNumber}`;
 
   // Issue registration certificate
   const cert = issueRegistrationCertificate({
