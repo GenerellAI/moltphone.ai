@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { generateDomainClaimToken, buildWellKnownUrl, validateDomainClaim } from '@/core/moltnumber/src';
+import { generateDomainClaimToken, buildWellKnownUrl, validateDomainClaim, validateDomainClaimDns } from '@/core/moltnumber/src';
 import { validateWebhookUrl } from '@/lib/ssrf';
 
 const CLAIM_TTL_HOURS = 48;
@@ -44,8 +44,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   return NextResponse.json({
     claim_id: claim.id,
     domain: cleanDomain,
-    well_known_url: buildWellKnownUrl(cleanDomain),
-    expected_file_contents: `moltnumber: ${agent.phoneNumber}\ntoken: ${token}`,
+    methods: {
+      http: {
+        url: buildWellKnownUrl(cleanDomain),
+        file_contents: `moltnumber: ${agent.phoneNumber}\ntoken: ${token}`,
+      },
+      dns: {
+        record: `_moltnumber.${cleanDomain}`,
+        type: 'TXT',
+        value: `moltnumber=${agent.phoneNumber} token=${token}`,
+      },
+    },
     expires_at: expiresAt.toISOString(),
   });
 }
@@ -60,10 +69,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  const { domain } = await req.json();
+  const body = await req.json();
+  const { domain, method: verifyMethod } = body;
   if (!domain || typeof domain !== 'string') {
     return NextResponse.json({ error: 'domain is required' }, { status: 400 });
   }
+  const useDns = verifyMethod === 'dns';
 
   const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
 
@@ -77,38 +88,49 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Claim expired, please create a new one' }, { status: 410 });
   }
 
-  // Fetch the well-known file with SSRF protection
-  const url = buildWellKnownUrl(cleanDomain);
-  const ssrfCheck = await validateWebhookUrl(url);
-  if (!ssrfCheck.ok) {
-    return NextResponse.json({ error: `SSRF blocked: ${ssrfCheck.reason}` }, { status: 400 });
-  }
+  let result: { valid: boolean; reason?: string };
+  let proofUrl: string;
 
-  let fileBody: string;
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'MoltNumber-Verifier/1.0' },
-    });
-    clearTimeout(timeout);
-    if (!response.ok) {
+  if (useDns) {
+    // DNS TXT verification
+    result = await validateDomainClaimDns(cleanDomain, agent.phoneNumber, claim.token);
+    proofUrl = `dns:_moltnumber.${cleanDomain}`;
+  } else {
+    // HTTP Well-Known verification (default)
+    const url = buildWellKnownUrl(cleanDomain);
+    const ssrfCheck = await validateWebhookUrl(url);
+    if (!ssrfCheck.ok) {
+      return NextResponse.json({ error: `SSRF blocked: ${ssrfCheck.reason}` }, { status: 400 });
+    }
+
+    let fileBody: string;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { 'User-Agent': 'MoltNumber-Verifier/1.0' },
+      });
+      clearTimeout(timeout);
+      if (!response.ok) {
+        await prisma.domainClaim.update({ where: { id: claim.id }, data: { status: 'failed' } });
+        return NextResponse.json({ error: `HTTP ${response.status} from ${url}` }, { status: 422 });
+      }
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > MAX_RESPONSE_BYTES) {
+        return NextResponse.json({ error: 'Response too large' }, { status: 422 });
+      }
+      fileBody = new TextDecoder().decode(buffer);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Fetch failed';
       await prisma.domainClaim.update({ where: { id: claim.id }, data: { status: 'failed' } });
-      return NextResponse.json({ error: `HTTP ${response.status} from ${url}` }, { status: 422 });
+      return NextResponse.json({ error: `Could not fetch ${url}: ${message}` }, { status: 422 });
     }
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength > MAX_RESPONSE_BYTES) {
-      return NextResponse.json({ error: 'Response too large' }, { status: 422 });
-    }
-    fileBody = new TextDecoder().decode(buffer);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Fetch failed';
-    await prisma.domainClaim.update({ where: { id: claim.id }, data: { status: 'failed' } });
-    return NextResponse.json({ error: `Could not fetch ${url}: ${message}` }, { status: 422 });
+
+    result = validateDomainClaim(fileBody, agent.phoneNumber, claim.token);
+    proofUrl = url;
   }
 
-  const result = validateDomainClaim(fileBody, agent.phoneNumber, claim.token);
   if (!result.valid) {
     await prisma.domainClaim.update({ where: { id: claim.id }, data: { status: 'failed' } });
     return NextResponse.json({ error: `Verification failed: ${result.reason}` }, { status: 422 });
@@ -122,8 +144,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     }),
     prisma.socialVerification.upsert({
       where: { agentId_provider_handleOrDomain: { agentId: id, provider: 'domain', handleOrDomain: cleanDomain } },
-      update: { status: 'verified', verifiedAt: new Date(), proofUrl: url },
-      create: { agentId: id, provider: 'domain', handleOrDomain: cleanDomain, status: 'verified', verifiedAt: new Date(), proofUrl: url },
+      update: { status: 'verified', verifiedAt: new Date(), proofUrl },
+      create: { agentId: id, provider: 'domain', handleOrDomain: cleanDomain, status: 'verified', verifiedAt: new Date(), proofUrl },
     }),
   ]);
 

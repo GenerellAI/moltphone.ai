@@ -29,4 +29,6 @@ export {
   buildWellKnownUrl,
   parseWellKnownFile,
   validateDomainClaim,
+  parseDnsTxtRecord,
+  validateDomainClaimDns,
 } from './domain-binding';

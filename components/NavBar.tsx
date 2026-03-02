@@ -7,6 +7,7 @@ import { useTheme } from './ThemeProvider';
 const navLinks = [
   { href: '/', label: 'Contacts' },
   { href: '/nations', label: 'Nations' },
+  { href: '/favorites', label: 'Favorites' },
   { href: '/calls', label: 'Recents' },
   { href: '/blocked', label: 'Blocked' },
 ];

@@ -28,12 +28,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
-import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked } from '@/lib/services/task-routing';
+import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked, checkCarrierBlock } from '@/lib/services/task-routing';
+import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
 import { moltErrorResponse } from '@/lib/errors';
 import {
   MOLT_BAD_REQUEST,
   MOLT_POLICY_DENIED,
   MOLT_NOT_FOUND,
+  MOLT_RATE_LIMITED,
   MOLT_OFFLINE,
   MOLT_BUSY,
   MOLT_DND,
@@ -64,6 +66,10 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ phoneNumber: string }> }) {
+  // Rate limit (before any DB queries)
+  const rl = rateLimit(rateLimitKey(req));
+  if (!rl.ok) return moltErrorResponse(MOLT_RATE_LIMITED, rl.error);
+
   const rawBody = await req.text();
   const { phoneNumber } = await params;
   const url = new URL(req.url);
@@ -74,7 +80,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
 
   const callerNumber = req.headers.get('x-molt-caller');
 
-  // Block check (before policy, for efficiency)
+  // Carrier-wide block check (before everything else)
+  {
+    let callerAgentForBlock: { id: string; nationCode: string } | null = null;
+    if (callerNumber) {
+      callerAgentForBlock = await prisma.agent.findFirst({
+        where: { phoneNumber: callerNumber, isActive: true },
+        select: { id: true, nationCode: true },
+      });
+    }
+    const requestIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? req.headers.get('x-real-ip');
+    const carrierBlock = await checkCarrierBlock({
+      callerAgentId: callerAgentForBlock?.id,
+      callerPhone: callerNumber,
+      callerNation: callerAgentForBlock?.nationCode,
+      requestIp,
+    });
+    if (carrierBlock) return moltErrorResponse(MOLT_POLICY_DENIED, carrierBlock);
+  }
+
+  // Per-agent block check
   if (callerNumber) {
     const callerAgent = await prisma.agent.findFirst({ where: { phoneNumber: callerNumber, isActive: true } });
     if (callerAgent && await isCallerBlocked(agent.ownerId, callerAgent.id)) {

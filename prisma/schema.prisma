@@ -7,11 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum UserRole {
+  user
+  admin
+}
+
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
   name          String?
   passwordHash  String
+  role          UserRole @default(user)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   
@@ -191,6 +197,30 @@ model NonceUsed {
   nonce     String   @id
   usedAt    DateTime @default(now())
   expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+// ── Carrier-wide Blocking ───────────────────────────────
+
+enum CarrierBlockType {
+  agent_id
+  phone_pattern
+  nation_code
+  ip_address
+}
+
+model CarrierBlock {
+  id          String           @id @default(cuid())
+  type        CarrierBlockType
+  value       String           // agentId, glob pattern, nation code, or IP/CIDR
+  reason      String?
+  createdBy   String           // admin user ID
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([type, value])
 }
 
 // ── Social Verification ─────────────────────────────────

@@ -133,3 +133,51 @@ export async function isCallerBlocked(
   });
   return !!block;
 }
+
+// ── Carrier-wide block enforcement ──────────────────────
+
+/**
+ * Check whether the request is blocked by a carrier-wide rule.
+ * Evaluates all active CarrierBlock rows against the caller's identity
+ * and the request IP.
+ *
+ * Returns the matching block reason (truthy) or null (not blocked).
+ */
+export async function checkCarrierBlock(opts: {
+  callerAgentId?: string | null;
+  callerPhone?: string | null;
+  callerNation?: string | null;
+  requestIp?: string | null;
+}): Promise<string | null> {
+  const blocks = await prisma.carrierBlock.findMany({
+    where: { isActive: true },
+  });
+
+  for (const b of blocks) {
+    switch (b.type) {
+      case 'agent_id':
+        if (opts.callerAgentId && b.value === opts.callerAgentId) return b.reason ?? 'Carrier block (agent)';
+        break;
+      case 'phone_pattern':
+        if (opts.callerPhone && matchGlob(b.value, opts.callerPhone)) return b.reason ?? 'Carrier block (phone pattern)';
+        break;
+      case 'nation_code':
+        if (opts.callerNation && b.value.toUpperCase() === opts.callerNation.toUpperCase()) return b.reason ?? 'Carrier block (nation)';
+        break;
+      case 'ip_address':
+        if (opts.requestIp && b.value === opts.requestIp) return b.reason ?? 'Carrier block (IP)';
+        break;
+    }
+  }
+
+  return null;
+}
+
+/** Simple glob matching: * matches any chars, ? matches one char. */
+function matchGlob(pattern: string, value: string): boolean {
+  const regex = new RegExp(
+    '^' + pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$',
+    'i',
+  );
+  return regex.test(value);
+}

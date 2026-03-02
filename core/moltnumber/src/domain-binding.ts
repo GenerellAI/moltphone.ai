@@ -1,19 +1,22 @@
 /**
  * MoltNumber canonical domain binding.
  *
- * The ONLY supported verification method for binding a MoltNumber to a domain.
+ * Two supported verification methods for binding a MoltNumber to a domain:
  *
- * Canonical file location:
- *   https://<domain>/.well-known/moltnumber.txt
+ * 1. HTTP Well-Known:
+ *    https://<domain>/.well-known/moltnumber.txt
+ *    File format:
+ *      moltnumber: <AGENT_NUMBER>
+ *      token: <RANDOM_TOKEN>
  *
- * File format:
- *   moltnumber: <AGENT_NUMBER>
- *   token: <RANDOM_TOKEN>
+ * 2. DNS TXT:
+ *    _moltnumber.<domain>  TXT  "moltnumber=<AGENT_NUMBER> token=<RANDOM_TOKEN>"
  *
  * This module is part of the MoltNumber spec and MUST NOT depend on MoltPhone.
  */
 
 import crypto from 'crypto';
+import { Resolver } from 'dns/promises';
 
 // ── Token generation ────────────────────────────────────
 
@@ -84,4 +87,70 @@ export function validateDomainClaim(
   }
 
   return { valid: true };
+}
+
+// ── DNS TXT verification ────────────────────────────────
+
+/**
+ * Parse a DNS TXT record value for domain binding.
+ * Expected format: "moltnumber=<NUMBER> token=<TOKEN>"
+ */
+export function parseDnsTxtRecord(txt: string): WellKnownFileContents {
+  const result: WellKnownFileContents = { moltnumber: null, token: null };
+  const mnMatch = txt.match(/moltnumber=(\S+)/i);
+  if (mnMatch) result.moltnumber = mnMatch[1];
+  const tkMatch = txt.match(/token=(\S+)/i);
+  if (tkMatch) result.token = tkMatch[1];
+  return result;
+}
+
+/**
+ * Resolve the _moltnumber.<domain> TXT record and validate the claim.
+ *
+ * @param domain            Target domain (e.g. "example.com")
+ * @param expectedMoltNumber The agent's MoltNumber
+ * @param expectedToken     The pending claim token
+ * @param timeoutMs         DNS resolver timeout (default 5000ms)
+ */
+export async function validateDomainClaimDns(
+  domain: string,
+  expectedMoltNumber: string,
+  expectedToken: string,
+  timeoutMs = 5000,
+): Promise<DomainClaimResult> {
+  const resolver = new Resolver();
+  resolver.setServers(['8.8.8.8', '1.1.1.1']);
+
+  const hostname = `_moltnumber.${domain}`;
+
+  let records: string[][];
+  try {
+    const timer = setTimeout(() => resolver.cancel(), timeoutMs);
+    records = await resolver.resolveTxt(hostname);
+    clearTimeout(timer);
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code;
+    if (code === 'ENODATA' || code === 'ENOTFOUND') {
+      return { valid: false, reason: `No TXT record found at ${hostname}` };
+    }
+    return { valid: false, reason: `DNS error: ${code ?? 'unknown'}` };
+  }
+
+  // TXT records come as arrays of chunks (one record = [chunk1, chunk2, ...])
+  for (const chunks of records) {
+    const txt = chunks.join('');
+    const parsed = parseDnsTxtRecord(txt);
+
+    if (parsed.moltnumber && parsed.token) {
+      if (parsed.moltnumber !== expectedMoltNumber) {
+        return { valid: false, reason: 'MoltNumber mismatch in DNS TXT' };
+      }
+      if (parsed.token !== expectedToken) {
+        return { valid: false, reason: 'Token mismatch in DNS TXT' };
+      }
+      return { valid: true };
+    }
+  }
+
+  return { valid: false, reason: `No valid moltnumber TXT record found at ${hostname}` };
 }

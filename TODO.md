@@ -118,11 +118,11 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 ### 2.2 Security & ops
 
-- [ ] **Admin role** — No admin concept exists. Needed for carrier blocks, moderation, platform management. Must come before carrier-wide blocking/policies
-- [ ] **Carrier-wide blocking** — Admin-level blocks by agentId, phone number pattern, or nation code. `CarrierBlock` model, enforcement before per-agent policy
+- [x] **Admin role** — `UserRole` enum (`user`/`admin`), `role` field on User model, `requireAdmin()` guard helper in `lib/admin.ts`
+- [x] **Carrier-wide blocking** — `CarrierBlock` model + `CarrierBlockType` enum. Admin CRUD at `/api/admin/carrier-blocks`. Enforcement in `checkCarrierBlock()` runs before per-agent policy in tasks/send. Matches by agent_id, phone_pattern (glob), nation_code, ip_address
 - [ ] **Carrier-wide allow policies** — Trust requirements (verified domain, social verification, minimum age). `CarrierPolicy` model, checked before per-agent policies
-- [ ] **Rate limiting** — Per-IP and per-agent limits on dial, auth, and API endpoints
-- [ ] **Nonce cleanup** — Scheduled task to prune expired `NonceUsed` rows
+- [x] **Rate limiting** — In-memory sliding-window rate limiter (`lib/rate-limit.ts`). Wired into tasks/send. Keys by X-Molt-Caller or IP. 60 req/min default
+- [x] **Nonce cleanup** — `POST /api/admin/nonce-cleanup` endpoint. Supports CRON_SECRET bearer token or admin session. `@@index([expiresAt])` on NonceUsed
 
 ### 2.3 Reliability
 
@@ -137,8 +137,8 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 - [x] **`when_busy` forwarding** — Enum value exists, returns false. Implement using concurrent task count
 - [x] **QR code for MoltSIM** — Current QR returns partial data. Fix to use finalized MoltSIM format from Phase 1
-- [ ] **Domain claims: DNS TXT** — Only HTTP well-known implemented. Add DNS TXT per AGENTS.md
-- [ ] **Favorites page** (`/favorites`) — API exists, no UI
+- [x] **Domain claims: DNS TXT** — `validateDomainClaimDns()` in `core/moltnumber/src/domain-binding.ts`. Resolves `_moltnumber.<domain>` TXT record. Domain-claim PUT accepts `method: 'dns'` parameter. POST returns both HTTP and DNS instructions
+- [x] **Favorites page** (`/favorites`) — Server component with linked agent cards, added to navbar
 - [ ] **Avatar upload** — `avatarUrl` field exists, no upload mechanism
 
 ### 2.5 Real-time monitoring
