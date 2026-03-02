@@ -13,11 +13,41 @@ import { CreditTransactionType } from '@prisma/client';
 /** Credits granted to new users on signup. Generous in early access. */
 export const SIGNUP_CREDITS = 10_000;
 
-/** Cost to create a new task (initial message). */
-export const TASK_COST = 1;
+/** Minimum cost per message (base fee). */
+export const BASE_MESSAGE_COST = 1;
 
-/** Cost per message in a multi-turn conversation (replies, follow-ups). */
-export const MESSAGE_COST = 1;
+/** Size of the "free" tier per message (bytes). Messages up to this size cost BASE_MESSAGE_COST. */
+export const FREE_TIER_BYTES = 4 * 1024; // 4 KB
+
+/** Additional credit per chunk of data above the free tier. */
+export const COST_PER_CHUNK = 1;
+
+/** Chunk size for cost calculation (bytes). */
+export const CHUNK_SIZE_BYTES = 4 * 1024; // 4 KB
+
+/**
+ * Calculate the credit cost for a message based on its serialized size.
+ *
+ * Pricing: BASE_MESSAGE_COST + ceil(max(0, size - FREE_TIER_BYTES) / CHUNK_SIZE_BYTES) * COST_PER_CHUNK
+ *
+ * Examples:
+ *   100 bytes → 1 credit  (short text)
+ *   4 KB      → 1 credit  (within free tier)
+ *   8 KB      → 2 credits (1 base + 1 chunk)
+ *   20 KB     → 5 credits (1 base + 4 chunks)
+ *   100 KB    → 25 credits (1 base + 24 chunks)
+ */
+export function calculateMessageCost(rawBody: string | Buffer): number {
+  const sizeBytes = typeof rawBody === 'string'
+    ? Buffer.byteLength(rawBody, 'utf-8')
+    : rawBody.length;
+
+  if (sizeBytes <= FREE_TIER_BYTES) return BASE_MESSAGE_COST;
+
+  const extraBytes = sizeBytes - FREE_TIER_BYTES;
+  const extraChunks = Math.ceil(extraBytes / CHUNK_SIZE_BYTES);
+  return BASE_MESSAGE_COST + extraChunks * COST_PER_CHUNK;
+}
 
 // ── Query ────────────────────────────────────────────────
 
@@ -121,24 +151,26 @@ export async function adminGrantCredits(
 }
 
 /**
- * Deduct credits for sending a task. Returns { ok, balance } or { ok: false, balance }.
+ * Deduct credits for sending a task. Cost is based on message size.
+ * Returns { ok, balance, cost } or { ok: false, balance, cost }.
  * Uses a transaction to prevent race conditions.
  */
 export async function deductTaskCredits(
   userId: string,
+  cost: number,
   taskId?: string,
-): Promise<{ ok: true; balance: number } | { ok: false; balance: number }> {
+): Promise<{ ok: true; balance: number; cost: number } | { ok: false; balance: number; cost: number }> {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: { credits: true },
     });
 
-    if (!user || user.credits < TASK_COST) {
-      return { ok: false as const, balance: user?.credits ?? 0 };
+    if (!user || user.credits < cost) {
+      return { ok: false as const, balance: user?.credits ?? 0, cost };
     }
 
-    const newBalance = user.credits - TASK_COST;
+    const newBalance = user.credits - cost;
 
     await tx.user.update({
       where: { id: userId },
@@ -148,38 +180,40 @@ export async function deductTaskCredits(
     await tx.creditTransaction.create({
       data: {
         userId,
-        amount: -TASK_COST,
+        amount: -cost,
         type: CreditTransactionType.task_send,
         balance: newBalance,
-        description: 'Task sent',
+        description: cost === 1 ? 'Task sent' : `Task sent (${cost} credits, size-based)`,
         taskId,
       },
     });
 
-    return { ok: true as const, balance: newBalance };
+    return { ok: true as const, balance: newBalance, cost };
   });
 }
 
 /**
  * Deduct credits for a message in an existing task (reply / follow-up).
- * Charges the sender's owner. Returns { ok, balance } or { ok: false, balance }.
+ * Cost is based on message size. Charges the sender's owner.
+ * Returns { ok, balance, cost } or { ok: false, balance, cost }.
  */
 export async function deductMessageCredits(
   userId: string,
+  cost: number,
   taskId: string,
   description = 'Message sent',
-): Promise<{ ok: true; balance: number } | { ok: false; balance: number }> {
+): Promise<{ ok: true; balance: number; cost: number } | { ok: false; balance: number; cost: number }> {
   return prisma.$transaction(async (tx) => {
     const user = await tx.user.findUnique({
       where: { id: userId },
       select: { credits: true },
     });
 
-    if (!user || user.credits < MESSAGE_COST) {
-      return { ok: false as const, balance: user?.credits ?? 0 };
+    if (!user || user.credits < cost) {
+      return { ok: false as const, balance: user?.credits ?? 0, cost };
     }
 
-    const newBalance = user.credits - MESSAGE_COST;
+    const newBalance = user.credits - cost;
 
     await tx.user.update({
       where: { id: userId },
@@ -189,31 +223,33 @@ export async function deductMessageCredits(
     await tx.creditTransaction.create({
       data: {
         userId,
-        amount: -MESSAGE_COST,
+        amount: -cost,
         type: CreditTransactionType.task_message,
         balance: newBalance,
-        description,
+        description: cost === 1 ? description : `${description} (${cost} credits, size-based)`,
         taskId,
       },
     });
 
-    return { ok: true as const, balance: newBalance };
+    return { ok: true as const, balance: newBalance, cost };
   });
 }
 
 /**
  * Refund credits for a failed task delivery (e.g. retries exhausted).
+ * Amount defaults to BASE_MESSAGE_COST but can be set to the original charge.
  */
 export async function refundTaskCredits(
   userId: string,
   taskId: string,
+  amount = BASE_MESSAGE_COST,
   reason?: string,
 ): Promise<number> {
   const [, user] = await prisma.$transaction([
     prisma.creditTransaction.create({
       data: {
         userId,
-        amount: TASK_COST,
+        amount,
         type: CreditTransactionType.refund,
         balance: 0, // updated below
         description: reason ?? 'Refund: delivery failed',
@@ -222,7 +258,7 @@ export async function refundTaskCredits(
     }),
     prisma.user.update({
       where: { id: userId },
-      data: { credits: { increment: TASK_COST } },
+      data: { credits: { increment: amount } },
       select: { credits: true },
     }),
   ]);

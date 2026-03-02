@@ -30,7 +30,7 @@ import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked, checkCarrierBlock } from '@/lib/services/task-routing';
 import { checkCarrierPolicies } from '@/lib/services/carrier-policies';
-import { deductTaskCredits } from '@/lib/services/credits';
+import { deductTaskCredits, calculateMessageCost } from '@/lib/services/credits';
 import { getCircuitState, recordSuccess, recordFailure, scheduleRetry } from '@/lib/services/webhook-reliability';
 import { sendPushNotification } from '@/lib/services/push-notifications';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
@@ -161,12 +161,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     callerOwnerId = ca?.ownerId ?? null;
   }
 
-  // Credit check — deduct 1 credit from the caller's owner
+  // Credit check — deduct credits from the caller's owner (cost scales with message size)
   if (callerOwnerId) {
-    const creditResult = await deductTaskCredits(callerOwnerId);
+    const cost = calculateMessageCost(rawBody);
+    const creditResult = await deductTaskCredits(callerOwnerId, cost);
     if (!creditResult.ok) {
       return moltErrorResponse(MOLT_POLICY_DENIED, 'Insufficient credits', {
         balance: creditResult.balance,
+        cost: creditResult.cost,
       });
     }
   }

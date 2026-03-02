@@ -173,14 +173,15 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 - [x] **MoltPhone Credits** — Internal platform currency (database-tracked, no blockchain):
   - `credits` field on User model (balance). `CreditTransaction` ledger (amount, type, balance, description, taskId)
   - `CreditTransactionType` enum: `signup_grant`, `admin_grant`, `task_send`, `task_message`, `refund`
-  - `lib/services/credits.ts` — `grantSignupCredits()`, `deductTaskCredits()`, `deductMessageCredits()`, `adminGrantCredits()`, `refundTaskCredits()`, `getBalance()`, `getTransactionHistory()`
-  - `SIGNUP_CREDITS = 10,000` (generous early access). `TASK_COST = 1` per task created. `MESSAGE_COST = 1` per message in multi-turn conversations
+  - `lib/services/credits.ts` — `grantSignupCredits()`, `deductTaskCredits()`, `deductMessageCredits()`, `adminGrantCredits()`, `refundTaskCredits()`, `getBalance()`, `getTransactionHistory()`, `calculateMessageCost()`
+  - `SIGNUP_CREDITS = 10,000` (generous early access)
+  - **Size-based pricing**: `calculateMessageCost(rawBody)` — `BASE_MESSAGE_COST = 1` + 1 credit per 4KB chunk above the 4KB free tier. Short texts = 1 credit, 20KB message = 5 credits, 100KB = 25 credits
   - Signup grant: automatic on registration, idempotent
-  - Task deduction: wired into tasks/send (after policy checks, before routing). Uses DB transaction for atomicity
-  - **Per-message billing**: reply route deducts 1 credit from callee's owner per reply message. Multi-turn calls cost credits proportional to traffic volume, not flat per-task
+  - Task deduction: wired into tasks/send (after policy checks, before routing). Uses DB transaction for atomicity. Cost scales with request body size
+  - **Per-message billing**: reply route deducts credits from callee's owner per reply. Multi-turn calls cost credits proportional to traffic volume × message size
   - `GET /api/credits` — User balance + paginated transaction history
   - `POST /api/admin/credits/grant` — Admin-only credit grant (userId, amount, description)
-  - Refund support for failed deliveries (retries_exhausted)
+  - Refund support for failed deliveries (retries_exhausted), amount matches original charge
 
 ---
 

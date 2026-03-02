@@ -18,7 +18,7 @@ import {
 } from '@/core/moltprotocol/src/errors';
 import { Prisma, TaskStatus } from '@prisma/client';
 import { z } from 'zod';
-import { deductMessageCredits } from '@/lib/services/credits';
+import { deductMessageCredits, calculateMessageCost } from '@/lib/services/credits';
 
 function asParts(parts: unknown): Prisma.InputJsonValue { return parts as Prisma.InputJsonValue; }
 
@@ -77,11 +77,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     return moltErrorResponse(MOLT_CONFLICT, 'Task already closed', { task_id: taskId, status: task.status });
   }
 
-  // Deduct credits from the replying agent's owner for this message
-  const creditResult = await deductMessageCredits(agent.ownerId, taskId, 'Reply message');
+  // Deduct credits from the replying agent's owner (cost scales with message size)
+  const cost = calculateMessageCost(rawBody);
+  const creditResult = await deductMessageCredits(agent.ownerId, cost, taskId, 'Reply message');
   if (!creditResult.ok) {
     return moltErrorResponse(MOLT_POLICY_DENIED, 'Insufficient credits', {
       balance: creditResult.balance,
+      cost: creditResult.cost,
     });
   }
 
