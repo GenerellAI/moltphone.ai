@@ -204,6 +204,18 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - *Defense in depth:* Layer 1 (MoltUA verification, free baseline) + Layer 2 (`carrier_only` relay, paid optional). MoltUA makes leaked endpoints useless. `carrier_only` adds privacy + audit
   - *Caller verification tracking:* `enforcePolicyAndAuth()` now returns `callerVerified`/`callerRegistered` in `PolicyCheckResult`, enabling accurate attestation level determination
 
+### 2.9 Self-Certifying MoltNumbers
+
+- [x] **Self-certifying MoltNumber derivation** — MoltNumbers are now cryptographically derived from Ed25519 public keys (like Bitcoin addresses, Tor .onion domains):
+  - *Format change:* `NATION-AAAA-BBBB-CCCC-D` (old, 60-bit, check digit) → `NATION-AAAA-BBBB-CCCC-DDDD` (new, 80-bit, no check digit)
+  - *Derivation:* `subscriber = Crockford32(SHA-256(nationCode + ":" + publicKey))[0:80 bits]`. The number IS the identity — trustless verification, no registry needed
+  - *Nation binding:* Nation code included in hash input, so same key produces different numbers in different nations
+  - *No check digit:* Self-certifying hash is the integrity check. Extra char used for entropy (60→80 bits, ~1T collision threshold)
+  - *Key rotation = new number:* MoltSIM re-provisioning generates new keypair AND new phone number. Compromised key = dead identity
+  - *Vanity mining:* Generate keypairs until subscriber starts with desired prefix. 4-char prefix ≈ 10s, 8-char ≈ 115 days
+  - *Agent creation:* Generate keypair first, derive number from it. Collision check (astronomically unlikely) returns 409
+  - *Files:* `core/moltnumber/src/format.ts` (rewritten), `core/moltnumber/src/index.ts`, `lib/phone-number.ts`, `app/api/agents/route.ts`, `app/api/agents/[id]/moltsim/route.ts`, `prisma/seed.ts`, both test files
+
 ---
 
 ## Phase 3 — Federation & Ecosystem
@@ -229,9 +241,9 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 - [ ] **MoltProtocol specification** — Write the MoltProtocol spec (moltprotocol.org). Defines the telephony layer on top of A2A: metadata schema (`molt.*`), Ed25519 signing format, intent semantics, carrier routing protocol, registry API, Agent Card `x-molt` extensions, trusted introduction handshake, error codes. RFC-style: ABNF, RFC 2119 language, security considerations
 - [ ] **MoltNumber specification overhaul** — RFC-quality: ABNF grammar, RFC 2119 language (MUST/SHOULD/MAY), security considerations, registry considerations, versioning. Study E.164, RFC 3986, RFC 7519. MoltNumber is now a sub-standard of MoltProtocol — reference it normatively
-- [ ] **Separate format from assignment** — `generateMoltNumber()` moves from `core/moltnumber/` to `lib/`. Spec defines format only; carrier defines assignment policy
-- [ ] **Number body semantics** — Decide: timestamp, sequential, random, or carrier-defined (current leaning: carrier-defined, flexible like E.164)
-- [ ] **Number uniqueness guarantees** — Spec: nation codes globally unique (registry-enforced). Carrier: atomic insert-and-retry. Ed25519 as self-correction for double-assignment
+- [ ] **Separate format from assignment** — `generateMoltNumber()` takes a public key, so generation is cryptographic, not carrier policy. Spec defines derivation; carrier handles collision checks
+- [x] **Number body semantics** — Resolved: self-certifying. Subscriber = SHA-256(nation + ":" + publicKey). No timestamp, no sequential, no random
+- [x] **Number uniqueness guarantees** — Resolved: self-certifying from Ed25519 public key. Collisions astronomically unlikely (80-bit hash). Carrier does single-check rejection (409)
 - [ ] **Nation code derivation rule** — Each carrier MUST have a primary nation code. The 4-letter code MUST be a subsequence of the carrier/nation name, anchored at the first character. That is: the first letter of the code MUST be the first letter of the name, and each subsequent letter MUST appear later in the name (in order), though letters may be skipped. Examples: "MoltPhone" → `MOLT`, `MLPH`, `MPHN` (valid); `OLTP` (invalid, wrong start). "Solar" → `SOLR`, `SLAR` (valid); `OLAR` (invalid). Enforced at registration by the registry
 
 ### 4.2 Testing

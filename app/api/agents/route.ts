@@ -69,15 +69,14 @@ export async function POST(req: NextRequest) {
       if (!check.ok) return NextResponse.json({ error: `Invalid endpoint URL: ${check.reason}` }, { status: 400 });
     }
     
-    let phoneNumber = '';
-    for (let i = 0; i < 5; i++) {
-      const candidate = generatePhoneNumber(data.nationCode);
-      const exists = await prisma.agent.findUnique({ where: { phoneNumber: candidate } });
-      if (!exists) { phoneNumber = candidate; break; }
-    }
-    if (!phoneNumber) return NextResponse.json({ error: 'Failed to generate unique phone number' }, { status: 500 });
-    
+    // Generate keypair first — the MoltNumber is derived from the public key
     const keyPair = generateKeyPair();
+    const phoneNumber = generatePhoneNumber(data.nationCode, keyPair.publicKey);
+    
+    // Self-certifying numbers are deterministic from the key, but check for
+    // the astronomically unlikely collision (2^-40 probability per attempt)
+    const exists = await prisma.agent.findUnique({ where: { phoneNumber } });
+    if (exists) return NextResponse.json({ error: 'Phone number collision — please retry' }, { status: 409 });
     
     const agent = await prisma.agent.create({
       data: {

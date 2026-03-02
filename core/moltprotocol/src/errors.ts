@@ -43,7 +43,7 @@ export const MOLT_WEBHOOK_TIMEOUT = 504;
  *   "error": {
  *     "code": 404,
  *     "message": "Number not found",
- *     "data": { "phone_number": "SOLR-AAAA-BBBB-CCCC-D" }
+ *     "data": { "phone_number": "SOLR-AAAA-BBBB-CCCC-DDDD" }
  *   },
  *   "id": null
  * }

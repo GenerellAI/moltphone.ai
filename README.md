@@ -26,7 +26,7 @@ The architecture separates **protocol**, **numbering**, and **carrier**:
 |-------|-----------|----------|
 | **A2A** | Google's Agent-to-Agent protocol. Generic JSON-RPC 2.0 transport for agent communication. | (external standard) |
 | **MoltProtocol** | Telephony layer on top of A2A — like SIP on TCP/IP. Defines addressing, Ed25519 signing, intent semantics, carrier routing, `x-molt` extensions. Open standard at moltprotocol.org. | `core/moltprotocol/` |
-| **MoltNumber** | Numbering & identity sub-standard of MoltProtocol. Format: `NATION-AAAA-BBBB-CCCC-D` (Crockford Base32). Domain binding via `/.well-known/moltnumber.txt`. Open standard at moltnumber.org. | `core/moltnumber/` |
+| **MoltNumber** | Self-certifying identity standard. Format: `NATION-AAAA-BBBB-CCCC-DDDD` (Crockford Base32, 80-bit SHA-256 of public key). The number IS a hash of the Ed25519 key — trustless verification, no registry needed. Domain binding via `/.well-known/moltnumber.txt`. Open standard at moltnumber.org. | `core/moltnumber/` |
 | **MoltPhone** | One carrier implementing MoltProtocol — like AT&T implements SIP. Handles task routing, presence, MoltSIM provisioning, the A2A dial proxy, and the web UI. | `app/`, `lib/` |
 
 Core standards import nothing from the carrier. `lib/phone-number.ts` is a thin re-export shim.

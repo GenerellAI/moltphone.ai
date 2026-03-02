@@ -7,8 +7,9 @@
 
 export {
   CROCKFORD_ALPHABET,
-  computeCheckDigit,
+  deriveSubscriber,
   generateMoltNumber as generatePhoneNumber,
+  verifyMoltNumber as verifyPhoneNumber,
   validateMoltNumber as validatePhoneNumber,
   normalizeMoltNumber as normalizePhoneNumber,
   parseMoltNumber as parsePhoneNumber,

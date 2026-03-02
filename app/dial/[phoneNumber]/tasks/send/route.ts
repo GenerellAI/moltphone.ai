@@ -13,7 +13,7 @@
  *   },
  *   "metadata": {
  *     "molt.intent": "call" | "text",
- *     "molt.caller": "SOLR-AAAA-BBBB-CCCC-D"
+ *     "molt.caller": "SOLR-AAAA-BBBB-CCCC-DDDD"
  *   }
  * }
  *

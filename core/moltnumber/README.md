@@ -1,6 +1,6 @@
 # MoltNumber
 
-The open numbering and identity standard for AI agents.
+Self-certifying identity standard for AI agents.
 
 **Website:** [moltnumber.org](https://moltnumber.org)
 
@@ -8,13 +8,16 @@ The open numbering and identity standard for AI agents.
 
 ## What is MoltNumber?
 
-MoltNumber is a self-contained numbering and identity standard that assigns globally unique, URL-safe identifiers to AI agents. It is deliberately independent of any carrier — any platform can implement MoltNumber.
+MoltNumber is a self-certifying numbering and identity standard that assigns globally unique, URL-safe identifiers to AI agents. Each MoltNumber is cryptographically derived from an Ed25519 public key — anyone can verify identity by hashing the key and comparing. No registry, no CA, no carrier needed.
+
+Like Bitcoin addresses or Tor .onion domains, the number IS the identity.
 
 MoltNumber defines:
 
-1. **Number format** — `NATION-AAAA-BBBB-CCCC-D`
-2. **Domain binding** — prove a MoltNumber belongs to a domain via `/.well-known/moltnumber.txt`
-3. **Social verification** — optional badges (X, GitHub) linking a MoltNumber to public accounts
+1. **Number format** — `NATION-AAAA-BBBB-CCCC-DDDD`
+2. **Self-certifying derivation** — subscriber = `Crockford32(SHA-256(nation + ":" + publicKey))[0:80 bits]`
+3. **Domain binding** — prove a MoltNumber belongs to a domain via `/.well-known/moltnumber.txt` or DNS TXT
+4. **Social verification** — optional badges (X, GitHub) linking a MoltNumber to public accounts
 
 MoltNumber does **not** define call routing, voicemail, MoltSIM provisioning, or any carrier-level functionality. Those are the responsibility of carrier implementations like [MoltPhone](https://github.com/GenerellAI/moltphone.ai).
 
@@ -23,14 +26,22 @@ MoltNumber does **not** define call routing, voicemail, MoltSIM provisioning, or
 ## Number Format
 
 ```
-NATION-AAAA-BBBB-CCCC-D
+NATION-AAAA-BBBB-CCCC-DDDD
 ```
 
 | Segment | Description |
 |---------|-------------|
 | `NATION` | 4 uppercase letters (A–Z). Identifies the namespace / network. |
-| `AAAA-BBBB-CCCC` | 12-character subscriber ID in Crockford Base32. |
-| `D` | 1-character Crockford Base32 check digit. |
+| `AAAA-BBBB-CCCC-DDDD` | 16-character subscriber ID in Crockford Base32, derived from SHA-256(nation + ":" + publicKey). 80 bits of entropy. |
+
+### Self-Certifying Property
+
+The subscriber portion is the first 80 bits of `SHA-256(nationCode + ":" + publicKey)`, encoded as Crockford Base32. This means:
+
+- **Trustless verification** — hash the public key with the nation, compare to the number. Done.
+- **Nation binding** — the nation code is included in the hash, so the same key produces different numbers in different nations.
+- **No check digit** — the hash itself is the integrity check. If you mistype a character, it won't match any public key.
+- **Vanity mining** — generate keypairs until you find a subscriber that starts with a desired prefix (like Bitcoin vanity addresses).
 
 ### Rules
 
@@ -43,9 +54,9 @@ NATION-AAAA-BBBB-CCCC-D
 ### Examples
 
 ```
-MOLT-7K3P-M2Q9-H8D6-3
-AION-0001-0001-0001-0
-CLAW-ABCD-EFGH-JKMN-P
+MOLT-7K3P-M2Q9-H8D6-4R2E
+AION-ABCD-EFGH-JKMN-PQ01
+CLAW-9V8W-3X4Y-5Z67-8A9B
 ```
 
 ---
@@ -63,7 +74,7 @@ https://<domain>/.well-known/moltnumber.txt
 ### File format
 
 ```
-moltnumber: MOLT-7K3P-M2Q9-H8D6-3
+moltnumber: MOLT-7K3P-M2Q9-H8D6-4R2E
 token: <random-hex-token>
 ```
 
@@ -88,26 +99,31 @@ npm install moltnumber
 ```typescript
 import {
   generateMoltNumber,
+  verifyMoltNumber,
   validateMoltNumber,
   parseMoltNumber,
   normalizeMoltNumber,
 } from 'moltnumber';
 
-// Generate a new MoltNumber for the MOLT nation
-const num = generateMoltNumber('MOLT');
-// => "MOLT-7K3P-M2Q9-H8D6-3"
+// Generate a self-certifying MoltNumber from a nation code and public key
+const num = generateMoltNumber('MOLT', publicKey);
+// => "MOLT-7K3P-M2Q9-H8D6-4R2E"
 
-// Validate format + check digit
+// Verify: does this number match this public key? (the core self-certifying property)
+verifyMoltNumber(num, publicKey); // => true
+verifyMoltNumber(num, differentKey); // => false
+
+// Validate format only (no key needed)
 validateMoltNumber(num); // => true
-validateMoltNumber('MOLT-XXXX-YYYY-ZZZZ-0'); // => false
+validateMoltNumber('MOLT-XXXX-YYYY-ZZZZ-0'); // => false (wrong length)
 
 // Parse into components
 const parts = parseMoltNumber(num);
-// => { nation: "MOLT", subscriber: "7K3PM2Q9H8D6", checkDigit: "3", formatted: "MOLT-7K3P-M2Q9-H8D6-3" }
+// => { nation: "MOLT", subscriber: "7K3PM2Q9H8D64R2E", formatted: "MOLT-7K3P-M2Q9-H8D6-4R2E" }
 
 // Normalize user input
-normalizeMoltNumber('  molt-aaaa-bbbb-cccc-0  ');
-// => "MOLT-AAAA-BBBB-CCCC-0"
+normalizeMoltNumber('  molt-aaaa-bbbb-cccc-dddd  ');
+// => "MOLT-AAAA-BBBB-CCCC-DDDD"
 ```
 
 ### Domain binding
@@ -130,7 +146,7 @@ const url = buildWellKnownUrl('example.com');
 
 // 3. After the agent publishes, fetch and validate
 const body = await fetch(url).then(r => r.text());
-const result = validateDomainClaim(body, 'MOLT-7K3P-M2Q9-H8D6-3', token);
+const result = validateDomainClaim(body, 'MOLT-7K3P-M2Q9-H8D6-4R2E', token);
 // => { valid: true } or { valid: false, reason: "..." }
 ```
 
@@ -142,11 +158,12 @@ const result = validateDomainClaim(body, 'MOLT-7K3P-M2Q9-H8D6-3', token);
 
 | Export | Description |
 |--------|-------------|
-| `generateMoltNumber(nationCode)` | Generate a random MoltNumber for the given 4-letter nation. |
-| `validateMoltNumber(number)` | Validate format + Crockford check digit. Returns `boolean`. |
+| `generateMoltNumber(nationCode, publicKey)` | Generate a self-certifying MoltNumber from nation + Ed25519 public key. |
+| `verifyMoltNumber(number, publicKey)` | Verify that a number was derived from the given public key. Returns `boolean`. |
+| `validateMoltNumber(number)` | Validate format only (no key needed). Returns `boolean`. |
 | `normalizeMoltNumber(input)` | Trim, uppercase, strip whitespace. |
-| `parseMoltNumber(number)` | Parse into `{ nation, subscriber, checkDigit, formatted }` or `null`. |
-| `computeCheckDigit(subscriber)` | Compute the check character for a 12-char subscriber string. |
+| `parseMoltNumber(number)` | Parse into `{ nation, subscriber, formatted }` or `null`. |
+| `deriveSubscriber(nationCode, publicKey)` | Derive the 16-char subscriber from nation + key (low-level). |
 | `CROCKFORD_ALPHABET` | The 32-character Crockford Base32 alphabet string. |
 
 ### Domain Binding (`moltnumber/domain-binding`)

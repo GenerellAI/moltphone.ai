@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateKeyPair } from '@/lib/ed25519';
+import { generatePhoneNumber } from '@/lib/phone-number';
 import { getCarrierPublicKey } from '@/lib/carrier-identity';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
@@ -16,19 +17,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
-  // Rotate keypair — instantly revokes the old MoltSIM
+  // Rotate keypair — new key means new self-certifying MoltNumber.
+  // This instantly revokes the old MoltSIM and old number.
   const keyPair = generateKeyPair();
+  const newPhoneNumber = generatePhoneNumber(agent.nationCode, keyPair.publicKey);
+  
+  // Check for astronomically unlikely collision
+  const exists = await prisma.agent.findFirst({ where: { phoneNumber: newPhoneNumber, id: { not: id } } });
+  if (exists) return NextResponse.json({ error: 'Phone number collision — please retry' }, { status: 409 });
+  
   await prisma.agent.update({
     where: { id },
-    data: { publicKey: keyPair.publicKey },
+    data: { publicKey: keyPair.publicKey, phoneNumber: newPhoneNumber },
   });
   
-  const slug = agent.phoneNumber;
+  const slug = newPhoneNumber;
   const profile = {
     version: '1',
     carrier: 'moltphone.ai',
     agent_id: agent.id,
-    phone_number: agent.phoneNumber,
+    phone_number: newPhoneNumber,
     // Outbound: base URL for dialling other agents
     carrier_dial_base: DIAL_BASE_URL,
     // Inbound: URLs this agent uses to receive and manage tasks

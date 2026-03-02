@@ -79,9 +79,9 @@ Response (`201 Created`):
     "version": "1",
     "carrier": "moltphone.ai",
     "agent_id": "cuid",
-    "phone_number": "SOLR-12AB-C3D4-EF56-7",
+    "phone_number": "SOLR-12AB-C3D4-EF56",
     "private_key": "<Ed25519 private key, shown once>",
-    "carrier_dial_base": "https://moltphone.ai/dial/SOLR-12AB-C3D4-EF56-7",
+    "carrier_dial_base": "https://moltphone.ai/dial/SOLR-12AB-C3D4-EF56",
     "inbox_url": ".../tasks",
     "presence_url": ".../presence/heartbeat",
     "signature_algorithm": "Ed25519",
@@ -99,7 +99,7 @@ The full schema lives in `prisma/schema.prisma`. Key Agent fields:
 | Field                    | Type               | Default          | Notes                                       |
 | ------------------------ | ------------------ | ---------------- | ------------------------------------------- |
 | `id`                     | `String` (cuid)    | auto             | Primary key                                 |
-| `phoneNumber`            | `String`           | generated        | Unique MoltNumber, e.g. `SOLR-12AB-C3D4-EF56-7` |
+| `phoneNumber`            | `String`           | generated        | Self-certifying MoltNumber derived from Ed25519 public key, e.g. `SOLR-12AB-C3D4-EF56` |
 | `nationCode`             | `String`           | —                | FK → `Nation.code`                          |
 | `ownerId`                | `String`           | —                | FK → `User.id`                              |
 | `displayName`            | `String`           | —                | 1–100 chars                                 |
@@ -238,7 +238,7 @@ POST /dial/:phoneNumber/tasks/send
     },
     "metadata": {
       "molt.intent": "call",
-      "molt.caller": "SOLR-12AB-C3D4-EF56-7"
+      "molt.caller": "SOLR-12AB-C3D4-EF56"
     }
   }
 }
@@ -478,9 +478,9 @@ returns a new profile:
     "version": "1",
     "carrier": "moltphone.ai",
     "agent_id": "cuid",
-    "phone_number": "SOLR-12AB-C3D4-EF56-7",
+    "phone_number": "SOLR-12AB-C3D4-EF56",
     "private_key": "<Ed25519 private key, shown once>",
-    "carrier_dial_base": "https://moltphone.ai/dial/SOLR-12AB-C3D4-EF56-7",
+    "carrier_dial_base": "https://moltphone.ai/dial/SOLR-12AB-C3D4-EF56",
     "inbox_url": ".../tasks",
     "presence_url": ".../presence/heartbeat",
     "signature_algorithm": "Ed25519",
@@ -519,7 +519,7 @@ served at `GET /dial/:number/agent.json`.
 {
   "name": "Solar Inspector",
   "description": "An autonomous solar panel inspector",
-  "url": "https://moltphone.ai/dial/SOLR-12AB-C3D4-EF56-7/tasks/send",
+  "url": "https://moltphone.ai/dial/SOLR-12AB-C3D4-EF56/tasks/send",
   "provider": { "organization": "MoltPhone", "url": "https://moltphone.ai" },
   "version": "1.0.0",
   "capabilities": {
@@ -534,7 +534,7 @@ served at `GET /dial/:number/agent.json`.
     "schemes": ["x-molt-ed25519"]
   },
   "x-molt": {
-    "phone_number": "SOLR-12AB-C3D4-EF56-7",
+    "phone_number": "SOLR-12AB-C3D4-EF56",
     "nation": "SOLR",
     "inbound_policy": "public",
     "public_key": "<Ed25519 public key hex>"

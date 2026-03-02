@@ -1,6 +1,7 @@
 import { PrismaClient, CreditTransactionType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateKeyPair } from '../core/moltprotocol/src/ed25519';
+import { generateMoltNumber } from '../core/moltnumber/src';
 
 const prisma = new PrismaClient();
 const SIGNUP_CREDITS = 10_000;
@@ -92,12 +93,13 @@ async function main() {
   });
   
   const kp1 = generateKeyPair();
+  const phone1 = generateMoltNumber('MOLT', kp1.publicKey);
   
   await prisma.agent.upsert({
-    where: { phoneNumber: 'MOLT-0001-0001-0001-0' },
+    where: { phoneNumber: phone1 },
     update: {},
     create: {
-      phoneNumber: 'MOLT-0001-0001-0001-0',
+      phoneNumber: phone1,
       nationCode: 'MOLT',
       ownerId: systemUser.id,
       displayName: 'MoltPhone Operator',
@@ -111,12 +113,13 @@ async function main() {
   });
   
   const kp2 = generateKeyPair();
+  const phone2 = generateMoltNumber('AION', kp2.publicKey);
   
   const agent2 = await prisma.agent.upsert({
-    where: { phoneNumber: 'AION-0001-0001-0001-0' },
+    where: { phoneNumber: phone2 },
     update: {},
     create: {
-      phoneNumber: 'AION-0001-0001-0001-0',
+      phoneNumber: phone2,
       nationCode: 'AION',
       ownerId: demoUser.id,
       displayName: 'AION Gateway Agent',
@@ -131,12 +134,13 @@ async function main() {
   });
   
   const kp3 = generateKeyPair();
+  const phone3 = generateMoltNumber('CLAW', kp3.publicKey);
   
   await prisma.agent.upsert({
-    where: { phoneNumber: 'CLAW-0001-0001-0001-0' },
+    where: { phoneNumber: phone3 },
     update: {},
     create: {
-      phoneNumber: 'CLAW-0001-0001-0001-0',
+      phoneNumber: phone3,
       nationCode: 'CLAW',
       ownerId: demoUser.id,
       displayName: 'OpenClaw Protocol Agent',
@@ -150,12 +154,13 @@ async function main() {
   });
   
   const kp4 = generateKeyPair();
+  const phone4 = generateMoltNumber('AION', kp4.publicKey);
   
   await prisma.agent.upsert({
-    where: { phoneNumber: 'AION-0001-0001-0002-0' },
+    where: { phoneNumber: phone4 },
     update: {},
     create: {
-      phoneNumber: 'AION-0001-0001-0002-0',
+      phoneNumber: phone4,
       nationCode: 'AION',
       ownerId: demoUser.id,
       displayName: 'AION Deep Think',
@@ -170,12 +175,13 @@ async function main() {
   });
   
   const kp5 = generateKeyPair();
+  const phone5 = generateMoltNumber('MOLT', kp5.publicKey);
   
   await prisma.agent.upsert({
-    where: { phoneNumber: 'MOLT-0001-0001-0002-0' },
+    where: { phoneNumber: phone5 },
     update: {},
     create: {
-      phoneNumber: 'MOLT-0001-0001-0002-0',
+      phoneNumber: phone5,
       nationCode: 'MOLT',
       ownerId: systemUser.id,
       displayName: 'MoltPhone Relay',
