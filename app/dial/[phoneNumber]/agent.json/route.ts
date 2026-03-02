@@ -12,6 +12,7 @@ import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { verifySignature } from '@/lib/ed25519';
 import { moltErrorResponse } from '@/lib/errors';
+import { getCarrierPublicKey, issueRegistrationCertificate, CARRIER_DOMAIN } from '@/lib/carrier-identity';
 import {
   MOLT_AUTH_REQUIRED,
   MOLT_POLICY_DENIED,
@@ -82,6 +83,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
     public_key: agent.publicKey ?? '',
     timestamp_window_seconds: 300,
     direct_connection_policy: agent.directConnectionPolicy,
+    // Registration certificate — proves this carrier registered this agent (offline-verifiable)
+    registration_certificate: agent.publicKey ? (() => {
+      const cert = issueRegistrationCertificate({
+        phoneNumber,
+        agentPublicKey: agent.publicKey!,
+        nationCode: agent.nationCode,
+      });
+      return {
+        version: cert.version,
+        phone_number: cert.phoneNumber,
+        agent_public_key: cert.agentPublicKey,
+        nation_code: cert.nationCode,
+        carrier_domain: cert.carrierDomain,
+        issued_at: cert.issuedAt,
+        signature: cert.signature,
+      };
+    })() : undefined,
   };
 
   const agentCard = {

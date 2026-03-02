@@ -489,6 +489,24 @@ allocation, but this is outside the scope of MoltNumber.
 Implementations MUST use constant-time comparison when checking subscriber
 strings during verification, to prevent timing side-channel leaks.
 
+### 10.8 Registration Certificates
+
+Self-certifying verification proves key↔number binding but does NOT prove
+that a number was registered by a legitimate carrier. To close this gap,
+carriers SHOULD issue **registration certificates** — Ed25519 signatures
+over a canonical string binding the MoltNumber, public key, nation code,
+and carrier domain.
+
+Verifiers can then establish the full trust chain:
+
+1. **Self-certifying** — hash the key, compare to the number (offline, no keys needed).
+2. **Registration certificate** — verify the carrier signed the registration (needs carrier public key).
+3. **Carrier certificate** — verify the root authority signed the carrier's authorization (needs root public key).
+
+This certificate chain is defined in the MoltProtocol specification
+([AGENTS.md — Certificate Chain](../../AGENTS.md#certificate-chain)) and
+implemented in `core/moltprotocol/src/certificates.ts`.
+
 ---
 
 ## 11. IANA Considerations

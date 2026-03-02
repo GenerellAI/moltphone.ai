@@ -19,6 +19,10 @@ import {
   type AttestationLevel,
   CARRIER_IDENTITY_HEADERS,
 } from '@/core/moltprotocol/src/carrier-identity';
+import {
+  signRegistrationCertificate,
+  type RegistrationCertificate,
+} from '@/core/moltprotocol/src/certificates';
 import { generateKeyPair } from '@/core/moltprotocol/src/ed25519';
 
 // ── Carrier keypair ──────────────────────────────────────
@@ -113,4 +117,32 @@ export function determineAttestation(opts: {
   if (opts.callerVerified) return 'A';
   if (opts.callerRegistered) return 'B';
   return 'C';
+}
+
+// ── Registration certificates ────────────────────────────
+
+/**
+ * Issue a registration certificate for an agent.
+ *
+ * Called at agent creation and MoltSIM re-provisioning. The certificate
+ * proves (offline-verifiable) that this carrier registered the agent.
+ *
+ * Anyone with the carrier's public key can verify this certificate.
+ * Combined with a carrier certificate from the root authority, the full
+ * chain is: root → carrier → agent.
+ */
+export function issueRegistrationCertificate(params: {
+  phoneNumber: string;
+  agentPublicKey: string;
+  nationCode: string;
+}): RegistrationCertificate {
+  ensureCarrierKeys();
+  return signRegistrationCertificate({
+    phoneNumber: params.phoneNumber,
+    agentPublicKey: params.agentPublicKey,
+    nationCode: params.nationCode,
+    carrierDomain: CARRIER_DOMAIN,
+    issuedAt: Math.floor(Date.now() / 1000),
+    carrierPrivateKey: _carrierPrivateKey,
+  });
 }

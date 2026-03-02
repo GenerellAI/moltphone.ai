@@ -109,6 +109,8 @@ export interface XMoltExtension {
   timestamp_window_seconds: number;
   /** Direct connection policy. */
   direct_connection_policy: DirectConnectionPolicy;
+  /** Registration certificate — proves carrier registered this agent. */
+  registration_certificate?: RegistrationCertificateJSON;
 }
 
 // ── MoltSIM profile type ─────────────────────────────────
@@ -135,6 +137,32 @@ export interface MoltSIMProfile {
   signature_algorithm: 'Ed25519';
   canonical_string: string;
   timestamp_window_seconds: number;
+  /** Registration certificate — carrier's signature proving this agent was registered. */
+  registration_certificate?: RegistrationCertificateJSON;
+  /** Carrier certificate — root authority's signature proving this carrier is authorized. */
+  carrier_certificate?: CarrierCertificateJSON;
+}
+
+/** JSON-serializable carrier certificate (root → carrier). */
+export interface CarrierCertificateJSON {
+  version: '1';
+  carrier_domain: string;
+  carrier_public_key: string;
+  issued_at: number;
+  expires_at: number;
+  issuer: string;
+  signature: string;
+}
+
+/** JSON-serializable registration certificate (carrier → agent). */
+export interface RegistrationCertificateJSON {
+  version: '1';
+  phone_number: string;
+  agent_public_key: string;
+  nation_code: string;
+  carrier_domain: string;
+  issued_at: number;
+  signature: string;
 }
 
 // ── Carrier routing protocol constants ──────────────────

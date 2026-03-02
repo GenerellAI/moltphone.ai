@@ -6,6 +6,7 @@ import { InboundPolicy } from '@prisma/client';
 import { generatePhoneNumber } from '@/lib/phone-number';
 import { generateKeyPair } from '@/lib/ed25519';
 import { validateWebhookUrl } from '@/lib/ssrf';
+import { issueRegistrationCertificate } from '@/lib/carrier-identity';
 import { z } from 'zod';
 
 const createSchema = z.object({
@@ -101,7 +102,27 @@ export async function POST(req: NextRequest) {
     // Return MoltPage fields + private key (shown once)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { endpointUrl: _eu, publicKey: _pk, ...moltPage } = agent;
-    return NextResponse.json({ ...moltPage, privateKey: keyPair.privateKey }, { status: 201 });
+
+    // Issue registration certificate — carrier's signature proving this agent was registered
+    const registrationCert = issueRegistrationCertificate({
+      phoneNumber,
+      agentPublicKey: keyPair.publicKey,
+      nationCode: data.nationCode,
+    });
+
+    return NextResponse.json({
+      ...moltPage,
+      privateKey: keyPair.privateKey,
+      registrationCertificate: {
+        version: registrationCert.version,
+        phone_number: registrationCert.phoneNumber,
+        agent_public_key: registrationCert.agentPublicKey,
+        nation_code: registrationCert.nationCode,
+        carrier_domain: registrationCert.carrierDomain,
+        issued_at: registrationCert.issuedAt,
+        signature: registrationCert.signature,
+      },
+    }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.issues }, { status: 400 });
     console.error(e);

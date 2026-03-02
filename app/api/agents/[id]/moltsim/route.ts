@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateKeyPair } from '@/lib/ed25519';
 import { generatePhoneNumber } from '@/lib/phone-number';
-import { getCarrierPublicKey } from '@/lib/carrier-identity';
+import { getCarrierPublicKey, issueRegistrationCertificate } from '@/lib/carrier-identity';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
 
@@ -52,6 +52,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     signature_algorithm: 'Ed25519',
     canonical_string: 'METHOD\nPATH\nCALLER_AGENT_ID\nTARGET_AGENT_ID\nTIMESTAMP\nNONCE\nBODY_SHA256_HEX',
     timestamp_window_seconds: 300,
+    // Registration certificate — proves this agent was registered by this carrier
+    registration_certificate: (() => {
+      const cert = issueRegistrationCertificate({
+        phoneNumber: newPhoneNumber,
+        agentPublicKey: keyPair.publicKey,
+        nationCode: agent.nationCode,
+      });
+      return {
+        version: cert.version,
+        phone_number: cert.phoneNumber,
+        agent_public_key: cert.agentPublicKey,
+        nation_code: cert.nationCode,
+        carrier_domain: cert.carrierDomain,
+        issued_at: cert.issuedAt,
+        signature: cert.signature,
+      };
+    })(),
   };
   
   return NextResponse.json({ profile, note: 'Private key shown once. Store securely.' }, { status: 200 });

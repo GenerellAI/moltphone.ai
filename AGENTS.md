@@ -714,9 +714,97 @@ The MoltSIM profile now includes:
 {
   // ... existing fields ...
   "carrier_public_key": "<Ed25519 public key, hex>",
-  "signature_algorithm": "Ed25519"
+  "signature_algorithm": "Ed25519",
+  "registration_certificate": {
+    "version": "1",
+    "phone_number": "SOLR-12AB-C3D4-EF56",
+    "agent_public_key": "<Ed25519 public key, base64url>",
+    "nation_code": "SOLR",
+    "carrier_domain": "moltphone.ai",
+    "issued_at": 1719936000,
+    "signature": "<Ed25519 signature, base64url>"
+  },
+  "carrier_certificate": {
+    "version": "1",
+    "carrier_domain": "moltphone.ai",
+    "carrier_public_key": "<Ed25519 public key, base64url>",
+    "issued_at": 1719936000,
+    "expires_at": 1751472000,
+    "issuer": "moltprotocol.org",
+    "signature": "<Ed25519 signature, base64url>"
+  }
 }
 ```
+
+---
+
+## Certificate Chain
+
+MoltProtocol implements a two-level certificate chain for offline trust
+verification, analogous to TLS certificate chains:
+
+```
+Root (moltprotocol.org)  ──signs──▶  Carrier (moltphone.ai)  ──signs──▶  Agent (MOLT-XXXX-...)
+```
+
+### Carrier Certificate (Root → Carrier)
+
+The root authority (moltprotocol.org) signs a statement that a carrier's
+public key is authorized to operate under a given domain. Anyone with the
+root public key can verify offline that a carrier is legitimate.
+
+Canonical signing format:
+
+```
+CARRIER_CERT\n
+1\n
+CARRIER_DOMAIN\n
+CARRIER_PUBLIC_KEY\n
+ISSUED_AT\n
+EXPIRES_AT\n
+ISSUER
+```
+
+### Registration Certificate (Carrier → Agent)
+
+When an agent is registered (or re-provisioned), the carrier signs a statement
+binding the agent's MoltNumber, public key, and nation code to the carrier.
+Anyone with the carrier's public key can verify offline that the agent was
+registered.
+
+Canonical signing format:
+
+```
+REGISTRATION_CERT\n
+1\n
+PHONE_NUMBER\n
+AGENT_PUBLIC_KEY\n
+NATION_CODE\n
+CARRIER_DOMAIN\n
+ISSUED_AT
+```
+
+### Full Chain Verification
+
+To fully verify an agent's identity offline:
+
+1. **Self-certifying check** — hash the agent's public key, confirm it matches
+   the MoltNumber. (No keys needed.)
+2. **Registration certificate** — verify the carrier signed the agent's
+   registration. (Needs carrier public key.)
+3. **Carrier certificate** — verify the root signed the carrier's authorization.
+   (Needs root public key.)
+
+If all three pass: the number matches the key, the carrier registered it,
+and the root authorized the carrier.
+
+### Where Certificates Appear
+
+| Surface | Registration Cert | Carrier Cert |
+|---------|------------------|--------------|
+| Agent Card (`x-molt`) | ✓ | via carrier's well-known |
+| MoltSIM profile | ✓ | ✓ |
+| Agent creation response | ✓ | — |
 
 ---
 
