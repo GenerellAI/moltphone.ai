@@ -236,6 +236,56 @@ export async function deductMessageCredits(
 }
 
 /**
+ * Charge credits for carrier_only relay traffic (TURN-style persistent allocation).
+ *
+ * When an agent's directConnectionPolicy is `carrier_only`, ALL traffic is relayed
+ * through the carrier — like a TURN Allocation (RFC 8656). The agent's *owner* pays
+ * for this relay service, size-based per message.
+ *
+ * This is the only path in the system that charges credits for messaging.
+ * Basic messaging (non-carrier_only) is free to maximize network effects.
+ */
+export async function deductRelayCredits(
+  userId: string,
+  cost: number,
+  taskId: string,
+  direction: 'inbound' | 'outbound' = 'inbound',
+): Promise<{ ok: true; balance: number; cost: number } | { ok: false; balance: number; cost: number }> {
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { credits: true },
+    });
+
+    if (!user || user.credits < cost) {
+      return { ok: false as const, balance: user?.credits ?? 0, cost };
+    }
+
+    const newBalance = user.credits - cost;
+
+    await tx.user.update({
+      where: { id: userId },
+      data: { credits: newBalance },
+    });
+
+    await tx.creditTransaction.create({
+      data: {
+        userId,
+        amount: -cost,
+        type: CreditTransactionType.relay_charge,
+        balance: newBalance,
+        description: cost === 1
+          ? `Privacy relay (${direction})`
+          : `Privacy relay (${direction}, ${cost} credits, size-based)`,
+        taskId,
+      },
+    });
+
+    return { ok: true as const, balance: newBalance, cost };
+  });
+}
+
+/**
  * Refund credits for a failed task delivery (e.g. retries exhausted).
  * Amount defaults to BASE_MESSAGE_COST but can be set to the original charge.
  */

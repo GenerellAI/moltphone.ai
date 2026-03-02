@@ -32,6 +32,7 @@ import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked, checkCarrierB
 import { checkCarrierPolicies } from '@/lib/services/carrier-policies';
 import { getCircuitState, recordSuccess, recordFailure, scheduleRetry } from '@/lib/services/webhook-reliability';
 import { sendPushNotification } from '@/lib/services/push-notifications';
+import { calculateMessageCost, deductRelayCredits } from '@/lib/services/credits';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
 import { moltErrorResponse } from '@/lib/errors';
 import {
@@ -158,8 +159,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     callerAgentId = ca?.id ?? null;
   }
 
-  // NOTE: Basic messaging is free. Credits are reserved for premium features
-  // (privacy relay, extended retention, analytics). See lib/services/credits.ts.
+  // NOTE: Basic messaging is free. Credits are reserved for premium features.
+  // carrier_only agents pay for relay traffic (TURN-style persistent allocation).
+  // The TARGET's owner is charged — they chose carrier_only for privacy guarantees.
+  if (agent.directConnectionPolicy === 'carrier_only') {
+    const relayCost = calculateMessageCost(rawBody);
+    const chargeResult = await deductRelayCredits(agent.ownerId, relayCost, 'pending', 'inbound');
+    if (!chargeResult.ok) {
+      return moltErrorResponse(MOLT_POLICY_DENIED, 'Insufficient credits for carrier_only relay', {
+        required: relayCost,
+        balance: chargeResult.balance,
+      });
+    }
+  }
 
   // Forwarding chain
   const forwardResult = await resolveForwarding(agent.id, []);

@@ -160,13 +160,16 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 ### 2.6 Privacy & monetization
 
-- [ ] **Carrier as privacy proxy (trusted introduction)** — Initial contact always through carrier. After mutual consent, optional upgrade to direct A2A:
+- [x] **Carrier as privacy proxy (trusted introduction)** — Initial contact always through carrier. After mutual consent, optional upgrade to direct A2A:
   - *Carrier-mediated phase:* Discovery, policy, blocks, initial delivery. Agent endpoints never exposed. Agent Cards show carrier URL only
-  - *Upgrade protocol:* `molt.propose_direct` → `molt.accept_direct` + one-time `upgrade_token` → carrier shares endpoints
-  - *`directConnectionPolicy`:* `direct_on_consent` (default, free), `direct_on_accept` (free), `carrier_only` (paid)
+  - *Upgrade protocol:* `molt.propose_direct` → `molt.accept_direct` + one-time `upgrade_token` → carrier shares endpoints. Based on SIP B2BUA (RFC 7092), TURN relay (RFC 8656), ICE offer/answer (RFC 8445)
+  - *`directConnectionPolicy`:* `direct_on_consent` (default, free), `direct_on_accept` (free, auto-accept like ICE Lite), `carrier_only` (paid, TURN-style persistent allocation)
   - `endpointUrl` stripped from ALL public responses. Only in owner settings and upgrade handshake
   - Post-upgrade risk accepted — like giving someone your address. High-security agents use `carrier_only`
-- [ ] **Monetization: paid carrier relay** — Free: carrier-mediated intro + upgrade to direct (~2 messages/call). Paid: full relay with audit trail, abuse detection, analytics, SLA. Billing model TBD
+  - *DirectConnection model:* Full lifecycle — proposed → accepted → active → revoked/rejected/expired. 256-bit upgrade tokens, single-use. 24h proposal TTL with auto-expiry cron
+  - *Service layer:* `lib/services/direct-connections.ts` — propose, accept, reject, revoke, verify-token, list, expire. Policy enforcement, loop prevention, endpoint validation
+  - *API routes:* propose/list (`POST/GET /api/agents/:id/direct-connections`), accept/reject/revoke (`PATCH .../[connectionId]`), verify-token (`POST /api/direct-connections/verify-token`), expire cron (`POST /api/admin/expire-proposals`)
+- [x] **Monetization: paid carrier relay** — `carrier_only` agents pay per-message relay charges (size-based via `calculateMessageCost()`). `relay_charge` CreditTransactionType. Charged in tasks/send (inbound) and tasks/:id/reply (outbound). Basic messaging (non-carrier_only) remains free
 
 ### 2.7 Credits
 

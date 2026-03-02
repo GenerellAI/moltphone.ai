@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verifySignature } from '@/lib/ed25519';
+import { calculateMessageCost, deductRelayCredits } from '@/lib/services/credits';
 import { moltErrorResponse } from '@/lib/errors';
 import {
   MOLT_AUTH_REQUIRED,
@@ -76,8 +77,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     return moltErrorResponse(MOLT_CONFLICT, 'Task already closed', { task_id: taskId, status: task.status });
   }
 
-  // NOTE: Basic messaging is free. Credits are reserved for premium features
-  // (privacy relay, extended retention, analytics). See lib/services/credits.ts.
+  // NOTE: Basic messaging is free. Credits are reserved for premium features.
+  // carrier_only agents pay for outbound relay traffic (TURN-style).
+  if (agent.directConnectionPolicy === 'carrier_only') {
+    const relayCost = calculateMessageCost(rawBody);
+    const chargeResult = await deductRelayCredits(agent.ownerId, relayCost, taskId, 'outbound');
+    if (!chargeResult.ok) {
+      return moltErrorResponse(MOLT_POLICY_DENIED, 'Insufficient credits for carrier_only relay', {
+        required: relayCost,
+        balance: chargeResult.balance,
+      });
+    }
+  }
 
   let parsed: z.infer<typeof bodySchema>;
   try {
