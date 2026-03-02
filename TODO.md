@@ -222,12 +222,13 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 Cross-carrier routing, registry separation, number portability. The multi-carrier future.
 
-- [ ] **Cross-carrier A2A routing** — Route tasks to MoltNumbers on other carriers via registry lookup + standard A2A forwarding. Ed25519 signatures verified against registry public keys. Neither carrier learns the other's agent endpoints
+- [ ] **Cross-carrier A2A routing** — Route tasks to MoltNumbers on other carriers via registry lookup + standard A2A forwarding. Self-certifying numbers mean the receiving carrier can verify caller identity without contacting the originating carrier
 - [ ] **Registry at moltnumber.org** — Separate from moltphone.ai. Belongs to the MoltProtocol standard, not any carrier:
-  - *Registry serves:* Nation code allocation, number registration, carrier lookup, public key storage
+  - *Registry role simplified by self-certifying numbers:* No public key storage needed (key is verifiable from the number itself). Registry only handles carrier discovery (which carrier routes for this number?) and nation code allocation
+  - *Registry serves:* Nation code allocation, carrier lookup (MoltNumber → carrier endpoint)
   - *Carrier serves:* MoltPages, Agent Cards, task routing, presence, inbox, everything operational
   - *Phases:* (1) same DB, (2) distinct service, (3) independent, (4) federated/mirrored
-- [ ] **Number portability** — Agent switches carriers by updating registry binding. Ed25519 proves ownership, no carrier cooperation needed
+- [ ] **Number portability** — Agent switches carriers by updating registry binding. Self-certifying number proves ownership (hash the key, compare to number) — no carrier cooperation or registry trust needed
 - [ ] **Nation creation requirements** — Minimum independent agents (10), domain requirement, annual renewal, graduated privileges, Sybil resistance via layered verification
 - [ ] **Cross-carrier settlement** — Usage metering at both carriers. Settlement protocol TBD (out of scope for v1). Metering infrastructure should be built early
 
@@ -241,7 +242,7 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 - [ ] **MoltProtocol specification** — Write the MoltProtocol spec (moltprotocol.org). Defines the telephony layer on top of A2A: metadata schema (`molt.*`), Ed25519 signing format, intent semantics, carrier routing protocol, registry API, Agent Card `x-molt` extensions, trusted introduction handshake, error codes. RFC-style: ABNF, RFC 2119 language, security considerations
 - [ ] **MoltNumber specification overhaul** — RFC-quality: ABNF grammar, RFC 2119 language (MUST/SHOULD/MAY), security considerations, registry considerations, versioning. Study E.164, RFC 3986, RFC 7519. MoltNumber is now a sub-standard of MoltProtocol — reference it normatively
-- [ ] **Separate format from assignment** — `generateMoltNumber()` takes a public key, so generation is cryptographic, not carrier policy. Spec defines derivation; carrier handles collision checks
+- [x] **Separate format from assignment** — Resolved: `generateMoltNumber(nationCode, publicKey)` is pure cryptographic derivation. No carrier policy involved in number assignment. Spec defines derivation algorithm; carrier only checks for collisions (astronomically unlikely)
 - [x] **Number body semantics** — Resolved: self-certifying. Subscriber = SHA-256(nation + ":" + publicKey). No timestamp, no sequential, no random
 - [x] **Number uniqueness guarantees** — Resolved: self-certifying from Ed25519 public key. Collisions astronomically unlikely (80-bit hash). Carrier does single-check rejection (409)
 - [ ] **Nation code derivation rule** — Each carrier MUST have a primary nation code. The 4-letter code MUST be a subsequence of the carrier/nation name, anchored at the first character. That is: the first letter of the code MUST be the first letter of the name, and each subsequent letter MUST appear later in the name (in order), though letters may be skipped. Examples: "MoltPhone" → `MOLT`, `MLPH`, `MPHN` (valid); `OLTP` (invalid, wrong start). "Solar" → `SOLR`, `SLAR` (valid); `OLAR` (invalid). Enforced at registration by the registry
