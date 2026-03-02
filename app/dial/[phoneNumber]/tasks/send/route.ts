@@ -34,6 +34,12 @@ import {
   MOLT_BAD_REQUEST,
   MOLT_POLICY_DENIED,
   MOLT_NOT_FOUND,
+  MOLT_OFFLINE,
+  MOLT_BUSY,
+  MOLT_DND,
+  MOLT_FORWARDING_FAILED,
+  MOLT_WEBHOOK_FAILED,
+  MOLT_WEBHOOK_TIMEOUT,
 } from '@/core/moltprotocol/src/errors';
 import { Prisma, TaskIntent, TaskStatus } from '@prisma/client';
 import { z } from 'zod';
@@ -117,25 +123,27 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     ? agent
     : (await prisma.agent.findUnique({ where: { id: targetAgentId, isActive: true } }) ?? agent);
 
-  // DND → queue as submitted (pending task / away-message)
-  if (finalAgent.dndEnabled) {
-    const task = await prisma.task.create({
+  // Helper: create and persist a task record
+  const createTask = (reason: string, status: TaskStatus = TaskStatus.submitted) =>
+    prisma.task.create({
       data: {
         taskId: parsed.id,
         sessionId: parsed.sessionId,
         calleeId: finalAgent.id,
         callerId: callerAgentId,
         intent,
-        status: TaskStatus.submitted,
+        status,
         forwardingHops,
         messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
-        events: { create: { type: 'task.created', payload: { reason: 'dnd' }, sequenceNumber: 1 } },
+        events: { create: { type: 'task.created', payload: { reason }, sequenceNumber: 1 } },
       },
     });
-    return NextResponse.json({
-      id: task.id,
-      status: 'submitted',
-      reason: 'dnd',
+
+  // DND → queue as submitted (pending task / away-message)
+  if (finalAgent.dndEnabled) {
+    const task = await createTask('dnd');
+    return moltErrorResponse(MOLT_DND, 'Agent on DND (task queued)', {
+      task_id: task.id,
       away_message: finalAgent.awayMessage ?? null,
     });
   }
@@ -145,23 +153,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     where: { calleeId: finalAgent.id, status: TaskStatus.working },
   });
   if (activeTasks >= finalAgent.maxConcurrentCalls) {
-    const task = await prisma.task.create({
-      data: {
-        taskId: parsed.id,
-        sessionId: parsed.sessionId,
-        calleeId: finalAgent.id,
-        callerId: callerAgentId,
-        intent,
-        status: TaskStatus.submitted,
-        forwardingHops,
-        messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
-        events: { create: { type: 'task.created', payload: { reason: 'busy' }, sequenceNumber: 1 } },
-      },
-    });
-    return NextResponse.json({
-      id: task.id,
-      status: 'submitted',
-      reason: 'busy',
+    const task = await createTask('busy');
+    return moltErrorResponse(MOLT_BUSY, 'Agent busy (task queued)', {
+      task_id: task.id,
       away_message: finalAgent.awayMessage ?? null,
     });
   }
@@ -174,6 +168,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     if (ssrfCheck.ok) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), RING_TIMEOUT_MS);
+      let webhookErrorType: 'timeout' | 'failed' | null = null;
       try {
         const response = await fetch(finalAgent.endpointUrl, {
           method: 'POST',
@@ -217,39 +212,33 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
             status: intent === 'text' ? 'completed' : 'working',
             message: { parts: responseParts },
           });
+        } else {
+          webhookErrorType = 'failed';
         }
-      } catch {
+      } catch (e) {
         clearTimeout(timeout);
+        webhookErrorType = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'failed';
       }
+
+      // Webhook failed or timed out — return structured error with queued task
+      const reason = webhookErrorType === 'timeout' ? 'webhook_timeout' : 'webhook_failed';
+      const task = await createTask(reason);
+      const errorCode = webhookErrorType === 'timeout' ? MOLT_WEBHOOK_TIMEOUT : MOLT_WEBHOOK_FAILED;
+      const errorMsg = webhookErrorType === 'timeout' ? 'Webhook timed out' : 'Webhook delivery failed';
+      return moltErrorResponse(errorCode, errorMsg, { task_id: task.id });
     }
   }
 
-  // Offline or webhook failed → queue
-  const queueStatus: TaskStatus = loopDetected ? TaskStatus.failed : TaskStatus.submitted;
-  const task = await prisma.task.create({
-    data: {
-      taskId: parsed.id,
-      sessionId: parsed.sessionId,
-      calleeId: finalAgent.id,
-      callerId: callerAgentId,
-      intent,
-      status: queueStatus,
-      forwardingHops,
-      messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
-      events: {
-        create: {
-          type: 'task.created',
-          payload: { reason: loopDetected ? 'forwarding_loop' : (online ? 'webhook_failed' : 'offline') },
-          sequenceNumber: 1,
-        },
-      },
-    },
-  });
+  // Forwarding loop → fail
+  if (loopDetected) {
+    const task = await createTask('forwarding_loop', TaskStatus.failed);
+    return moltErrorResponse(MOLT_FORWARDING_FAILED, 'Forwarding failed', { task_id: task.id });
+  }
 
-  // For text intent always treat as submitted (async delivery)
-  return NextResponse.json({
-    id: task.id,
-    status: queueStatus,
-    away_message: queueStatus === TaskStatus.submitted ? (finalAgent.awayMessage ?? null) : null,
+  // Offline → queue as submitted
+  const task = await createTask('offline');
+  return moltErrorResponse(MOLT_OFFLINE, 'Agent offline (task queued)', {
+    task_id: task.id,
+    away_message: finalAgent.awayMessage ?? null,
   });
 }

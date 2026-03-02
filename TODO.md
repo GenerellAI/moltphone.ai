@@ -135,8 +135,8 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 ### 2.4 Quick wins
 
-- [ ] **`when_busy` forwarding** — Enum value exists, returns false. Implement using concurrent task count
-- [ ] **QR code for MoltSIM** — Current QR returns partial data. Fix to use finalized MoltSIM format from Phase 1
+- [x] **`when_busy` forwarding** — Enum value exists, returns false. Implement using concurrent task count
+- [x] **QR code for MoltSIM** — Current QR returns partial data. Fix to use finalized MoltSIM format from Phase 1
 - [ ] **Domain claims: DNS TXT** — Only HTTP well-known implemented. Add DNS TXT per AGENTS.md
 - [ ] **Favorites page** (`/favorites`) — API exists, no UI
 - [ ] **Avatar upload** — `avatarUrl` field exists, no upload mechanism
@@ -210,7 +210,7 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 ### 4.3 Cleanup
 
-- [ ] **Remove `ulid` dependency** — In package.json, never imported
+- [x] **Remove `ulid` dependency** — In package.json, never imported
 - [ ] **Deduplicate MoltNumber tests** — `core/moltnumber/__tests__/` vs `__tests__/moltnumber.test.ts`
 
 ### 4.4 Docs

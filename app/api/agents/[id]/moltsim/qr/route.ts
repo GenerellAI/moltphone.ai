@@ -16,16 +16,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   
   const slug = agent.phoneNumber;
-  const data = JSON.stringify({
+  // Encode the full MoltSIM profile structure (minus private_key, which is not stored)
+  const profile = {
+    version: '1',
+    carrier: 'moltphone.ai',
     agent_id: agent.id,
     phone_number: agent.phoneNumber,
     carrier_dial_base: DIAL_BASE_URL,
     inbox_url: `${DIAL_BASE_URL}/${slug}/tasks`,
-    task_send_url: `${DIAL_BASE_URL}/${slug}/tasks/send`,
-    agent_card_url: `${DIAL_BASE_URL}/${slug}/agent.json`,
+    task_reply_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/reply`,
+    task_cancel_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/cancel`,
+    presence_url: `${DIAL_BASE_URL}/${slug}/presence/heartbeat`,
     public_key: agent.publicKey,
-  });
+    signature_algorithm: 'Ed25519',
+    canonical_string: 'METHOD\nPATH\nCALLER_AGENT_ID\nTARGET_AGENT_ID\nTIMESTAMP\nNONCE\nBODY_SHA256_HEX',
+    timestamp_window_seconds: 300,
+  };
   
-  const qr = await QRCode.toDataURL(data);
+  const qr = await QRCode.toDataURL(JSON.stringify(profile));
   return NextResponse.json({ qr });
 }
