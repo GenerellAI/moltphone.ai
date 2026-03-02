@@ -13,8 +13,11 @@ import { CreditTransactionType } from '@prisma/client';
 /** Credits granted to new users on signup. Generous in early access. */
 export const SIGNUP_CREDITS = 10_000;
 
-/** Cost per task sent (calls and texts equal for now). */
+/** Cost to create a new task (initial message). */
 export const TASK_COST = 1;
+
+/** Cost per message in a multi-turn conversation (replies, follow-ups). */
+export const MESSAGE_COST = 1;
 
 // ── Query ────────────────────────────────────────────────
 
@@ -149,6 +152,47 @@ export async function deductTaskCredits(
         type: CreditTransactionType.task_send,
         balance: newBalance,
         description: 'Task sent',
+        taskId,
+      },
+    });
+
+    return { ok: true as const, balance: newBalance };
+  });
+}
+
+/**
+ * Deduct credits for a message in an existing task (reply / follow-up).
+ * Charges the sender's owner. Returns { ok, balance } or { ok: false, balance }.
+ */
+export async function deductMessageCredits(
+  userId: string,
+  taskId: string,
+  description = 'Message sent',
+): Promise<{ ok: true; balance: number } | { ok: false; balance: number }> {
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+      where: { id: userId },
+      select: { credits: true },
+    });
+
+    if (!user || user.credits < MESSAGE_COST) {
+      return { ok: false as const, balance: user?.credits ?? 0 };
+    }
+
+    const newBalance = user.credits - MESSAGE_COST;
+
+    await tx.user.update({
+      where: { id: userId },
+      data: { credits: newBalance },
+    });
+
+    await tx.creditTransaction.create({
+      data: {
+        userId,
+        amount: -MESSAGE_COST,
+        type: CreditTransactionType.task_message,
+        balance: newBalance,
+        description,
         taskId,
       },
     });

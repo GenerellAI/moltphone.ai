@@ -34,7 +34,8 @@ model User {
 enum CreditTransactionType {
   signup_grant      // Free credits on registration
   admin_grant       // Admin-issued credits
-  task_send         // Deducted when sending a task
+  task_send         // Deducted when creating a new task
+  task_message      // Deducted per message in a multi-turn conversation
   refund            // Refund for failed delivery
 }
 

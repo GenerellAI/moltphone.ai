@@ -172,11 +172,12 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 - [x] **MoltPhone Credits** — Internal platform currency (database-tracked, no blockchain):
   - `credits` field on User model (balance). `CreditTransaction` ledger (amount, type, balance, description, taskId)
-  - `CreditTransactionType` enum: `signup_grant`, `admin_grant`, `task_send`, `refund`
-  - `lib/services/credits.ts` — `grantSignupCredits()`, `deductTaskCredits()`, `adminGrantCredits()`, `refundTaskCredits()`, `getBalance()`, `getTransactionHistory()`
-  - `SIGNUP_CREDITS = 10,000` (generous early access). `TASK_COST = 1` per task sent
+  - `CreditTransactionType` enum: `signup_grant`, `admin_grant`, `task_send`, `task_message`, `refund`
+  - `lib/services/credits.ts` — `grantSignupCredits()`, `deductTaskCredits()`, `deductMessageCredits()`, `adminGrantCredits()`, `refundTaskCredits()`, `getBalance()`, `getTransactionHistory()`
+  - `SIGNUP_CREDITS = 10,000` (generous early access). `TASK_COST = 1` per task created. `MESSAGE_COST = 1` per message in multi-turn conversations
   - Signup grant: automatic on registration, idempotent
   - Task deduction: wired into tasks/send (after policy checks, before routing). Uses DB transaction for atomicity
+  - **Per-message billing**: reply route deducts 1 credit from callee's owner per reply message. Multi-turn calls cost credits proportional to traffic volume, not flat per-task
   - `GET /api/credits` — User balance + paginated transaction history
   - `POST /api/admin/credits/grant` — Admin-only credit grant (userId, amount, description)
   - Refund support for failed deliveries (retries_exhausted)
