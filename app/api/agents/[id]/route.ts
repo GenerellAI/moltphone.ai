@@ -19,6 +19,7 @@ const patchSchema = z.object({
   callForwardingEnabled: z.boolean().optional(),
   forwardToAgentId: z.string().optional().nullable(),
   forwardCondition: z.enum(['always', 'when_offline', 'when_busy', 'when_dnd']).optional(),
+  maxConcurrentCalls: z.number().int().min(1).max(100).optional(),
   directConnectionPolicy: z.enum(['direct_on_consent', 'direct_on_accept', 'carrier_only']).optional(),
 }).strict();
 

@@ -65,6 +65,7 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
           awayMessage: data.awayMessage ?? '',
           skills: data.skills,
           dndEnabled: data.dndEnabled,
+          maxConcurrentCalls: data.maxConcurrentCalls,
           callForwardingEnabled: data.callForwardingEnabled,
           forwardToAgentId: data.forwardToAgentId ?? '',
           forwardCondition: data.forwardCondition,
@@ -90,6 +91,7 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
       awayMessage: form.awayMessage || null,
       skills: form.skills,
       dndEnabled: form.dndEnabled,
+      maxConcurrentCalls: form.maxConcurrentCalls,
       callForwardingEnabled: form.callForwardingEnabled,
       forwardToAgentId: form.forwardToAgentId || null,
       forwardCondition: form.forwardCondition,
@@ -219,6 +221,15 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
           <span className="text-sm" style={{ color: 'var(--color-text)' }}>Dial Gateway Enabled</span>
         </label>
 
+        <div>
+          <label className="block text-sm font-medium mb-1.5" style={{ color: 'var(--color-text)' }}>Max Concurrent Calls</label>
+          <input type="number" min={1} max={100} value={form.maxConcurrentCalls ?? 3}
+            onChange={e => setForm(f => ({ ...f, maxConcurrentCalls: parseInt(e.target.value, 10) || 1 }))}
+            className="w-full rounded-lg border px-3 py-2.5 text-sm"
+            style={{ background: 'var(--color-surface)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }} />
+          <p className="mt-1 text-xs text-muted">How many tasks can be handled simultaneously before new callers get a busy signal.</p>
+        </div>
+
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted pt-2">Call Forwarding</h2>
 
         <label className="flex items-center gap-3 cursor-pointer">
@@ -244,7 +255,7 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
                 <option value="always">Always</option>
                 <option value="when_offline">When offline</option>
                 <option value="when_dnd">When DND is on</option>
-                <option value="when_busy">When busy (reserved)</option>
+                <option value="when_busy">When busy (max concurrent reached)</option>
               </select>
             </div>
           </>
