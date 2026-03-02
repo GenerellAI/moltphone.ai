@@ -13,8 +13,8 @@ const VERIFY_CARRIER = (process.env.VERIFY_CARRIER || 'true').toLowerCase() !== 
 const HEARTBEAT_ENABLED = (process.env.HEARTBEAT_ENABLED || 'true').toLowerCase() !== 'false';
 const HEARTBEAT_INTERVAL_SECONDS = parseInt(process.env.HEARTBEAT_INTERVAL_SECONDS || '120', 10);
 const OPENCLAW_BIN = process.env.OPENCLAW_BIN || 'openclaw';
-const OPENCLAW_TIMEOUT_MS = parseInt(process.env.OPENCLAW_TIMEOUT_MS || '45000', 10);
-const OPENCLAW_ARGS_JSON = process.env.OPENCLAW_ARGS_JSON || '[]';
+const OPENCLAW_TIMEOUT_MS = parseInt(process.env.OPENCLAW_TIMEOUT_MS || '60000', 10);
+const OPENCLAW_THINKING = process.env.OPENCLAW_THINKING || '';   // off|minimal|low|medium|high|xhigh
 const ERROR_MODE = (process.env.ERROR_MODE || 'respond').toLowerCase(); // respond | fail
 
 function log(...args) {
@@ -160,14 +160,20 @@ function extractTextParts(payload) {
 function extractReplyText(stdout, stderr) {
   const cleaned = stripAnsi(String(stdout || '')).trim();
   if (cleaned) {
+    // OpenClaw --json outputs structured JSON with the reply text.
+    // Try to parse it from the last line(s).
     const lines = cleaned.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     for (let i = lines.length - 1; i >= 0; i -= 1) {
       const maybeJson = parseJsonSafe(lines[i]);
       if (maybeJson && typeof maybeJson === 'object') {
-        const direct = maybeJson.text || maybeJson.response || maybeJson.output;
+        // --json mode: { text, media, metadata, ... }
+        if (typeof maybeJson.text === 'string' && maybeJson.text.trim()) return maybeJson.text.trim();
+        // Fallback fields
+        const direct = maybeJson.response || maybeJson.output || maybeJson.reply;
         if (typeof direct === 'string' && direct.trim()) return direct.trim();
       }
     }
+    // Non-JSON: last non-empty line is the reply
     return lines[lines.length - 1];
   }
 
@@ -180,15 +186,14 @@ function extractReplyText(stdout, stderr) {
   return 'OpenClaw completed without output.';
 }
 
-function parseOpenClawArgs(extraArgsJson) {
-  const parsed = parseJsonSafe(extraArgsJson);
-  if (!Array.isArray(parsed)) return [];
-  return parsed.filter((v) => typeof v === 'string' && v.length > 0);
-}
-
 async function runOpenClawTask({ sessionId, message }) {
-  const extraArgs = parseOpenClawArgs(OPENCLAW_ARGS_JSON);
-  const args = ['agent', '--session-id', sessionId, '--message', message, ...extraArgs];
+  // --local: skip the Gateway, run embedded agent runtime directly
+  // --json: structured output for reliable parsing
+  // --session-id: maintain conversation context across turns
+  const args = ['agent', '--local', '--json', '--session-id', sessionId, '--message', message];
+  if (OPENCLAW_THINKING) {
+    args.push('--thinking', OPENCLAW_THINKING);
+  }
 
   return new Promise((resolve) => {
     const child = spawn(OPENCLAW_BIN, args, {
