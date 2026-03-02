@@ -24,6 +24,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import { verifyInboundDelivery, type MoltUAConfig, type InboundDeliveryHeaders } from '../core/moltprotocol/src/molt-ua';
+import { signRequest } from '../core/moltprotocol/src/ed25519';
 
 // ── CLI args ─────────────────────────────────────────────
 
@@ -78,7 +79,8 @@ if (MOLTSIM_PATH) {
       carrierPublicKey: profile.carrier_public_key,
       carrierDomain: profile.carrier_domain || 'moltphone.ai',
       timestampWindowSeconds: profile.timestamp_window_seconds || 300,
-    };
+      carrierDialBase: profile.carrier_dial_base,
+    } as MoltUAConfig & { carrierDialBase?: string };
 
     console.log(`${c.green}✓${c.reset} Loaded MoltSIM for ${c.bold}${moltUAConfig.phoneNumber}${c.reset}`);
     console.log(`  Carrier: ${moltUAConfig.carrierDomain}`);
@@ -90,6 +92,73 @@ if (MOLTSIM_PATH) {
 } else if (!SKIP_VERIFY) {
   console.log(`${c.yellow}⚠${c.reset} No MoltSIM loaded — carrier signature verification ${c.yellow}disabled${c.reset}`);
   console.log(`  Use ${c.dim}--moltsim path/to/sim.json${c.reset} to enable MoltUA verification`);
+}
+
+// ── Heartbeat sender ─────────────────────────────────────
+
+const HEARTBEAT_INTERVAL_MS = 60_000; // every 60s (presence TTL is 5 min)
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+
+async function sendHeartbeat() {
+  if (!moltUAConfig) return;
+  const phoneNumber = moltUAConfig.phoneNumber;
+  const carrierBase = (moltUAConfig as any).carrierDialBase || `http://localhost:3000/dial/${phoneNumber}`;
+
+  // After NextResponse.rewrite(), Next.js keeps the *original* request URL in
+  // req.url, so the route handler sees /<number>/... not /dial/<number>/...
+  // Sign with the original path to match what the handler verifies against.
+  const canonicalPath = `/${phoneNumber}/presence/heartbeat`;
+  const body = JSON.stringify({ ts: Date.now() });
+
+  const headers = signRequest({
+    method: 'POST',
+    path: canonicalPath,
+    callerAgentId: phoneNumber,
+    targetAgentId: phoneNumber,
+    body,
+    privateKey: moltUAConfig.privateKey,
+  });
+
+  // Determine the actual fetch URL and whether we need subdomain routing.
+  // In dev, use X-Forwarded-Host: dial.localhost so the middleware rewrites
+  // /<number>/... → /dial/<number>/... internally.
+  const baseOrigin = carrierBase.replace(/\/dial\/[^/]+$/, '');
+  const parsed = new URL(baseOrigin);
+  const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+
+  // URL path is /<number>/... (without /dial/ prefix) since middleware adds it
+  const subdomainPath = `/${phoneNumber}/presence/heartbeat`;
+  const url = `${baseOrigin}${subdomainPath}`;
+  const forwardedHost = isLocal
+    ? `dial.localhost:${parsed.port || '3000'}`
+    : `dial.${parsed.hostname}`;
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Forwarded-Host': forwardedHost,
+        ...headers,
+      },
+      body,
+    });
+    if (res.ok) {
+      console.log(`${c.dim}♥ heartbeat sent${c.reset}`);
+    } else {
+      const text = await res.text();
+      console.log(`${c.yellow}♥ heartbeat ${res.status}${c.reset}: ${text.slice(0, 120)}`);
+    }
+  } catch (err: any) {
+    console.log(`${c.yellow}♥ heartbeat failed${c.reset}: ${err.message}`);
+  }
+}
+
+function startHeartbeats() {
+  if (!moltUAConfig) return;
+  console.log(`${c.green}♥${c.reset} Heartbeats enabled (every ${HEARTBEAT_INTERVAL_MS / 1000}s)`);
+  sendHeartbeat(); // immediately
+  heartbeatTimer = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
 }
 
 // ── Request counter ──────────────────────────────────────
@@ -210,8 +279,8 @@ const server = http.createServer(async (req, res) => {
           message: {
             role: 'agent',
             parts: textParts.length
-              ? [{ type: 'text', text: `[echo] ${textParts.join(' ')}` }]
-              : [{ type: 'text', text: '[echo] received your task' }],
+              ? [{ type: 'text', text: `Hello! You said: "${textParts.join(' ')}". I'm a mock agent running on localhost — this confirms the full A2A delivery pipeline is working. 🔌` }]
+              : [{ type: 'text', text: 'Hello! I received your task but it had no text content. I\'m a mock agent on localhost — delivery is working! 🔌' }],
           },
         },
       });
@@ -260,9 +329,11 @@ server.listen(PORT, () => {
   console.log(`${c.bold}   Listening on:${c.reset} http://localhost:${PORT}`);
   console.log(`${c.bold}   Mode:${c.reset}         ${MODE}`);
   console.log(`${c.bold}   Verify:${c.reset}       ${moltUAConfig && !SKIP_VERIFY ? `${c.green}yes (MoltUA Level 1)${c.reset}` : `${c.yellow}no${c.reset}`}`);
+  console.log(`${c.bold}   Heartbeat:${c.reset}    ${moltUAConfig ? `${c.green}enabled${c.reset}` : `${c.yellow}disabled${c.reset} (load --moltsim to enable)`}`);
   console.log(`\n${c.dim}Set your agent's endpointUrl to:${c.reset}`);
   console.log(`${c.bold}   http://localhost:${PORT}${c.reset}`);
   console.log(`\n${c.dim}Waiting for deliveries...${c.reset}\n`);
+  startHeartbeats();
 });
 
 // ── Helpers ──────────────────────────────────────────────
@@ -283,6 +354,7 @@ function logTiming(start: number) {
 // Graceful shutdown
 process.on('SIGINT', () => {
   console.log(`\n\n${c.yellow}Shutting down...${c.reset} (received ${requestCount} request${requestCount !== 1 ? 's' : ''})`);
+  if (heartbeatTimer) clearInterval(heartbeatTimer);
   server.close();
   process.exit(0);
 });

@@ -29,6 +29,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# MoltSIM profiles (contain private keys)
+moltsim*.json
+
 # vercel
 .vercel
 
