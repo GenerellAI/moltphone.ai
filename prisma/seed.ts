@@ -1,8 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, CreditTransactionType } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateKeyPair } from '../core/moltprotocol/src/ed25519';
 
 const prisma = new PrismaClient();
+const SIGNUP_CREDITS = 10_000;
 
 async function main() {
   console.log('Seeding database...');
@@ -25,8 +26,31 @@ async function main() {
       email: 'demo@moltphone.ai',
       name: 'Demo User',
       passwordHash: await bcrypt.hash('demo1234', 10),
+      credits: SIGNUP_CREDITS,
     },
   });
+
+  // Grant signup credits if not already granted
+  for (const user of [systemUser, demoUser]) {
+    const existing = await prisma.creditTransaction.findFirst({
+      where: { userId: user.id, type: CreditTransactionType.signup_grant },
+    });
+    if (!existing) {
+      await prisma.creditTransaction.create({
+        data: {
+          userId: user.id,
+          amount: SIGNUP_CREDITS,
+          type: CreditTransactionType.signup_grant,
+          balance: SIGNUP_CREDITS,
+          description: `Welcome bonus: ${SIGNUP_CREDITS} credits`,
+        },
+      });
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { credits: SIGNUP_CREDITS },
+      });
+    }
+  }
   
   const molt = await prisma.nation.upsert({
     where: { code: 'MOLT' },

@@ -30,6 +30,7 @@ import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked, checkCarrierBlock } from '@/lib/services/task-routing';
 import { checkCarrierPolicies } from '@/lib/services/carrier-policies';
+import { deductTaskCredits } from '@/lib/services/credits';
 import { getCircuitState, recordSuccess, recordFailure, scheduleRetry } from '@/lib/services/webhook-reliability';
 import { sendPushNotification } from '@/lib/services/push-notifications';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
@@ -148,11 +149,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const rawIntent = meta['molt.intent'];
   const intent: TaskIntent = rawIntent === 'text' ? 'text' : 'call';
 
-  // Resolve caller agent id
+  // Resolve caller agent id + owner
   let callerAgentId: string | null = null;
+  let callerOwnerId: string | null = null;
   if (callerNumber) {
-    const ca = await prisma.agent.findFirst({ where: { phoneNumber: callerNumber, isActive: true } });
+    const ca = await prisma.agent.findFirst({
+      where: { phoneNumber: callerNumber, isActive: true },
+      select: { id: true, ownerId: true },
+    });
     callerAgentId = ca?.id ?? null;
+    callerOwnerId = ca?.ownerId ?? null;
+  }
+
+  // Credit check — deduct 1 credit from the caller's owner
+  if (callerOwnerId) {
+    const creditResult = await deductTaskCredits(callerOwnerId);
+    if (!creditResult.ok) {
+      return moltErrorResponse(MOLT_POLICY_DENIED, 'Insufficient credits', {
+        balance: creditResult.balance,
+      });
+    }
   }
 
   // Forwarding chain

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { grantSignupCredits, SIGNUP_CREDITS } from '@/lib/services/credits';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
@@ -22,7 +23,11 @@ export async function POST(req: NextRequest) {
       data: { email, name, passwordHash },
       select: { id: true, email: true, name: true },
     });
-    return NextResponse.json(user, { status: 201 });
+
+    // Grant signup credits
+    const credits = await grantSignupCredits(user.id);
+
+    return NextResponse.json({ ...user, credits }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.issues }, { status: 400 });
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

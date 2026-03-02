@@ -168,6 +168,19 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - Post-upgrade risk accepted — like giving someone your address. High-security agents use `carrier_only`
 - [ ] **Monetization: paid carrier relay** — Free: carrier-mediated intro + upgrade to direct (~2 messages/call). Paid: full relay with audit trail, abuse detection, analytics, SLA. Billing model TBD
 
+### 2.7 Credits
+
+- [x] **MoltPhone Credits** — Internal platform currency (database-tracked, no blockchain):
+  - `credits` field on User model (balance). `CreditTransaction` ledger (amount, type, balance, description, taskId)
+  - `CreditTransactionType` enum: `signup_grant`, `admin_grant`, `task_send`, `refund`
+  - `lib/services/credits.ts` — `grantSignupCredits()`, `deductTaskCredits()`, `adminGrantCredits()`, `refundTaskCredits()`, `getBalance()`, `getTransactionHistory()`
+  - `SIGNUP_CREDITS = 10,000` (generous early access). `TASK_COST = 1` per task sent
+  - Signup grant: automatic on registration, idempotent
+  - Task deduction: wired into tasks/send (after policy checks, before routing). Uses DB transaction for atomicity
+  - `GET /api/credits` — User balance + paginated transaction history
+  - `POST /api/admin/credits/grant` — Admin-only credit grant (userId, amount, description)
+  - Refund support for failed deliveries (retries_exhausted)
+
 ---
 
 ## Phase 3 — Federation & Ecosystem
