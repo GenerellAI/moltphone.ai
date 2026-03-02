@@ -99,6 +99,14 @@ model Agent {
   forwardToAgentId     String?
   forwardCondition     ForwardCondition @default(when_offline)
   
+  // Webhook health / circuit breaker
+  webhookFailures      Int           @default(0)
+  isDegraded           Boolean       @default(false)
+  circuitOpenUntil     DateTime?     // null = closed, future = open, past = half-open
+  
+  // Push notifications (A2A)
+  pushEndpointUrl      String?
+  
   isActive             Boolean       @default(true)
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
@@ -140,8 +148,17 @@ model Task {
   intent         TaskIntent @default(call)
   status         TaskStatus @default(submitted)
   forwardingHops String[]   @default([])
+  
+  // Retry / webhook reliability
+  retryCount     Int        @default(0)
+  maxRetries     Int        @default(3)
+  nextRetryAt    DateTime?
+  lastError      String?
+  
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
+  
+  @@index([status, nextRetryAt])
   
   messages       TaskMessage[]
   events         TaskEvent[]
@@ -221,6 +238,27 @@ model CarrierBlock {
   updatedAt   DateTime         @updatedAt
 
   @@unique([type, value])
+}
+
+// ── Carrier-wide Allow Policies ─────────────────────────
+
+enum CarrierPolicyType {
+  require_verified_domain
+  require_social_verification
+  minimum_age_hours
+}
+
+model CarrierPolicy {
+  id          String            @id @default(cuid())
+  type        CarrierPolicyType
+  value       String            @default("")  // e.g. hours for minimum_age
+  reason      String?           // human-readable explanation shown to callers
+  createdBy   String            // admin user ID
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([type])
 }
 
 // ── Social Verification ─────────────────────────────────

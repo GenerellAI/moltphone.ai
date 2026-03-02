@@ -29,6 +29,9 @@ import { prisma } from '@/lib/prisma';
 import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked, checkCarrierBlock } from '@/lib/services/task-routing';
+import { checkCarrierPolicies } from '@/lib/services/carrier-policies';
+import { getCircuitState, recordSuccess, recordFailure, scheduleRetry } from '@/lib/services/webhook-reliability';
+import { sendPushNotification } from '@/lib/services/push-notifications';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
 import { moltErrorResponse } from '@/lib/errors';
 import {
@@ -99,6 +102,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
     if (carrierBlock) return moltErrorResponse(MOLT_POLICY_DENIED, carrierBlock);
   }
 
+  // Carrier-wide allow policies (trust requirements)
+  {
+    let callerAgentIdForPolicy: string | null = null;
+    if (callerNumber) {
+      const ca = await prisma.agent.findFirst({
+        where: { phoneNumber: callerNumber, isActive: true },
+        select: { id: true },
+      });
+      callerAgentIdForPolicy = ca?.id ?? null;
+    }
+    const policyCheck = await checkCarrierPolicies(callerAgentIdForPolicy);
+    if (!policyCheck.ok) return moltErrorResponse(MOLT_POLICY_DENIED, policyCheck.reason);
+  }
+
   // Per-agent block check
   if (callerNumber) {
     const callerAgent = await prisma.agent.findFirst({ where: { phoneNumber: callerNumber, isActive: true } });
@@ -167,6 +184,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   // DND → queue as submitted (pending task / away-message)
   if (finalAgent.dndEnabled) {
     const task = await createTask('dnd');
+    // Best-effort push notification
+    if (finalAgent.pushEndpointUrl) {
+      sendPushNotification(finalAgent.pushEndpointUrl, {
+        taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: 'dnd',
+        awayMessage: finalAgent.awayMessage,
+      }).catch(() => {});
+    }
     return moltErrorResponse(MOLT_DND, 'Agent on DND (task queued)', {
       task_id: task.id,
       away_message: finalAgent.awayMessage ?? null,
@@ -179,6 +203,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   });
   if (activeTasks >= finalAgent.maxConcurrentCalls) {
     const task = await createTask('busy');
+    // Best-effort push notification
+    if (finalAgent.pushEndpointUrl) {
+      sendPushNotification(finalAgent.pushEndpointUrl, {
+        taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: 'busy',
+        awayMessage: finalAgent.awayMessage,
+      }).catch(() => {});
+    }
     return moltErrorResponse(MOLT_BUSY, 'Agent busy (task queued)', {
       task_id: task.id,
       away_message: finalAgent.awayMessage ?? null,
@@ -187,8 +218,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
 
   const online = isOnline(finalAgent.lastSeenAt);
 
-  // Online with endpoint → try webhook delivery
-  if (finalAgent.endpointUrl && online) {
+  // Online with endpoint → try webhook delivery (respecting circuit breaker)
+  const circuitState = getCircuitState(finalAgent);
+  if (finalAgent.endpointUrl && online && circuitState !== 'open') {
     const ssrfCheck = await validateWebhookUrl(finalAgent.endpointUrl);
     if (ssrfCheck.ok) {
       const controller = new AbortController();
@@ -204,6 +236,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
         clearTimeout(timeout);
 
         if (response.ok) {
+          // Reset circuit breaker on success
+          await recordSuccess(finalAgent.id);
+
           const responseBody = await response.text();
           let responseParts: unknown[];
           try {
@@ -245,11 +280,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
         webhookErrorType = e instanceof Error && e.name === 'AbortError' ? 'timeout' : 'failed';
       }
 
-      // Webhook failed or timed out — return structured error with queued task
+      // Webhook failed or timed out — record failure for circuit breaker + schedule retry
+      await recordFailure(finalAgent.id);
+
       const reason = webhookErrorType === 'timeout' ? 'webhook_timeout' : 'webhook_failed';
-      const task = await createTask(reason);
+      const maxRetries = intent === 'call' ? 3 : 5;
+      const task = await prisma.task.create({
+        data: {
+          taskId: parsed.id,
+          sessionId: parsed.sessionId,
+          calleeId: finalAgent.id,
+          callerId: callerAgentId,
+          intent,
+          status: TaskStatus.submitted,
+          maxRetries,
+          forwardingHops,
+          lastError: reason,
+          messages: { create: { role: 'user', parts: asParts(parsed.message.parts) } },
+          events: { create: { type: 'task.created', payload: { reason }, sequenceNumber: 1 } },
+        },
+      });
+      await scheduleRetry(task.id);
       const errorCode = webhookErrorType === 'timeout' ? MOLT_WEBHOOK_TIMEOUT : MOLT_WEBHOOK_FAILED;
-      const errorMsg = webhookErrorType === 'timeout' ? 'Webhook timed out' : 'Webhook delivery failed';
+      const errorMsg = webhookErrorType === 'timeout' ? 'Webhook timed out (retry scheduled)' : 'Webhook delivery failed (retry scheduled)';
       return moltErrorResponse(errorCode, errorMsg, { task_id: task.id });
     }
   }
@@ -262,6 +315,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
 
   // Offline → queue as submitted
   const task = await createTask('offline');
+  // Best-effort push notification
+  if (finalAgent.pushEndpointUrl) {
+    sendPushNotification(finalAgent.pushEndpointUrl, {
+      taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: 'offline',
+      awayMessage: finalAgent.awayMessage,
+    }).catch(() => {});
+  }
   return moltErrorResponse(MOLT_OFFLINE, 'Agent offline (task queued)', {
     task_id: task.id,
     away_message: finalAgent.awayMessage ?? null,

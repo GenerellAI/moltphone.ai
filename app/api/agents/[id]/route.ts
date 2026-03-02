@@ -21,6 +21,7 @@ const patchSchema = z.object({
   forwardCondition: z.enum(['always', 'when_offline', 'when_busy', 'when_dnd']).optional(),
   maxConcurrentCalls: z.number().int().min(1).max(100).optional(),
   directConnectionPolicy: z.enum(['direct_on_consent', 'direct_on_accept', 'carrier_only']).optional(),
+  pushEndpointUrl: z.string().url().optional().nullable(),
 }).strict();
 
 /** MoltPage — public view, no sensitive fields */
@@ -63,6 +64,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (data.endpointUrl) {
       const check = await validateWebhookUrl(data.endpointUrl);
       if (!check.ok) return NextResponse.json({ error: `Invalid endpoint: ${check.reason}` }, { status: 400 });
+    }
+    if (data.pushEndpointUrl) {
+      const check = await validateWebhookUrl(data.pushEndpointUrl);
+      if (!check.ok) return NextResponse.json({ error: `Invalid push endpoint: ${check.reason}` }, { status: 400 });
     }
     
     const updated = await prisma.agent.update({

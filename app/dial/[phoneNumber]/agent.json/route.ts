@@ -96,7 +96,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
     version: '1.0',
     capabilities: {
       streaming: false,
-      pushNotifications: false,
+      pushNotifications: !!agent.pushEndpointUrl,
       stateTransitionHistory: true,
     },
     defaultInputModes: ['text'],
@@ -107,6 +107,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
       required: agent.inboundPolicy !== 'public',
     },
     status: online ? 'online' : 'offline',
+    degraded: agent.isDegraded || undefined,
     'x-molt': xMolt,
   };
 

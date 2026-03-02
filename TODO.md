@@ -120,18 +120,19 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 
 - [x] **Admin role** — `UserRole` enum (`user`/`admin`), `role` field on User model, `requireAdmin()` guard helper in `lib/admin.ts`
 - [x] **Carrier-wide blocking** — `CarrierBlock` model + `CarrierBlockType` enum. Admin CRUD at `/api/admin/carrier-blocks`. Enforcement in `checkCarrierBlock()` runs before per-agent policy in tasks/send. Matches by agent_id, phone_pattern (glob), nation_code, ip_address
-- [ ] **Carrier-wide allow policies** — Trust requirements (verified domain, social verification, minimum age). `CarrierPolicy` model, checked before per-agent policies
+- [x] **Carrier-wide allow policies** — Trust requirements (verified domain, social verification, minimum age). `CarrierPolicy` model + `CarrierPolicyType` enum. Admin CRUD at `/api/admin/carrier-policies` (GET/POST/DELETE). Enforcement via `checkCarrierPolicies()` in `lib/services/carrier-policies.ts`, wired into tasks/send between carrier block and per-agent policy
 - [x] **Rate limiting** — In-memory sliding-window rate limiter (`lib/rate-limit.ts`). Wired into tasks/send. Keys by X-Molt-Caller or IP. 60 req/min default
 - [x] **Nonce cleanup** — `POST /api/admin/nonce-cleanup` endpoint. Supports CRON_SECRET bearer token or admin session. `@@index([expiresAt])` on NonceUsed
 
 ### 2.3 Reliability
 
-- [ ] **Webhook reliability** — What happens when an agent's endpoint is down or slow. Depends on error codes (2.1) for structured failure responses:
-  - *Retry policy:* Exponential backoff (1s, 5s, 30s, 5m). Max 3 attempts for sync calls, 5 for async (text/queued)
-  - *Dead letter queue:* Tasks that exhaust retries → `failed` with `retries_exhausted`. Visible in monitoring UI, manually retryable
-  - *Timeout escalation:* Ring timeout (5s default) → no response → task queued as `submitted`. Background worker retries
-  - *Health monitoring:* Track endpoint success rate per agent. Mark as `degraded` after N consecutive failures (visible in MoltPage/Agent Card). Auto-recover on next success
-  - *Circuit breaker:* Stop hammering failing endpoints. Back off to periodic health checks (5 min). Resume on recovery
+- [x] **Webhook reliability** — Full implementation:
+  - *Circuit breaker:* `lib/services/webhook-reliability.ts` — `getCircuitState()` (closed/open/half-open), `recordSuccess()`, `recordFailure()`. 5 failures → open for 5 min → half-open probe
+  - *Retry policy:* Exponential backoff (1s, 5s, 30s, 5m, 15m). `scheduleRetry()` + `retryDelayMs()`. Max 3 for calls, 5 for texts
+  - *Dead letter queue:* Tasks exhausting retries → `failed` with `retries_exhausted`
+  - *Retry worker:* `POST /api/admin/task-retry-worker` — cron-callable, batched processing, circuit-aware. Auth via CRON_SECRET or admin session
+  - *Health monitoring:* `webhookFailures`, `isDegraded`, `circuitOpenUntil` on Agent model. `isDegraded` exposed in Agent Card
+  - *Schema:* Task: `retryCount`, `maxRetries`, `nextRetryAt`, `lastError`, `@@index([status, nextRetryAt])`. Agent: `webhookFailures`, `isDegraded`, `circuitOpenUntil`
 
 ### 2.4 Quick wins
 
@@ -149,10 +150,12 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - *UI:* `/calls` rebuilt as split-panel dashboard with `TaskMonitor` client component. Left: live task list with status badges + SSE updates. Right: conversation transcript with chat bubbles, typed parts (text/data/file), auto-scroll
   - *Connection indicator:* Green/red dot showing SSE connection status
   - *Auto-close:* Single-task stream auto-closes after terminal state
-- [ ] **Push notifications** — A2A supports push for async delivery. When a task arrives for an offline agent:
-  - Agent registers push endpoint in Agent Card (`capabilities.pushNotifications`)
-  - Carrier sends lightweight notification (task ID, caller info, intent)
-  - Agent then fetches full task via inbox endpoint
+- [x] **Push notifications** — Full implementation:
+  - `pushEndpointUrl` on Agent model (SSRF-validated on save)
+  - `lib/services/push-notifications.ts` — `sendPushNotification()` with 3s timeout, best-effort (never blocks task flow)
+  - Wired into tasks/send for DND, busy, and offline paths
+  - Agent Card `capabilities.pushNotifications` reflects whether agent has push endpoint
+  - Payload: `{ event: 'task.queued', taskId, intent, callerId, callerNumber, reason, awayMessage }`
   - Fallback: polling via `GET /dial/:number/tasks` (always available)
 
 ### 2.6 Privacy & monetization
@@ -197,15 +200,18 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 
 ### 4.2 Testing
 
-- [ ] **API integration tests** — Route tests for all API endpoints
-- [ ] **Dial protocol tests** — Task routing, forwarding, DND, busy, policy enforcement
-- [ ] **SSRF tests** — Webhook URL validation
-- [ ] **Presence tests** — `isOnline()` logic
+- [x] **SSRF tests** — `__tests__/ssrf.test.ts` — 14 tests: protocol validation, all private IP ranges (127.x, 10.x, 192.168.x, 172.16-31.x, 169.254.x, 0.x, IPv6 ::1), public IPs
+- [x] **Presence tests** — `__tests__/presence.test.ts` — 6 tests: null, recent, boundary, expired, far-past, just-now
+- [x] **Rate limiter tests** — `__tests__/rate-limit.test.ts` — 5 tests: allow, remaining tracking, blocking, key isolation, window expiry
+- [x] **Webhook reliability tests** — `__tests__/webhook-reliability.test.ts` — 12 tests: circuit state (closed/open/half-open/boundary), retry delay schedule (all 5 tiers + cap + monotonicity)
+- [x] **MoltProtocol error tests** — `__tests__/moltprotocol-errors.test.ts` — 10 tests: code uniqueness, ranges (4xx/SIP/5xx), default messages, factory (default/custom/data/unknown/omit)
+- [ ] **API integration tests** — Route tests for all API endpoints (requires test DB setup)
+- [ ] **Dial protocol tests** — Task routing, forwarding, DND, busy, policy enforcement (requires test DB setup)
 
 ### 4.3 Cleanup
 
 - [x] **Remove `ulid` dependency** — In package.json, never imported
-- [ ] **Deduplicate MoltNumber tests** — `core/moltnumber/__tests__/` vs `__tests__/moltnumber.test.ts`
+- [x] **Deduplicate MoltNumber tests** — Removed `__tests__/moltnumber.test.ts` (duplicate). Canonical: `core/moltnumber/__tests__/moltnumber.test.ts`. Carrier shim tested via `__tests__/phone-number.test.ts`
 
 ### 4.4 Docs
 

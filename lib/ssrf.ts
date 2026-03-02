@@ -27,10 +27,15 @@ export async function validateWebhookUrl(rawUrl: string): Promise<{ ok: boolean;
   }
 
   const hostname = parsed.hostname;
+
+  // Strip IPv6 brackets for pattern matching
+  const bareHost = hostname.startsWith('[') && hostname.endsWith(']')
+    ? hostname.slice(1, -1)
+    : hostname;
   
-  if (/^\d+\.\d+\.\d+\.\d+$/.test(hostname) || /^[0-9a-f:]+$/i.test(hostname)) {
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(bareHost) || /^[0-9a-f:]+$/i.test(bareHost)) {
     for (const pattern of BLOCKED_PATTERNS) {
-      if (pattern.test(hostname)) {
+      if (pattern.test(bareHost)) {
         return { ok: false, reason: 'Private IP range not allowed' };
       }
     }
