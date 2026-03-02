@@ -31,6 +31,9 @@ const mockPrisma = {
   nation: {
     findUnique: jest.fn(),
   },
+  user: {
+    findUnique: jest.fn(),
+  },
 };
 jest.mock('@/lib/prisma', () => ({ prisma: mockPrisma }));
 
@@ -59,6 +62,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetAgentCounter();
   mockGetServerSession.mockResolvedValue(mockSession());
+  // Default: session user exists in DB
+  mockPrisma.user.findUnique.mockResolvedValue({ id: TEST_USER.id, name: TEST_USER.name, email: TEST_USER.email });
 });
 
 // ── GET /api/agents ──────────────────────────────────────

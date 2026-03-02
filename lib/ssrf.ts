@@ -1,7 +1,7 @@
 import { URL } from 'url';
 import dns from 'dns/promises';
 
-const IS_DEV = process.env.NODE_ENV !== 'production';
+const IS_DEV = process.env.NODE_ENV === 'development';
 
 const BLOCKED_PATTERNS = [
   /^127\./,
