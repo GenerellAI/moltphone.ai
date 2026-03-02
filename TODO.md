@@ -139,22 +139,16 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
 - [x] **QR code for MoltSIM** — Current QR returns partial data. Fix to use finalized MoltSIM format from Phase 1
 - [x] **Domain claims: DNS TXT** — `validateDomainClaimDns()` in `core/moltnumber/src/domain-binding.ts`. Resolves `_moltnumber.<domain>` TXT record. Domain-claim PUT accepts `method: 'dns'` parameter. POST returns both HTTP and DNS instructions
 - [x] **Favorites page** (`/favorites`) — Server component with linked agent cards, added to navbar
-- [ ] **Avatar upload** — `avatarUrl` field exists, no upload mechanism
+- [x] **Avatar upload** — `POST/DELETE /api/agents/:id/avatar`. Multipart form-data, max 2 MB, JPEG/PNG/WebP/GIF. Stores to `/public/avatars/`
 
 ### 2.5 Real-time monitoring
 
-- [ ] **Live monitoring UI** — Agent owners watch conversations in real-time from the browser. Depends on error codes (2.1) and task routing service (Phase 1). The carrier already relays SSE between caller and callee — mirror events to owner's browser (third tap, zero extra load):
-  - *SSE endpoints (session-authenticated):*
-    - `GET /api/tasks/stream` — all task events across all of the user's agents
-    - `GET /api/tasks/stream?agentId=X` — filter to one agent
-    - `GET /api/tasks/:taskId/stream` — single conversation
-  - *REST endpoints:*
-    - `GET /api/tasks` — list tasks (replaces `/api/calls`)
-    - `GET /api/tasks/:taskId` — full task with message history
-  - *Events:* `task.created`, `task.status`, `task.message` (with typed parts)
-  - *UI:* `/calls` becomes split-panel dashboard — left: live task list with state badges, right: selected conversation transcript with messages appearing in real-time
-  - *Reconnection:* `Last-Event-ID` header + DB-backed `TaskEvent` log
-  - *Future:* owner intervention (cancel, inject, takeover), analytics, webhooks, alerts
+- [x] **Live monitoring UI** — Full implementation:
+  - *REST:* `GET /api/tasks` (paginated, filterable by agent/status/cursor), `GET /api/tasks/:taskId` (full detail with messages + events)
+  - *SSE:* `GET /api/tasks/stream` (all agents, filterable by agentId), `GET /api/tasks/:taskId/stream` (single task). Both support `Last-Event-ID` reconnection
+  - *UI:* `/calls` rebuilt as split-panel dashboard with `TaskMonitor` client component. Left: live task list with status badges + SSE updates. Right: conversation transcript with chat bubbles, typed parts (text/data/file), auto-scroll
+  - *Connection indicator:* Green/red dot showing SSE connection status
+  - *Auto-close:* Single-task stream auto-closes after terminal state
 - [ ] **Push notifications** — A2A supports push for async delivery. When a task arrives for an offline agent:
   - Agent registers push endpoint in Agent Card (`capabilities.pushNotifications`)
   - Carrier sends lightweight notification (task ID, caller info, intent)
