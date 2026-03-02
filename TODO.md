@@ -175,10 +175,10 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - `CreditTransactionType` enum: `signup_grant`, `admin_grant`, `task_send`, `task_message`, `refund`
   - `lib/services/credits.ts` — `grantSignupCredits()`, `deductTaskCredits()`, `deductMessageCredits()`, `adminGrantCredits()`, `refundTaskCredits()`, `getBalance()`, `getTransactionHistory()`, `calculateMessageCost()`
   - `SIGNUP_CREDITS = 10,000` (generous early access)
-  - **Size-based pricing**: `calculateMessageCost(rawBody)` — `BASE_MESSAGE_COST = 1` + 1 credit per 4KB chunk above the 4KB free tier. Short texts = 1 credit, 20KB message = 5 credits, 100KB = 25 credits
+  - **Size-based pricing** (ready, not wired into free routes): `calculateMessageCost(rawBody)` — `BASE_MESSAGE_COST = 1` + 1 credit per 4KB chunk above the 4KB free tier
   - Signup grant: automatic on registration, idempotent
-  - Task deduction: wired into tasks/send (after policy checks, before routing). Uses DB transaction for atomicity. Cost scales with request body size
-  - **Per-message billing**: reply route deducts credits from callee's owner per reply. Multi-turn calls cost credits proportional to traffic volume × message size
+  - **Basic messaging is FREE**: tasks/send and tasks/:id/reply do NOT charge credits. Credits are reserved for premium features only
+  - **Premium features (future)**: `carrier_only` privacy relay (size-based per-message cost), extended retention, analytics/audit trail, priority routing SLA
   - `GET /api/credits` — User balance + paginated transaction history
   - `POST /api/admin/credits/grant` — Admin-only credit grant (userId, amount, description)
   - Refund support for failed deliveries (retries_exhausted), amount matches original charge

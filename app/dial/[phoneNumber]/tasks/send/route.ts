@@ -30,7 +30,6 @@ import { isOnline } from '@/lib/presence';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import { resolveForwarding, enforcePolicyAndAuth, isCallerBlocked, checkCarrierBlock } from '@/lib/services/task-routing';
 import { checkCarrierPolicies } from '@/lib/services/carrier-policies';
-import { deductTaskCredits, calculateMessageCost } from '@/lib/services/credits';
 import { getCircuitState, recordSuccess, recordFailure, scheduleRetry } from '@/lib/services/webhook-reliability';
 import { sendPushNotification } from '@/lib/services/push-notifications';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
@@ -149,29 +148,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   const rawIntent = meta['molt.intent'];
   const intent: TaskIntent = rawIntent === 'text' ? 'text' : 'call';
 
-  // Resolve caller agent id + owner
+  // Resolve caller agent id
   let callerAgentId: string | null = null;
-  let callerOwnerId: string | null = null;
   if (callerNumber) {
     const ca = await prisma.agent.findFirst({
       where: { phoneNumber: callerNumber, isActive: true },
-      select: { id: true, ownerId: true },
+      select: { id: true },
     });
     callerAgentId = ca?.id ?? null;
-    callerOwnerId = ca?.ownerId ?? null;
   }
 
-  // Credit check — deduct credits from the caller's owner (cost scales with message size)
-  if (callerOwnerId) {
-    const cost = calculateMessageCost(rawBody);
-    const creditResult = await deductTaskCredits(callerOwnerId, cost);
-    if (!creditResult.ok) {
-      return moltErrorResponse(MOLT_POLICY_DENIED, 'Insufficient credits', {
-        balance: creditResult.balance,
-        cost: creditResult.cost,
-      });
-    }
-  }
+  // NOTE: Basic messaging is free. Credits are reserved for premium features
+  // (privacy relay, extended retention, analytics). See lib/services/credits.ts.
 
   // Forwarding chain
   const forwardResult = await resolveForwarding(agent.id, []);
