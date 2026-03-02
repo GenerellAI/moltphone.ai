@@ -186,6 +186,24 @@ Real-time monitoring, reliability, security hardening, admin tools. Builds on th
   - `POST /api/admin/credits/grant` — Admin-only credit grant (userId, amount, description)
   - Refund support for failed deliveries (retries_exhausted), amount matches original charge
 
+### 2.8 MoltUA & Carrier Identity (STIR/SHAKEN)
+
+- [x] **Carrier Identity — STIR/SHAKEN-inspired delivery authentication** — Carrier signs every webhook delivery with its Ed25519 key, analogous to STIR/SHAKEN (RFC 8224/8225) in SIP:
+  - *Attestation levels:* `A` (Full — caller Ed25519 verified), `B` (Partial — registered caller, not signature-verified), `C` (Gateway — external/anonymous caller). Matches STIR/SHAKEN attestation tiers
+  - *Canonical signing format:* `CARRIER_DOMAIN\nATTESTATION\nORIG\nDEST\nTIMESTAMP\nBODY_SHA256_HEX`
+  - *Headers:* `X-Molt-Identity` (signature), `X-Molt-Identity-Carrier` (domain), `X-Molt-Identity-Attest` (A/B/C), `X-Molt-Identity-Timestamp` (unix seconds)
+  - *Carrier keypair:* From `CARRIER_PRIVATE_KEY`/`CARRIER_PUBLIC_KEY` env vars. Ephemeral in dev. Public key distributed in MoltSIM as `carrier_public_key`
+  - *Protocol layer:* `core/moltprotocol/src/carrier-identity.ts` — canonical string, sign, verify, header constants
+  - *Carrier layer:* `lib/carrier-identity.ts` — `ensureCarrierKeys()`, `signDelivery()`, `determineAttestation()`, `getCarrierPublicKey()`
+  - *Wired into:* tasks/send signs all webhook deliveries. MoltSIM now includes `carrier_public_key`
+- [x] **MoltUA — Client compliance layer** — Like SIP User Agent (RFC 3261). Defines what a conforming MoltProtocol client MUST/SHOULD/MAY implement:
+  - *Level 1 (Baseline, MUST):* Verify carrier identity signature on inbound deliveries. Reject requests not signed by the expected carrier. This alone makes leaked endpoints unexploitable
+  - *Level 2 (Standard, SHOULD):* Verify caller Ed25519 signatures. Validate attestation levels. Timestamp window enforcement
+  - *Level 3 (Full, MAY):* Direct connection upgrade support. SSE streaming. Push notification handling
+  - *Reference implementation:* `core/moltprotocol/src/molt-ua.ts` — `verifyInboundDelivery()`, `extractCarrierHeaders()`. Strict vs non-strict mode
+  - *Defense in depth:* Layer 1 (MoltUA verification, free baseline) + Layer 2 (`carrier_only` relay, paid optional). MoltUA makes leaked endpoints useless. `carrier_only` adds privacy + audit
+  - *Caller verification tracking:* `enforcePolicyAndAuth()` now returns `callerVerified`/`callerRegistered` in `PolicyCheckResult`, enabling accurate attestation level determination
+
 ---
 
 ## Phase 3 — Federation & Ecosystem
@@ -223,6 +241,7 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 - [x] **Rate limiter tests** — `__tests__/rate-limit.test.ts` — 5 tests: allow, remaining tracking, blocking, key isolation, window expiry
 - [x] **Webhook reliability tests** — `__tests__/webhook-reliability.test.ts` — 12 tests: circuit state (closed/open/half-open/boundary), retry delay schedule (all 5 tiers + cap + monotonicity)
 - [x] **MoltProtocol error tests** — `__tests__/moltprotocol-errors.test.ts` — 10 tests: code uniqueness, ranges (4xx/SIP/5xx), default messages, factory (default/custom/data/unknown/omit)
+- [x] **Carrier identity + MoltUA tests** — `__tests__/carrier-identity.test.ts` — 21 tests: canonical string (all fields, anonymous), attestation levels (A/B/C), sign+verify round-trip (success, wrong key, body tamper, timestamp expiry, attestation preservation), header names, MoltUA inbound verification (valid, strict/non-strict missing headers, domain mismatch, forged signature), header extraction, security properties (leaked endpoint, body-bound signatures)
 - [ ] **API integration tests** — Route tests for all API endpoints (requires test DB setup)
 - [ ] **Dial protocol tests** — Task routing, forwarding, DND, busy, policy enforcement (requires test DB setup)
 

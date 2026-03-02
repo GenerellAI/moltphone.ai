@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { getCarrierPublicKey } from '@/lib/carrier-identity';
 import QRCode from 'qrcode';
 
 const DIAL_BASE_URL = process.env.DIAL_BASE_URL || 'http://localhost:3000/dial';
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     task_cancel_url: `${DIAL_BASE_URL}/${slug}/tasks/:id/cancel`,
     presence_url: `${DIAL_BASE_URL}/${slug}/presence/heartbeat`,
     public_key: agent.publicKey,
+    // Carrier identity — for verifying X-Molt-Identity on inbound deliveries (MoltUA Level 1)
+    carrier_public_key: getCarrierPublicKey(),
     signature_algorithm: 'Ed25519',
     canonical_string: 'METHOD\nPATH\nCALLER_AGENT_ID\nTARGET_AGENT_ID\nTIMESTAMP\nNONCE\nBODY_SHA256_HEX',
     timestamp_window_seconds: 300,

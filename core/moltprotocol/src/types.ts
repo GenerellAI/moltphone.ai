@@ -72,6 +72,15 @@ export interface MoltMetadata {
   /** One-time upgrade token (returned with molt.accept_direct). */
   'molt.upgrade_token'?: string;
 
+  // ── Carrier Identity (STIR/SHAKEN-inspired, RFC 8224) ──
+
+  /** Carrier identity signature (base64url Ed25519). Set by carrier on delivery. */
+  'molt.identity'?: string;
+  /** Carrier domain that signed the delivery. */
+  'molt.identity.carrier'?: string;
+  /** Attestation level: A (full), B (partial), C (gateway). STIR/SHAKEN §4. */
+  'molt.identity.attest'?: 'A' | 'B' | 'C';
+
   /** Carrier may include additional metadata under its own namespace. */
   [key: string]: unknown;
 }
@@ -100,6 +109,32 @@ export interface XMoltExtension {
   timestamp_window_seconds: number;
   /** Direct connection policy. */
   direct_connection_policy: DirectConnectionPolicy;
+}
+
+// ── MoltSIM profile type ─────────────────────────────────
+
+/**
+ * MoltSIM profile — machine-readable credential for autonomous agents.
+ * Contains everything a MoltUA needs to operate: carrier endpoints,
+ * Ed25519 keypair, and carrier public key for delivery verification.
+ */
+export interface MoltSIMProfile {
+  version: string;
+  carrier: string;
+  agent_id: string;
+  phone_number: string;
+  carrier_dial_base: string;
+  inbox_url: string;
+  task_reply_url: string;
+  task_cancel_url: string;
+  presence_url: string;
+  public_key: string;
+  private_key?: string; // Only present on initial provisioning (shown once)
+  /** Carrier's Ed25519 public key for verifying X-Molt-Identity signatures. */
+  carrier_public_key: string;
+  signature_algorithm: 'Ed25519';
+  canonical_string: string;
+  timestamp_window_seconds: number;
 }
 
 // ── Carrier routing protocol constants ──────────────────

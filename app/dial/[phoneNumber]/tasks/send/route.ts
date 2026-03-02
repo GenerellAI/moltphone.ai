@@ -33,6 +33,7 @@ import { checkCarrierPolicies } from '@/lib/services/carrier-policies';
 import { getCircuitState, recordSuccess, recordFailure, scheduleRetry } from '@/lib/services/webhook-reliability';
 import { sendPushNotification } from '@/lib/services/push-notifications';
 import { calculateMessageCost, deductRelayCredits } from '@/lib/services/credits';
+import { signDelivery, determineAttestation } from '@/lib/carrier-identity';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
 import { moltErrorResponse } from '@/lib/errors';
 import {
@@ -138,6 +139,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   });
   if (!policy.ok) return moltErrorResponse(policy.code!, policy.error);
 
+  // Track caller verification for carrier identity attestation (STIR/SHAKEN)
+  const callerVerified = policy.callerVerified ?? false;
+  const callerRegistered = policy.callerRegistered ?? false;
+
   let parsed: z.infer<typeof bodySchema>;
   try {
     parsed = bodySchema.parse(JSON.parse(rawBody));
@@ -241,13 +246,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   if (finalAgent.endpointUrl && online && circuitState !== 'open') {
     const ssrfCheck = await validateWebhookUrl(finalAgent.endpointUrl);
     if (ssrfCheck.ok) {
+      // Sign the delivery with carrier identity (STIR/SHAKEN-inspired)
+      const attestation = determineAttestation({ callerVerified, callerRegistered });
+      const identityHeaders = signDelivery({
+        origNumber: callerNumber ?? 'anonymous',
+        destNumber: finalAgent.phoneNumber,
+        body: rawBody,
+        attestation,
+      });
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), RING_TIMEOUT_MS);
       let webhookErrorType: 'timeout' | 'failed' | null = null;
       try {
         const response = await fetch(finalAgent.endpointUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-MoltPhone-Target': finalAgent.id },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-MoltPhone-Target': finalAgent.id,
+            ...identityHeaders,
+          },
           body: rawBody,
           signal: controller.signal,
         });

@@ -71,6 +71,10 @@ export interface PolicyCheckResult {
   /** MoltProtocol error code (MOLT_* constant). */
   code?: number;
   error?: string;
+  /** Whether the caller's Ed25519 signature was verified. */
+  callerVerified?: boolean;
+  /** Whether the caller is a registered agent on this carrier. */
+  callerRegistered?: boolean;
 }
 
 export async function enforcePolicyAndAuth(params: PolicyCheckParams): Promise<PolicyCheckResult> {
@@ -118,7 +122,30 @@ export async function enforcePolicyAndAuth(params: PolicyCheckParams): Promise<P
     }
   }
 
-  return { ok: true };
+  // Determine caller verification status for carrier identity attestation
+  const callerRegistered = !!callerNumber;
+  // Caller is verified if non-public policy (Ed25519 was checked above) or if
+  // public policy but caller provided valid signature headers
+  let callerVerified = false;
+  if (agent.inboundPolicy !== 'public') {
+    // Non-public: signature was verified above (or we would have returned early)
+    callerVerified = true;
+  } else if (callerNumber && timestamp && nonce && signature) {
+    // Public policy: caller optionally provided signature — verify it best-effort
+    const callerAgent = await prisma.agent.findFirst({
+      where: { phoneNumber: callerNumber, isActive: true },
+      select: { publicKey: true },
+    });
+    if (callerAgent?.publicKey) {
+      const result = verifySignature({
+        method, path, callerAgentId: callerNumber, targetAgentId: agent.phoneNumber,
+        body: rawBody, publicKey: callerAgent.publicKey, timestamp, nonce, signature,
+      });
+      callerVerified = result.valid;
+    }
+  }
+
+  return { ok: true, callerVerified, callerRegistered };
 }
 
 // ── Block enforcement ────────────────────────────────────
