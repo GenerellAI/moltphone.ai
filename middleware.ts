@@ -63,9 +63,11 @@ export function middleware(req: NextRequest) {
 
   // Block direct access to /dial/ — must go through subdomain
   // Allow internal server-side requests (from chat proxy, etc.)
+  // Allow all /dial/ in development (no real subdomain available)
   if (req.nextUrl.pathname.startsWith('/dial/')) {
+    const isDev = process.env.NODE_ENV === 'development';
     const isInternal = req.headers.get('x-molt-internal') === (process.env.NEXTAUTH_SECRET || 'dev-secret-change-me');
-    if (!isInternal) {
+    if (!isDev && !isInternal) {
       return NextResponse.json({ error: 'Use dial.moltphone.ai instead' }, { status: 404 });
     }
   }

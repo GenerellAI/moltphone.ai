@@ -264,6 +264,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
           headers: {
             'Content-Type': 'application/json',
             'X-MoltPhone-Target': finalAgent.id,
+            'X-Molt-Caller': callerNumber ?? 'anonymous',
             ...identityHeaders,
           },
           body: rawBody,

@@ -632,7 +632,12 @@ const server = http.createServer(async (req, res) => {
   }
 
   const metadata = (payload.metadata && typeof payload.metadata === 'object') ? payload.metadata : {};
-  const callerNumber = typeof metadata['molt.caller'] === 'string' ? metadata['molt.caller'] : 'anonymous';
+  // The carrier forwards X-Molt-Caller in the delivery — use that for
+  // signature verification since the carrier signed with this value.
+  // Fall back to body metadata, then 'anonymous'.
+  const callerNumber = req.headers['x-molt-caller']
+    || (typeof metadata['molt.caller'] === 'string' ? metadata['molt.caller'] : null)
+    || 'anonymous';
   const intent = metadata['molt.intent'] === 'text' ? 'text' : 'call';
 
   // ---------------------------------------------------------------------------

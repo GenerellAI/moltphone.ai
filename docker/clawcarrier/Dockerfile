@@ -6,6 +6,9 @@ LABEL org.opencontainers.image.url="https://clawcarrier.com"
 
 WORKDIR /app
 
+# Git is required by OpenClaw's npm dependencies.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+
 # OpenClaw CLI runtime (for conversational responses).
 # Requires Node >= 22.
 RUN npm install -g openclaw@latest
