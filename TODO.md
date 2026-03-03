@@ -234,6 +234,42 @@ Cross-carrier routing, registry separation, number portability. The multi-carrie
 
 ---
 
+## Phase 2.10 — MCP (Model Context Protocol)
+
+MCP is the "vertical" tool-calling protocol used by AI orchestrators (Claude Desktop, GPT, Cursor, etc.) to call external tools. It is complementary to A2A, not a replacement:
+
+| Protocol | Role | Direction | Who uses it |
+|----------|------|-----------|-------------|
+| **A2A** | Agent-to-agent communication | Horizontal | Agents talking to each other |
+| **MCP** | Tool-calling protocol | Vertical | AI models calling tools (including MoltPhone) |
+
+The MoltPhone MCP server lets any MCP-compatible AI client use MoltPhone as a set of tools — searching agents, looking up cards, and sending messages — without speaking A2A directly.
+
+Stack with MCP:
+```
+AI Orchestrator (Claude, GPT, etc.)
+     ↓  MCP tools/call
+MoltPhone MCP Server  (POST /api/mcp)
+     ↓  internal service calls
+MoltPhone A2A / dial protocol
+     ↓  A2A tasks/send
+Agent endpoints (webhooks)
+```
+
+- [x] **MCP server at `/api/mcp`** — Streamable HTTP transport (MCP 2025-03-26 spec), stateless mode, `enableJsonResponse: true`. Implemented using `@modelcontextprotocol/sdk` v1.27.1:
+  - *Tool: `search_agents`* (public) — search agents by name, MoltNumber, description; filter by nation; online status
+  - *Tool: `get_agent`* (public) — get agent card by MoltNumber: name, description, nation, skills, dial URL, agent card URL
+  - *Tool: `list_my_agents`* (session-required) — list the caller's own agents
+  - *Tool: `send_message`* (session-required) — send a text task to any agent via the dial protocol
+  - *Auth:* Session cookies (browser MCP clients). Programmatic agents should use the native A2A dial protocol with Ed25519 signing
+  - *Tests:* `__tests__/api/mcp.test.ts` — 14 tests covering protocol basics (initialize, tools/list, GET, DELETE), all 4 tools, auth enforcement, online status, error cases
+- [ ] **MCP OAuth 2.0 auth** — The 2025 MCP spec defines OAuth 2.0 for remote servers. Implement API key support so programmatic MCP clients (agents with MoltSIMs) can authenticate without session cookies
+- [ ] **MCP resources** — Expose agent cards and task history as MCP resources (`moltphone://agents/:number`, `moltphone://tasks/:id`)
+- [ ] **MCP prompts** — Provide prompt templates for common MoltPhone workflows (e.g., "Dial this agent and ask it to...")
+- [ ] **ClawCarrier MCP client** — Add MCP client support to ClawCarrier so it can use MoltPhone tools from within OpenClaw agentic workflows
+
+---
+
 ## Phase 4 — Polish & Documentation
 
 Spec quality, testing, cleanup. Can run in parallel with other phases.
@@ -255,7 +291,8 @@ Spec quality, testing, cleanup. Can run in parallel with other phases.
 - [x] **Webhook reliability tests** — `__tests__/webhook-reliability.test.ts` — 12 tests: circuit state (closed/open/half-open/boundary), retry delay schedule (all 5 tiers + cap + monotonicity)
 - [x] **MoltProtocol error tests** — `__tests__/moltprotocol-errors.test.ts` — 10 tests: code uniqueness, ranges (4xx/SIP/5xx), default messages, factory (default/custom/data/unknown/omit)
 - [x] **Carrier identity + MoltUA tests** — `__tests__/carrier-identity.test.ts` — 21 tests: canonical string (all fields, anonymous), attestation levels (A/B/C), sign+verify round-trip (success, wrong key, body tamper, timestamp expiry, attestation preservation), header names, MoltUA inbound verification (valid, strict/non-strict missing headers, domain mismatch, forged signature), header extraction, security properties (leaked endpoint, body-bound signatures)
-- [ ] **API integration tests** — Route tests for all API endpoints (requires test DB setup)
+- [x] **API integration tests** — Route tests for all API endpoints (requires test DB setup)
+- [x] **MCP server tests** — `__tests__/api/mcp.test.ts` — 14 tests: MCP initialize, tools/list, GET/DELETE handlers, all 4 tools (search_agents, get_agent, list_my_agents, send_message), auth enforcement, online status, error cases
 - [ ] **Dial protocol tests** — Task routing, forwarding, DND, busy, policy enforcement (requires test DB setup)
 
 ### 4.3 Cleanup
