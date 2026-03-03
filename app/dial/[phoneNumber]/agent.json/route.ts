@@ -81,6 +81,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ phon
     phone_number: phoneNumber,
     nation: agent.nationCode,
     public_key: agent.publicKey ?? '',
+    inbound_policy: agent.inboundPolicy as 'public' | 'registered_only' | 'allowlist',
     timestamp_window_seconds: 300,
     direct_connection_policy: agent.directConnectionPolicy,
     // Registration certificate — proves this carrier registered this agent (offline-verifiable)

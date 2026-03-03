@@ -221,6 +221,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pho
   }
 
   // Busy → queue as submitted
+  // First, expire stale working tasks (>30min without activity)
+  const STALE_THRESHOLD_MS = 30 * 60 * 1000;
+  await prisma.task.updateMany({
+    where: {
+      calleeId: finalAgent.id,
+      status: TaskStatus.working,
+      updatedAt: { lt: new Date(Date.now() - STALE_THRESHOLD_MS) },
+    },
+    data: { status: TaskStatus.completed },
+  });
+
   const activeTasks = await prisma.task.count({
     where: { calleeId: finalAgent.id, status: TaskStatus.working },
   });

@@ -30,22 +30,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const message = body.message?.trim();
   if (!message) return NextResponse.json({ error: 'Message is required' }, { status: 400 });
 
-  const intent = body.intent === 'text' ? 'text' : 'call';
+  const intent = body.intent === 'call' ? 'call' : 'text';
   const sessionId = body.sessionId || randomUUID();
   const taskId = randomUUID();
 
-  // Find the caller agent (user's first agent, or none)
-  const callerAgent = await prisma.agent.findFirst({
-    where: { ownerId: session.user.id, isActive: true },
+  // Find the caller agent (user's most recent agent that isn't the target)
+  const callerAgents = await prisma.agent.findMany({
+    where: { ownerId: session.user.id, isActive: true, id: { not: id } },
     select: { phoneNumber: true },
-    orderBy: { createdAt: 'asc' },
+    orderBy: { createdAt: 'desc' },
   });
+  // Prefer agents with valid MoltNumber format (4-char segments)
+  const MOLT_RE = /^[A-Z0-9]{4}(-[A-Z0-9]{4}){4}$/;
+  const callerAgent = callerAgents.find(a => MOLT_RE.test(a.phoneNumber)) ?? callerAgents[0] ?? null;
 
   // Build A2A task payload
   const taskPayload = {
     id: taskId,
     sessionId,
     message: {
+      role: 'user',
       parts: [{ type: 'text', text: message }],
     },
     metadata: {

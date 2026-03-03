@@ -107,6 +107,8 @@ export interface XMoltExtension {
   public_key: string;
   /** Timestamp window for signature verification (seconds). */
   timestamp_window_seconds: number;
+  /** Inbound policy. */
+  inbound_policy: 'public' | 'registered_only' | 'allowlist';
   /** Direct connection policy. */
   direct_connection_policy: DirectConnectionPolicy;
   /** Registration certificate — proves carrier registered this agent. */

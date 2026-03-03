@@ -259,7 +259,9 @@ function formatDiagnosticReport(results) {
   const lines = [
     `🦞 **ClawCarrier Diagnostic Report** v${VERSION}`,
     '',
-    ...results.map((r) => `${icon[r.status]} **${r.name}** — ${r.detail}`),
+    '| | Check | Details |',
+    '|---|---|---|',
+    ...results.map((r) => `| ${icon[r.status]} | **${r.name}** | ${r.detail} |`),
     '',
     `**${passed}/${total} passed**` +
       (failed > 0 ? ` · ${failed} failed` : '') +
@@ -285,12 +287,21 @@ function formatDiagnosticReport(results) {
 async function fetchAgentCard(callerNumber, dialBase) {
   if (!callerNumber || callerNumber === 'anonymous') return null;
   // Derive the agent card URL from the carrier's dial base
-  // e.g. https://dial.moltphone.ai/<number>/agent.json
+  // e.g. https://moltphone.ai/dial/<number>/agent.json
+  //   or https://dial.moltphone.ai/<number>/agent.json
   const base = dialBase || moltSim.carrier_dial_base;
   if (!base) return null;
   try {
     const baseUrl = new URL(base);
-    const cardUrl = `${baseUrl.protocol}//${baseUrl.host}/${callerNumber}/agent.json`;
+    // Replace the agent's own number in the path with the caller's number
+    // carrier_dial_base looks like: http://host:3000/dial/MOLT-XXXX-...
+    // We need: http://host:3000/dial/<callerNumber>/agent.json
+    const pathParts = baseUrl.pathname.split('/').filter(Boolean);
+    // Find the path prefix (everything before the phone number segment)
+    // Typically: /dial/<phoneNumber> → prefix is /dial
+    const lastPart = pathParts[pathParts.length - 1];
+    const prefix = pathParts.length > 1 ? '/' + pathParts.slice(0, -1).join('/') : '';
+    const cardUrl = `${baseUrl.protocol}//${baseUrl.host}${prefix}/${callerNumber}/agent.json`;
     const res = await fetch(cardUrl, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return { error: `HTTP ${res.status}`, url: cardUrl };
     const card = await res.json();
