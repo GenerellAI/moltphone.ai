@@ -4,25 +4,34 @@ import { notFound } from 'next/navigation';
 import { isOnline } from '@/lib/presence';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Wifi, WifiOff, BellOff } from 'lucide-react';
+import { Wifi, WifiOff, BellOff, CheckCircle2, ExternalLink } from 'lucide-react';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { isNationAdmin } from '@/lib/nation-admin';
+import { DomainVerification } from '@/components/DomainVerification';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NationPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const nation = await prisma.nation.findUnique({
-    where: { code: code.toUpperCase() },
-    include: {
-      owner: { select: { name: true } },
-      _count: { select: { agents: true } },
-      agents: {
-        where: { isActive: true },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, moltNumber: true, displayName: true, avatarUrl: true, badge: true, lastSeenAt: true, dndEnabled: true, description: true },
+  const [nation, session] = await Promise.all([
+    prisma.nation.findUnique({
+      where: { code: code.toUpperCase() },
+      include: {
+        owner: { select: { name: true } },
+        _count: { select: { agents: true } },
+        agents: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, moltNumber: true, displayName: true, avatarUrl: true, badge: true, lastSeenAt: true, dndEnabled: true, description: true },
+        },
       },
-    },
-  });
+    }),
+    getServerSession(authOptions),
+  ]);
   if (!nation) notFound();
+
+  const isAdmin = session?.user?.id ? isNationAdmin(nation, session.user.id) : false;
 
   return (
     <div>
@@ -45,10 +54,35 @@ export default async function NationPage({ params }: { params: Promise<{ code: s
             <p className="text-xl">{nation.displayName}</p>
           </div>
           {!nation.isPublic && <Badge variant="destructive">Private Nation</Badge>}
+          {nation.verifiedDomain && nation.domainVerifiedAt && !nation.verifiedDomain.startsWith('pending:') && (
+            <a
+              href={`https://${nation.verifiedDomain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5"
+            >
+              <Badge variant="secondary" className="gap-1 text-emerald-700 dark:text-emerald-400">
+                <CheckCircle2 className="h-3 w-3" />
+                {nation.verifiedDomain}
+                <ExternalLink className="h-3 w-3 ml-0.5" />
+              </Badge>
+            </a>
+          )}
         </div>
         {nation.description && <p className="text-muted-foreground mb-3">{nation.description}</p>}
         <p className="text-sm text-muted-foreground">Owned by {nation.owner.name} · {nation._count.agents} agents</p>
       </div>
+
+      {/* Domain Verification — visible only to nation owner/admins */}
+      {isAdmin && (
+        <Card className="mb-8 p-5">
+          <DomainVerification
+            nationCode={nation.code}
+            verifiedDomain={nation.verifiedDomain}
+            domainVerifiedAt={nation.domainVerifiedAt?.toISOString() ?? null}
+          />
+        </Card>
+      )}
 
       <h2 className="text-xl font-semibold mb-4">Agents</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

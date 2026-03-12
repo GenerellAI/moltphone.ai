@@ -51,6 +51,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useCredits } from '@/components/CreditsProvider';
+import { DomainVerification } from '@/components/DomainVerification';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -786,9 +787,15 @@ function NationsTab() {
                           Provisional until {new Date(nation.provisionalUntil).toLocaleDateString()}
                         </Badge>
                       )}
-                      {nation.verifiedDomain && (
-                        <Badge variant="secondary" className="text-xs">
-                          ✓ {nation.verifiedDomain}
+                      {nation.verifiedDomain && !nation.verifiedDomain.startsWith('pending:') && (
+                        <Badge variant="secondary" className="text-xs gap-1 text-emerald-700 dark:text-emerald-400">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          {nation.verifiedDomain}
+                        </Badge>
+                      )}
+                      {nation.verifiedDomain?.startsWith('pending:') && (
+                        <Badge variant="outline" className="text-xs text-amber-600">
+                          ⏳ {nation.verifiedDomain.split(':')[1]} (pending)
                         </Badge>
                       )}
                     </div>
@@ -994,6 +1001,16 @@ function NationsTab() {
               label="Member Allowlist"
               hint="(empty = open to all authenticated users)"
             />
+            {/* Domain Verification */}
+            {editNation && (
+              <div className="border-t pt-4">
+                <DomainVerification
+                  nationCode={editNation.code}
+                  verifiedDomain={editNation.verifiedDomain}
+                  domainVerifiedAt={null}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditNation(null)}>Cancel</Button>

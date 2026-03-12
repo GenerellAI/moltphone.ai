@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CheckCircle2 } from 'lucide-react';
 import AgentGrid from '@/components/AgentGrid';
 
 export const dynamic = 'force-dynamic';
@@ -71,6 +72,12 @@ export default async function AgentDiscoveryPage() {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
+                  {nation.verifiedDomain && nation.domainVerifiedAt && !nation.verifiedDomain.startsWith('pending:') && (
+                    <span className="inline-flex items-center gap-0.5 ml-2 text-emerald-700 dark:text-emerald-400">
+                      <CheckCircle2 className="h-2.5 w-2.5" />
+                      {nation.verifiedDomain}
+                    </span>
+                  )}
                 </div>
               </Card>
             </Link>

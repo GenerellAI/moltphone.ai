@@ -288,3 +288,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ code
 
   return NextResponse.json({ status: 'none' });
 }
+
+// ── DELETE: Remove domain verification ──────────────────
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { code } = await params;
+  const nation = await prisma.nation.findUnique({ where: { code: code.toUpperCase() } });
+  if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
+  if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  await prisma.nation.update({
+    where: { code: code.toUpperCase() },
+    data: {
+      verifiedDomain: null,
+      domainVerifiedAt: null,
+    },
+  });
+
+  return NextResponse.json({ ok: true });
+}

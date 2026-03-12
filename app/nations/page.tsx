@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { CheckCircle2 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,13 +47,19 @@ export default async function NationsPage() {
               {nation.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{nation.description}</p>
               )}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                 <Badge variant="secondary" className="text-xs">
                   {nation.type}
                 </Badge>
                 {!nation.isPublic && (
                   <Badge variant="outline" className="text-xs">
                     Private
+                  </Badge>
+                )}
+                {nation.verifiedDomain && nation.domainVerifiedAt && !nation.verifiedDomain.startsWith('pending:') && (
+                  <Badge variant="outline" className="text-xs gap-1 text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-2.5 w-2.5" />
+                    {nation.verifiedDomain}
                   </Badge>
                 )}
                 <span>{nation._count.agents} agents</span>
