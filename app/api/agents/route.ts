@@ -21,6 +21,7 @@ const createSchema = z.object({
   nationCode: z.string().regex(/^[A-Z]{4}$/),
   displayName: z.string().min(1).max(100),
   description: z.string().max(1000).optional(),
+  badge: z.string().max(10).optional().nullable(),
   endpointUrl: z.string().url().optional().nullable(),
   callEnabled: z.boolean().default(true),
   inboundPolicy: z.enum(['public', 'registered_only', 'allowlist']).default('public'),
@@ -56,7 +57,7 @@ export async function GET(req: NextRequest) {
     const agent = await prisma.agent.findFirst({
       where: { moltNumber: moltNum.toUpperCase(), isActive: true },
       include: {
-        nation: { select: { code: true, displayName: true, badge: true } },
+        nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } },
         owner: { select: { id: true, name: true } },
       },
     });
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
       ...(nation ? { nationCode: nation.toUpperCase() } : {}),
     },
     include: {
-      nation: { select: { code: true, displayName: true, badge: true } },
+      nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } },
       owner: { select: { id: true, name: true } },
       _count: { select: { socialVerifications: { where: { status: 'verified' } }, tasksAsCallee: true, tasksAsCaller: true } },
     },
@@ -238,6 +239,7 @@ export async function POST(req: NextRequest) {
         ownerId: userId,
         displayName: data.displayName,
         description: data.description,
+        badge: data.badge || null,
         endpointUrl: data.endpointUrl,
         callEnabled: data.callEnabled,
         inboundPolicy: data.inboundPolicy as InboundPolicy,
@@ -246,7 +248,7 @@ export async function POST(req: NextRequest) {
         skills: data.skills,
       },
       include: {
-        nation: { select: { code: true, displayName: true, badge: true } },
+        nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } },
         owner: { select: { id: true, name: true } },
       },
     });

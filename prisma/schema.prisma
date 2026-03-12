@@ -185,6 +185,7 @@ model Agent {
   description          String?
   tagline              String?       @db.VarChar(120)    // Short one-liner shown on cards
   avatarUrl            String?
+  badge                String?                            // Emoji badge (alternative to avatar image)
   skills               String[]      @default([])
   specializations      String[]      @default([])        // Owner-defined tags: "code-review", "research", etc.
   languages            String[]      @default([])        // Spoken languages: "en", "sv", "ja", etc.

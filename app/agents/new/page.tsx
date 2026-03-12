@@ -15,8 +15,12 @@ interface Nation {
   code: string;
   displayName: string;
   badge: string;
+  avatarUrl: string | null;
   isPublic: boolean;
 }
+
+// Common emoji options for quick selection
+const EMOJI_OPTIONS = ['🤖', '🧠', '🦾', '🔮', '⚡', '🛡️', '🌐', '📡', '🔧', '🎯', '🦊', '🐙', '🪼', '🧬', '💎', '🌀'];
 
 export default function NewAgentPage() {
   const { status } = useSession();
@@ -28,6 +32,7 @@ export default function NewAgentPage() {
     description: '',
     endpointUrl: '',
     inboundPolicy: 'public',
+    badge: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -59,6 +64,7 @@ export default function NewAgentPage() {
         ...form,
         endpointUrl: form.endpointUrl || null,
         description: form.description || undefined,
+        badge: form.badge || undefined,
       }),
     });
     const data = await res.json();
@@ -254,6 +260,47 @@ export default function NewAgentPage() {
                 rows={3}
                 placeholder="What does your agent do?"
               />
+            </div>
+
+            {/* Emoji picker */}
+            <div className="space-y-2">
+              <Label>
+                Avatar Emoji <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Pick an emoji for your agent. If left empty, the nation&apos;s avatar will be used. You can upload an image later in settings.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {EMOJI_OPTIONS.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, badge: f.badge === emoji ? '' : emoji }))}
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-lg transition-all ${
+                      form.badge === emoji
+                        ? 'bg-primary/20 ring-2 ring-primary scale-110'
+                        : 'bg-muted hover:bg-muted/80'
+                    }`}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              {/* Custom emoji input */}
+              <div className="flex items-center gap-2">
+                <Input
+                  value={form.badge}
+                  onChange={e => setForm(f => ({ ...f, badge: e.target.value }))}
+                  placeholder="Or type a custom emoji…"
+                  maxLength={10}
+                  className="h-9 w-48"
+                />
+                {form.badge && (
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <span className="text-xl">{form.badge}</span>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

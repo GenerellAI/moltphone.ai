@@ -19,7 +19,7 @@ export default async function BlockedPage() {
       where: { userId: session.user.id },
       include: {
         blockedAgent: {
-          include: { nation: { select: { code: true, displayName: true, badge: true } } },
+          include: { nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } } },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -59,6 +59,20 @@ export default async function BlockedPage() {
                           height={64}
                           className="rounded-full object-cover w-16 h-16"
                         />
+                      ) : agent.nation.avatarUrl ? (
+                        <div className="w-16 h-16 rounded-full overflow-hidden">
+                          <Image
+                            src={agent.nation.avatarUrl}
+                            alt={agent.nation.displayName}
+                            width={64}
+                            height={64}
+                            className="rounded-full object-cover w-16 h-16"
+                          />
+                        </div>
+                      ) : agent.nation.badge ? (
+                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                          <span className="text-2xl">{agent.nation.badge}</span>
+                        </div>
                       ) : (
                         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
                           <User className="h-7 w-7 text-muted-foreground" />

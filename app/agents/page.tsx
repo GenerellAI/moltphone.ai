@@ -29,7 +29,7 @@ interface Agent {
   languages?: string[];
   responseTimeSla?: string | null;
   isPersonalAgent?: boolean;
-  nation: { code: string; displayName: string; badge: string };
+  nation: { code: string; displayName: string; badge: string; avatarUrl?: string | null };
 }
 
 export default function MyAgentsPage() {
@@ -183,8 +183,12 @@ export default function MyAgentsPage() {
                     <div className={`h-14 w-14 rounded-full flex items-center justify-center overflow-hidden shrink-0 ${agent.isPersonalAgent ? 'bg-primary/15 border-2 border-primary/30' : 'bg-primary/10 border border-primary/20'}`}>
                       {agent.avatarUrl ? (
                         <img src={agent.avatarUrl} alt={agent.displayName} className="h-full w-full object-cover" />
+                      ) : (agent as Agent & { badge?: string | null }).badge ? (
+                        <span className="text-xl">{(agent as Agent & { badge?: string | null }).badge}</span>
                       ) : agent.isPersonalAgent ? (
                         <User className="h-6 w-6 text-primary" />
+                      ) : agent.nation.avatarUrl ? (
+                        <img src={agent.nation.avatarUrl} alt={agent.nation.displayName} className="h-full w-full object-cover" />
                       ) : (
                         <span className="text-xl">{agent.nation.badge || '🪼'}</span>
                       )}

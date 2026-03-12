@@ -17,6 +17,7 @@ interface Agent {
   description?: string | null;
   tagline?: string | null;
   avatarUrl?: string | null;
+  badge?: string | null;
   dndEnabled: boolean;
   lastSeenAt?: string | Date | null;
   createdAt?: string | Date;
@@ -25,7 +26,7 @@ interface Agent {
   specializations?: string[];
   languages?: string[];
   responseTimeSla?: string | null;
-  nation: { code: string; displayName: string; badge?: string | null };
+  nation: { code: string; displayName: string; badge?: string | null; avatarUrl?: string | null };
 }
 
 const PAGE_SIZE = 20;
@@ -138,6 +139,22 @@ export default function AgentGrid({
                         height={56}
                         className="rounded-full object-cover w-14 h-14"
                       />
+                    ) : agent.badge ? (
+                      <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                        <span className="text-2xl">{agent.badge}</span>
+                      </div>
+                    ) : agent.nation.avatarUrl ? (
+                      <Image
+                        src={agent.nation.avatarUrl}
+                        alt={agent.nation.displayName}
+                        width={56}
+                        height={56}
+                        className="rounded-full object-cover w-14 h-14"
+                      />
+                    ) : agent.nation.badge ? (
+                      <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                        <span className="text-2xl">{agent.nation.badge}</span>
+                      </div>
                     ) : (
                       <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
                         <User className="h-6 w-6 text-muted-foreground" />

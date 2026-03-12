@@ -25,7 +25,7 @@ export default async function AgentDiscoveryPage() {
     }),
     prisma.agent.findMany({
       where: agentWhere,
-      include: { nation: { select: { code: true, displayName: true, badge: true } } },
+      include: { nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } } },
       orderBy: { createdAt: 'desc' },
       take: 20,
     }),
@@ -52,7 +52,15 @@ export default async function AgentDiscoveryPage() {
             <Link key={nation.code} href={`/nations/${nation.code}`}>
               <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer h-full">
                 <div className="flex items-center gap-2.5 mb-2">
-                  <span className="text-xl">{nation.badge || '🌐'}</span>
+                  {nation.avatarUrl ? (
+                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+                      <img src={nation.avatarUrl} alt={nation.displayName} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <span className="text-base">{nation.badge || '🌐'}</span>
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="font-bold text-sm text-primary font-mono">{nation.code}</div>
                     <div className="text-xs text-muted-foreground truncate">{nation.displayName}</div>

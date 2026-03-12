@@ -16,7 +16,7 @@ export async function GET() {
   const agents = await prisma.agent.findMany({
     where: { ownerId: session.user.id, isActive: true },
     include: {
-      nation: { select: { code: true, displayName: true, badge: true } },
+      nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } },
       _count: { select: { socialVerifications: { where: { status: 'verified' } }, tasksAsCallee: true, tasksAsCaller: true } },
     },
     orderBy: { createdAt: 'desc' },

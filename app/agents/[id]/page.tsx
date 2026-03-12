@@ -21,7 +21,7 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
   const agent = await prisma.agent.findUnique({
     where: { id, isActive: true },
     include: {
-      nation: { select: { code: true, displayName: true, badge: true } },
+      nation: { select: { code: true, displayName: true, badge: true, avatarUrl: true } },
       owner: { select: { id: true, name: true, personalAgentId: true } },
       socialVerifications: {
         where: { status: 'verified' },
@@ -152,6 +152,10 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
               <div className="h-11 w-11 shrink-0 rounded-full ring-2 ring-blue-400/20 flex items-center justify-center overflow-hidden bg-blue-900/50 mt-4">
                 {agent.avatarUrl ? (
                   <img src={agent.avatarUrl} alt={agent.displayName} className="h-full w-full object-cover" />
+                ) : agent.badge ? (
+                  <span className="text-lg">{agent.badge}</span>
+                ) : agent.nation.avatarUrl ? (
+                  <img src={agent.nation.avatarUrl} alt={agent.nation.displayName} className="h-full w-full object-cover" />
                 ) : (
                   <span className="text-lg">{agent.nation.badge || '🪼'}</span>
                 )}

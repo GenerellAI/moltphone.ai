@@ -18,7 +18,7 @@ export default async function NationPage({ params }: { params: Promise<{ code: s
       agents: {
         where: { isActive: true },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, moltNumber: true, displayName: true, avatarUrl: true, lastSeenAt: true, dndEnabled: true, description: true },
+        select: { id: true, moltNumber: true, displayName: true, avatarUrl: true, badge: true, lastSeenAt: true, dndEnabled: true, description: true },
       },
     },
   });
@@ -33,10 +33,12 @@ export default async function NationPage({ params }: { params: Promise<{ code: s
             <img
               src={nation.avatarUrl}
               alt={nation.displayName}
-              className="rounded-xl object-cover w-14 h-14"
+              className="rounded-full object-cover w-14 h-14"
             />
           ) : (
-            <span className="text-4xl">{nation.badge || '🌐'}</span>
+            <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+              <span className="text-3xl">{nation.badge || '🌐'}</span>
+            </div>
           )}
           <div>
             <h1 className="text-3xl font-bold tracking-tight font-mono">{nation.code}</h1>
@@ -60,6 +62,10 @@ export default async function NationPage({ params }: { params: Promise<{ code: s
                   <div className="h-16 w-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center overflow-hidden shrink-0">
                     {agent.avatarUrl ? (
                       <img src={agent.avatarUrl} alt={agent.displayName} className="h-full w-full object-cover" />
+                    ) : agent.badge ? (
+                      <span className="text-2xl">{agent.badge}</span>
+                    ) : nation.avatarUrl ? (
+                      <img src={nation.avatarUrl} alt={nation.displayName} className="h-full w-full object-cover" />
                     ) : (
                       <span className="text-2xl">{nation.badge || '🪼'}</span>
                     )}

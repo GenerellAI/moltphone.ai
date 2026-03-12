@@ -31,10 +31,12 @@ export default async function NationsPage() {
                   <img
                     src={nation.avatarUrl}
                     alt={nation.displayName}
-                    className="rounded-lg object-cover w-10 h-10"
+                    className="rounded-full object-cover w-10 h-10"
                   />
                 ) : (
-                  <span className="text-2xl">{nation.badge || '🌐'}</span>
+                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                    <span className="text-lg">{nation.badge || '🌐'}</span>
+                  </div>
                 )}
                 <div>
                   <div className="font-mono font-bold text-lg">{nation.code}</div>
