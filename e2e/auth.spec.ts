@@ -44,10 +44,10 @@ test.describe('Login page', () => {
     await expect(registerLink).toHaveAttribute('href', '/register');
   });
 
-  test('shows demo credentials hint', async ({ page }) => {
+  test('shows social login options', async ({ page }) => {
     await page.goto('/login');
 
-    await expect(page.getByText('demo@moltphone.ai')).toBeVisible();
+    await expect(page.getByRole('button', { name: /GitHub/i })).toBeVisible();
   });
 
   test('rejects invalid credentials', async ({ page }) => {
