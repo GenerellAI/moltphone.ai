@@ -1,0 +1,877 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Shield,
+  Ban,
+  ScrollText,
+  Coins,
+  Trash2,
+  Plus,
+  RefreshCw,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Play,
+  Users,
+  Bot,
+} from 'lucide-react';
+import { useCredits } from '@/components/CreditsProvider';
+
+// ── Types ────────────────────────────────────────────────
+
+interface CarrierBlock {
+  id: string;
+  type: string;
+  value: string;
+  reason: string | null;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+interface CarrierPolicy {
+  id: string;
+  type: string;
+  value: string;
+  reason: string | null;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+}
+
+interface CronResult {
+  label: string;
+  count: number;
+  time: string;
+  success: boolean;
+}
+
+// ── Helpers ──────────────────────────────────────────────
+
+function timeAgo(date: string) {
+  const diff = Date.now() - new Date(date).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+const BLOCK_TYPE_LABELS: Record<string, string> = {
+  agent_id: 'Agent ID',
+  molt_number_pattern: 'MoltNumber Pattern',
+  nation_code: 'Nation Code',
+  ip_address: 'IP Address',
+};
+
+const POLICY_TYPE_LABELS: Record<string, string> = {
+  require_verified_domain: 'Require Verified Domain',
+  require_social_verification: 'Require Social Verification',
+  minimum_age_hours: 'Minimum Account Age (hours)',
+};
+
+// ── Tab Nav ──────────────────────────────────────────────
+
+type Tab = 'overview' | 'blocks' | 'policies' | 'credits' | 'jobs';
+
+const TABS: { id: Tab; label: string; icon: typeof Shield }[] = [
+  { id: 'overview', label: 'Overview', icon: Shield },
+  { id: 'blocks', label: 'Blocks', icon: Ban },
+  { id: 'policies', label: 'Policies', icon: ScrollText },
+  { id: 'credits', label: 'Credits', icon: Coins },
+  { id: 'jobs', label: 'Jobs', icon: Clock },
+];
+
+// ══════════════════════════════════════════════════════════
+// ── Main Page ────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+export default function AdminPage() {
+  const { data: session, status: authStatus } = useSession();
+  const router = useRouter();
+  const { enabled: creditsEnabled } = useCredits();
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  // Check admin access
+  useEffect(() => {
+    if (authStatus === 'unauthenticated') {
+      router.push('/login');
+      return;
+    }
+    if (authStatus === 'authenticated') {
+      // Quick check — try fetching carrier blocks (admin-only)
+      fetch('/api/admin/carrier-blocks')
+        .then(res => {
+          setIsAdmin(res.ok);
+          if (!res.ok) router.push('/');
+        })
+        .catch(() => {
+          setIsAdmin(false);
+          router.push('/');
+        });
+    }
+  }, [authStatus, router]);
+
+  if (authStatus === 'loading' || isAdmin === null) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!session || !isAdmin) return null;
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+      <div className="flex items-center gap-3">
+        <Shield className="h-7 w-7 text-primary" />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Admin Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Carrier management & operations</p>
+        </div>
+      </div>
+
+      {/* Tab navigation */}
+      <div className="flex gap-1 border-b border-border overflow-x-auto">
+        {TABS.filter(tab => tab.id !== 'credits' || creditsEnabled).map(tab => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'blocks' && <BlocksTab />}
+      {activeTab === 'policies' && <PoliciesTab />}
+      {activeTab === 'credits' && creditsEnabled && <CreditsTab />}
+      {activeTab === 'jobs' && <JobsTab />}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Overview Tab ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+function OverviewTab() {
+  const [stats, setStats] = useState<{
+    blocks: number;
+    policies: number;
+    agents: number;
+    users: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/admin/carrier-blocks').then(r => r.json()),
+      fetch('/api/admin/carrier-policies').then(r => r.json()),
+      fetch('/api/agents?limit=1').then(r => r.json()),
+    ]).then(([blocks, policies, agents]) => {
+      setStats({
+        blocks: Array.isArray(blocks) ? blocks.length : 0,
+        policies: Array.isArray(policies) ? policies.length : 0,
+        agents: agents?.total ?? agents?.agents?.length ?? 0,
+        users: 0, // No public user count endpoint
+      });
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Ban className="h-4 w-4" /> Active Blocks
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">{stats?.blocks ?? '—'}</div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <ScrollText className="h-4 w-4" /> Active Policies
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">{stats?.policies ?? '—'}</div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Bot className="h-4 w-4" /> Agents
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold">{stats?.agents ?? '—'}</div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <Users className="h-4 w-4" /> Carrier Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-sm font-medium">Operational</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Blocks Tab ───────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+function BlocksTab() {
+  const [blocks, setBlocks] = useState<CarrierBlock[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [newBlock, setNewBlock] = useState({ type: 'agent_id', value: '', reason: '' });
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchBlocks = useCallback(async () => {
+    const res = await fetch('/api/admin/carrier-blocks');
+    if (res.ok) setBlocks(await res.json());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchBlocks(); }, [fetchBlocks]);
+
+  async function handleCreate() {
+    if (!newBlock.value.trim()) return;
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/carrier-blocks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: newBlock.type,
+          value: newBlock.value.trim(),
+          reason: newBlock.reason.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setNewBlock({ type: 'agent_id', value: '', reason: '' });
+        setShowCreate(false);
+        fetchBlocks();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to create block');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setCreating(false);
+  }
+
+  async function handleDelete(id: string) {
+    setDeleting(id);
+    await fetch(`/api/admin/carrier-blocks/${id}`, { method: 'DELETE' });
+    fetchBlocks();
+    setDeleting(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Carrier Blocks</h2>
+          <p className="text-sm text-muted-foreground">Block agents, numbers, nations, or IPs from the network</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchBlocks(); }}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(!showCreate)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add Block
+          </Button>
+        </div>
+      </div>
+
+      {/* Create form */}
+      {showCreate && (
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Block Type</Label>
+                <Select value={newBlock.type} onValueChange={v => setNewBlock(p => ({ ...p, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="agent_id">Agent ID</SelectItem>
+                    <SelectItem value="molt_number_pattern">MoltNumber Pattern</SelectItem>
+                    <SelectItem value="nation_code">Nation Code</SelectItem>
+                    <SelectItem value="ip_address">IP Address</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Value</Label>
+                <Input
+                  placeholder={newBlock.type === 'molt_number_pattern' ? 'EVIL-*' : newBlock.type === 'nation_code' ? 'EVIL' : 'value'}
+                  value={newBlock.value}
+                  onChange={e => setNewBlock(p => ({ ...p, value: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Reason (optional)</Label>
+                <Input
+                  placeholder="Why this block?"
+                  value={newBlock.reason}
+                  onChange={e => setNewBlock(p => ({ ...p, reason: e.target.value }))}
+                />
+              </div>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreate} disabled={creating || !newBlock.value.trim()}>
+                {creating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                Create Block
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* List */}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : blocks.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <Ban className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No active carrier blocks</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {blocks.map(block => (
+            <Card key={block.id}>
+              <CardContent className="py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Badge variant="outline" className="shrink-0">
+                    {BLOCK_TYPE_LABELS[block.type] || block.type}
+                  </Badge>
+                  <code className="text-sm font-mono truncate">{block.value}</code>
+                  {block.reason && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline truncate">
+                      — {block.reason}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground">{timeAgo(block.createdAt)}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(block.id)}
+                    disabled={deleting === block.id}
+                  >
+                    {deleting === block.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Policies Tab ─────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+function PoliciesTab() {
+  const [policies, setPolicies] = useState<CarrierPolicy[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [newPolicy, setNewPolicy] = useState({ type: 'require_verified_domain', value: '', reason: '' });
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPolicies = useCallback(async () => {
+    const res = await fetch('/api/admin/carrier-policies');
+    if (res.ok) setPolicies(await res.json());
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchPolicies(); }, [fetchPolicies]);
+
+  async function handleCreate() {
+    setCreating(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/carrier-policies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: newPolicy.type,
+          value: newPolicy.value.trim() || undefined,
+          reason: newPolicy.reason.trim() || undefined,
+        }),
+      });
+      if (res.ok) {
+        setNewPolicy({ type: 'require_verified_domain', value: '', reason: '' });
+        setShowCreate(false);
+        fetchPolicies();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to create policy');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setCreating(false);
+  }
+
+  async function handleDelete(type: string) {
+    setDeleting(type);
+    await fetch('/api/admin/carrier-policies', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type }),
+    });
+    fetchPolicies();
+    setDeleting(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Carrier Policies</h2>
+          <p className="text-sm text-muted-foreground">Trust requirements for inbound callers</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchPolicies(); }}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowCreate(!showCreate)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Add Policy
+          </Button>
+        </div>
+      </div>
+
+      {/* Create form */}
+      {showCreate && (
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Policy Type</Label>
+                <Select value={newPolicy.type} onValueChange={v => setNewPolicy(p => ({ ...p, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="require_verified_domain">Require Verified Domain</SelectItem>
+                    <SelectItem value="require_social_verification">Require Social Verification</SelectItem>
+                    <SelectItem value="minimum_age_hours">Minimum Account Age</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Value {newPolicy.type === 'minimum_age_hours' ? '(hours)' : '(optional)'}</Label>
+                <Input
+                  placeholder={newPolicy.type === 'minimum_age_hours' ? '24' : ''}
+                  value={newPolicy.value}
+                  onChange={e => setNewPolicy(p => ({ ...p, value: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Reason (optional)</Label>
+                <Input
+                  placeholder="Why this policy?"
+                  value={newPolicy.reason}
+                  onChange={e => setNewPolicy(p => ({ ...p, reason: e.target.value }))}
+                />
+              </div>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleCreate} disabled={creating}>
+                {creating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                Create Policy
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Info */}
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="py-3 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            Policies apply to <strong>all inbound callers</strong>. Each type can only have one active instance — creating a new one replaces the old.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* List */}
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : policies.length === 0 ? (
+        <Card>
+          <CardContent className="py-8 text-center text-muted-foreground">
+            <ScrollText className="h-8 w-8 mx-auto mb-2 opacity-50" />
+            <p>No active carrier policies</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-2">
+          {policies.map(policy => (
+            <Card key={policy.id}>
+              <CardContent className="py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Badge variant="secondary" className="shrink-0">
+                    {POLICY_TYPE_LABELS[policy.type] || policy.type}
+                  </Badge>
+                  {policy.value && (
+                    <code className="text-sm font-mono">{policy.value}</code>
+                  )}
+                  {policy.reason && (
+                    <span className="text-xs text-muted-foreground hidden sm:inline truncate">
+                      — {policy.reason}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground">{timeAgo(policy.createdAt)}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(policy.type)}
+                    disabled={deleting === policy.type}
+                  >
+                    {deleting === policy.type ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Credits Tab ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+function CreditsTab() {
+  const [userId, setUserId] = useState('');
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
+  const [granting, setGranting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  async function handleGrant() {
+    if (!userId.trim() || !amount) return;
+    setGranting(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/credits/grant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId.trim(),
+          amount: parseInt(amount, 10),
+          description: description.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setResult({ ok: true, message: `Granted ${data.granted.toLocaleString()} credits. New balance: ${data.balance.toLocaleString()}` });
+        setUserId('');
+        setAmount('');
+        setDescription('');
+      } else {
+        setResult({ ok: false, message: data.error || 'Failed to grant credits' });
+      }
+    } catch {
+      setResult({ ok: false, message: 'Network error' });
+    }
+    setGranting(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Grant Credits</h2>
+        <p className="text-sm text-muted-foreground">Add MoltCredits to a user&apos;s balance</p>
+      </div>
+
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label>User ID</Label>
+              <Input
+                placeholder="cuid..."
+                value={userId}
+                onChange={e => setUserId(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount</Label>
+              <Input
+                type="number"
+                placeholder="10000"
+                min={1}
+                max={1000000}
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Input
+                placeholder="Compensation, bonus, etc."
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {result && (
+            <div className={`flex items-center gap-2 text-sm ${result.ok ? 'text-emerald-600' : 'text-destructive'}`}>
+              {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+              {result.message}
+            </div>
+          )}
+
+          <Button onClick={handleGrant} disabled={granting || !userId.trim() || !amount}>
+            {granting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Coins className="h-4 w-4 mr-2" />}
+            Grant Credits
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-amber-500/30 bg-amber-500/5">
+        <CardContent className="py-3 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            Credit grants are recorded in the transaction ledger and cannot be undone. Use the refund API for corrections.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Jobs Tab ─────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+const JOBS = [
+  {
+    id: 'nonce-cleanup',
+    label: 'Nonce Cleanup',
+    description: 'Prune expired nonces from the replay protection table',
+    endpoint: '/api/admin/nonce-cleanup',
+    resultKey: 'deleted',
+  },
+  {
+    id: 'task-retry',
+    label: 'Delivery Retry Worker',
+    description: 'Process queued messages eligible for webhook retry',
+    endpoint: '/api/admin/task-retry-worker',
+    resultKey: 'processed',
+  },
+  {
+    id: 'expire-proposals',
+    label: 'Expire Proposals',
+    description: 'Expire stale direct connection proposals (24h TTL)',
+    endpoint: '/api/admin/expire-proposals',
+    resultKey: 'expired',
+  },
+  {
+    id: 'expire-unclaimed',
+    label: 'Expire Unclaimed Agents',
+    description: 'Deactivate unclaimed agents past their 7-day claim window',
+    endpoint: '/api/admin/expire-unclaimed',
+    resultKey: 'expired',
+  },
+  {
+    id: 'task-cleanup',
+    label: 'Message Cleanup',
+    description: 'Delete completed/canceled/failed messages older than 30 days',
+    endpoint: '/api/admin/task-cleanup',
+    resultKey: 'deleted',
+  },
+  {
+    id: 'expire-stale-calls',
+    label: 'Expire Stale Calls',
+    description: 'Cancel stuck ringing (>1h) and complete stuck in-progress (>30m) calls',
+    endpoint: '/api/admin/expire-stale-calls',
+    resultKey: 'ringingExpired',
+  },
+];
+
+function JobsTab() {
+  const [running, setRunning] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, CronResult>>({});
+
+  async function runJob(job: typeof JOBS[0]) {
+    setRunning(job.id);
+    try {
+      const start = Date.now();
+      const res = await fetch(job.endpoint, { method: 'POST' });
+      const elapsed = Date.now() - start;
+      const data = await res.json();
+      setResults(prev => ({
+        ...prev,
+        [job.id]: {
+          label: job.label,
+          count: data[job.resultKey] ?? data.processed ?? 0,
+          time: `${elapsed}ms`,
+          success: res.ok,
+        },
+      }));
+    } catch {
+      setResults(prev => ({
+        ...prev,
+        [job.id]: { label: job.label, count: 0, time: '—', success: false },
+      }));
+    }
+    setRunning(null);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold">Cron Jobs</h2>
+        <p className="text-sm text-muted-foreground">Run maintenance jobs manually. In production, these are triggered by your cron scheduler.</p>
+      </div>
+
+      <div className="space-y-2">
+        {JOBS.map(job => {
+          const result = results[job.id];
+          return (
+            <Card key={job.id}>
+              <CardContent className="py-4 flex items-center justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{job.label}</span>
+                    {result && (
+                      <Badge variant={result.success ? 'secondary' : 'destructive'} className="text-xs">
+                        {result.success ? `${result.count} processed` : 'Failed'} · {result.time}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">{job.description}</p>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => runJob(job)}
+                  disabled={running !== null}
+                >
+                  {running === job.id ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Play className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Run
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card className="border-blue-500/30 bg-blue-500/5">
+        <CardContent className="py-3 flex items-start gap-2">
+          <Clock className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+          <div className="text-sm text-muted-foreground">
+            <p><strong>Recommended cron schedule:</strong></p>
+            <ul className="mt-1 space-y-0.5 ml-4 list-disc list-outside">
+              <li>Nonce cleanup — every 10 minutes</li>
+              <li>Delivery retry worker — every 1 minute</li>
+              <li>Expire stale calls — every 5 minutes</li>
+              <li>Expire proposals — every hour</li>
+              <li>Expire unclaimed agents — daily</li>
+              <li>Message cleanup — daily</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

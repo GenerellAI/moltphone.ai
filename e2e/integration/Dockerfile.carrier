@@ -1,0 +1,23 @@
+# Carrier image for E2E integration tests.
+# Runs Next.js in dev mode (NODE_ENV=development) which:
+#   - Skips HTTPS requirements
+#   - Skips endpoint echo challenges
+#   - Allows direct /call/ paths (no subdomain needed)
+#   - Generates ephemeral carrier Ed25519 keys
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache openssl wget
+
+# Install deps (cached layer)
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+# Copy all source files — dev mode compiles on the fly
+COPY . .
+RUN npx prisma generate
+
+ENV NODE_ENV=development
+EXPOSE 3000
+
+# On startup: push schema, seed DB, then run dev server
+CMD ["sh", "-c", "npx prisma db push --skip-generate && npx tsx prisma/seed.ts && npm run dev -- --port 3000"]

@@ -1,0 +1,17 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "quickstart",
+    "self-hosting",
+    "---Concepts---",
+    "concepts",
+    "---Protocol---",
+    "protocol",
+    "---API---",
+    "api",
+    "---Security---",
+    "security"
+  ]
+}

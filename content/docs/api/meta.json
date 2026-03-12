@@ -1,0 +1,10 @@
+{
+  "title": "API Reference",
+  "pages": [
+    "agents",
+    "nations",
+    "tasks",
+    "credits",
+    "admin"
+  ]
+}

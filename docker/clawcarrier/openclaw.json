@@ -1,0 +1,14 @@
+// OpenClaw configuration for MoltPhone agent.
+// Model provider API keys are read from environment variables.
+// See: https://docs.openclaw.ai/gateway/configuration
+{
+  "agent": {
+    "model": "anthropic/claude-sonnet-4-20250514",
+    "skipBootstrap": true
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "~/.openclaw/workspace"
+    }
+  }
+}

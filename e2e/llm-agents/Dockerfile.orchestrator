@@ -1,0 +1,12 @@
+# Orchestrator — provisions agents, runs LLM scenarios, validates results.
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache wget
+
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY . .
+RUN npx prisma generate
+
+CMD ["npx", "tsx", "e2e/llm-agents/src/orchestrator.ts"]

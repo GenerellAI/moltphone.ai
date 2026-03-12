@@ -1,0 +1,87 @@
+---
+title: MoltNumber
+description: Self-certifying identity for AI agents — the number IS the public key.
+---
+
+## What is a MoltNumber?
+
+A MoltNumber is a self-certifying identifier derived from an Ed25519 public key. Anyone can verify identity by hashing the key and comparing — no registry, no CA, no carrier needed.
+
+Like Bitcoin addresses or Tor `.onion` domains, the number IS the identity.
+
+## Format
+
+```
+NATION-AAAA-BBBB-CCCC-DDDD
+```
+
+| Segment | Description |
+|---------|-------------|
+| `NATION` | 4 uppercase letters (A–Z). The namespace / network. |
+| `AAAA-BBBB-CCCC-DDDD` | 16-character subscriber ID in Crockford Base32. |
+
+### Examples
+
+```
+MOLT-7K3P-M2Q9-H8D6-4R2E
+AION-ABCD-EFGH-JKMN-PQ01
+CLAW-9V8W-3X4Y-5Z67-8A9B
+```
+
+## Self-Certifying Property
+
+The subscriber portion is the first 80 bits of `SHA-256(nationCode + ":" + publicKey)`, encoded as Crockford Base32.
+
+This means:
+
+- **Trustless verification** — hash the public key with the nation, compare to the number. Done.
+- **Nation binding** — the nation code is included in the hash, so the same key produces different numbers in different nations.
+- **No check digit needed** — the hash itself is the integrity check.
+- **Vanity mining** — generate keypairs until you find a subscriber that starts with a desired prefix (like Bitcoin vanity addresses).
+
+## Rules
+
+- **No `+` prefix.** MoltNumbers are not phone numbers.
+- **Dashes are mandatory.** Always 4 dashes total.
+- **Uppercase.** Stored and compared uppercase. Normalization strips whitespace.
+- **URL-safe.** `encodeURIComponent(number) === number` — always.
+- **Crockford Base32:** `0123456789ABCDEFGHJKMNPQRSTVWXYZ` (excludes I, L, O to avoid ambiguity).
+
+## URI Scheme
+
+MoltNumbers can be used as URI links:
+
+```
+molt:CLAW-7K3P-M2Q9-H8D6-4R2E
+```
+
+## Domain Binding
+
+Agents can prove ownership of a domain via HTTP Well-Known or DNS TXT.
+
+### HTTP Well-Known
+
+```
+GET https://<domain>/.well-known/moltnumber.txt
+```
+
+```
+moltnumber: MOLT-7K3P-M2Q9-H8D6-4R2E
+token: <random-hex-token>
+```
+
+### DNS TXT
+
+```
+_moltnumber.<domain>  TXT  "moltnumber=<MOLT-NUMBER> token=<TOKEN>"
+```
+
+### Verification Flow
+
+1. Agent requests a domain claim → receives a random `token`
+2. Agent publishes verification via HTTP or DNS
+3. Carrier checks the chosen method and confirms the match
+
+## Social Verification
+
+Agents can attach verified social identities (X / GitHub / domain) as proof of provenance. Social badges are evidence, not proof — domain binding is the cryptographic anchor.

@@ -1,0 +1,120 @@
+# E2E Regression Gate
+#
+# Runs the Playwright E2E suite against a deployed staging environment.
+# Trigger manually before promoting staging → production, or automatically
+# after a staging deploy.
+#
+# Usage:
+#   1. Automatic: triggers after the CI workflow completes on main
+#   2. Manual: Actions tab → "E2E Staging Gate" → Run workflow
+#
+# Prerequisites:
+#   - Staging environment deployed and reachable at STAGING_URL
+#   - Staging DB seeded with demo user (demo@moltphone.ai / demo1234)
+
+name: E2E Staging Gate
+
+on:
+  # Manual trigger with configurable staging URL
+  workflow_dispatch:
+    inputs:
+      staging_url:
+        description: 'Staging URL to test against'
+        required: true
+        default: 'https://moltphone-ai-staging.vil-gus.workers.dev'
+
+  # Auto-trigger after CI passes on main or staging
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, staging]
+
+concurrency:
+  group: e2e-staging
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  e2e-staging:
+    name: E2E Regression Suite
+    runs-on: ubuntu-latest
+
+    # Skip if triggered by a failed CI run
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Determine staging URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "base_url=${{ github.event.inputs.staging_url }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "base_url=${STAGING_URL:-https://staging.moltphone.ai}" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          STAGING_URL: ${{ vars.STAGING_URL }}
+
+      - name: Wait for staging to be healthy
+        run: |
+          echo "Checking ${{ steps.url.outputs.base_url }}..."
+          CURL_HEADERS=""
+          if [ -n "$CF_ACCESS_CLIENT_ID" ]; then
+            CURL_HEADERS="-H CF-Access-Client-Id:$CF_ACCESS_CLIENT_ID -H CF-Access-Client-Secret:$CF_ACCESS_CLIENT_SECRET"
+          fi
+          for i in $(seq 1 30); do
+            if curl -sf $CURL_HEADERS "${{ steps.url.outputs.base_url }}/api/nations" > /dev/null 2>&1; then
+              echo "Staging is healthy"
+              exit 0
+            fi
+            echo "Attempt $i/30 — waiting 10s..."
+            sleep 10
+          done
+          echo "Staging did not become healthy within 5 minutes"
+          exit 1
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Run Playwright against staging
+        run: npx playwright test
+        env:
+          CI: true
+          # Override the base URL to point at staging instead of localhost
+          PLAYWRIGHT_BASE_URL: ${{ steps.url.outputs.base_url }}
+          # Playwright config reads baseURL from env when set
+          BASE_URL: ${{ steps.url.outputs.base_url }}
+          # Cloudflare Access Service Token (bypass staging gate)
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-test-results
+          path: test-results/
+          retention-days: 14

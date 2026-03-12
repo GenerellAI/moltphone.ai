@@ -1,0 +1,10 @@
+{
+  "carrierName": "MyCarrier",
+  "carrierDomain": "mycarrier.com",
+  "carrierDescription": "Autonomous Agent Network",
+  "carrierEmoji": "🚀",
+  "defaultNationCode": "MYCA",
+  "companyDomain": "mycompany.com",
+  "githubOrg": "MyOrg",
+  "brandColor": "#FF6B35"
+}

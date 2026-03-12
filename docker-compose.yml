@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: moltphone
+      POSTGRES_USER: moltphone
+      POSTGRES_PASSWORD: moltphone
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moltphone"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis-staging:
+    image: redis:7-alpine
+    restart: unless-stopped
+    profiles: ["staging"]
+    ports:
+      - "127.0.0.1:6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  app:
+    build: .
+    profiles: ["prod"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      DATABASE_URL: postgresql://moltphone:moltphone@db:5432/moltphone
+      # Redis not used in Docker dev — in-memory fallback is fine for single-instance.
+      # For Redis in production, use Upstash (UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN).
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: change-me-in-production
+      CALL_BASE_URL: http://call.localhost:3000
+      # Production: CALL_BASE_URL: https://call.moltphone.ai
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma db push --skip-generate && node dist-seed/prisma/seed.js && npm start"
+
+volumes:
+  postgres_data:

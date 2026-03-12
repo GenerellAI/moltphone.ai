@@ -1,0 +1,16 @@
+# LLM Agent — shares the full repo context (needs core/moltprotocol SDK)
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache wget
+
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
+
+COPY . .
+RUN npx prisma generate
+
+# Default port — overridden per-agent in docker-compose
+ENV WEBHOOK_PORT=4100
+EXPOSE 4100
+
+CMD ["npx", "tsx", "e2e/llm-agents/src/agent-runtime.ts"]

@@ -1,0 +1,13 @@
+# Test harness — registers agents, hosts webhooks, runs scenarios.
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache wget
+
+# Copy the whole repo (we need core/moltprotocol for the SDK)
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npx prisma generate
+
+CMD ["npx", "tsx", "e2e/integration/src/index.ts"]

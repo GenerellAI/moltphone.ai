@@ -1,0 +1,640 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  user
+  admin
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String?
+  passwordHash    String?             // null for OAuth-only users
+  role            UserRole  @default(user)
+  credits         Int       @default(0)
+  personalAgentId String?   @unique  // Auto-created personal MoltNumber
+  emailVerifiedAt DateTime?           // null = unverified
+  lastSeenCallAt    DateTime?           // Sidebar badge: count calls newer than this
+  lastSeenMessageAt DateTime?           // Sidebar badge: count texts newer than this
+  globalCallPolicyIn  Json?             // Global inbound call policy (CallPolicyIn), inherited by all agents unless overridden
+  globalCallPolicyOut Json?             // Global outbound call policy (CallPolicyOut), inherited by all agents unless overridden
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  nations       Nation[]
+  agents        Agent[]
+  contacts      Contact[]
+  blocks        Block[]
+  creditTransactions CreditTransaction[]
+  emailVerificationTokens EmailVerificationToken[]
+  apiKeys ApiKey[]
+}
+
+// ── API Keys ─────────────────────────────────────────────
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String                  // Human-readable label, e.g. "CI pipeline"
+  keyHash     String                  // bcrypt hash of the raw key
+  prefix      String                  // First 8 chars of key for identification (e.g. "molt_k1_")
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?               // null = never expires
+  revokedAt   DateTime?               // null = active
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([prefix])
+}
+
+// ── Email Verification ───────────────────────────────────
+
+model EmailVerificationToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ── Credits ──────────────────────────────────────────────
+
+enum CreditTransactionType {
+  signup_grant      // Free credits on registration
+  admin_grant       // Admin-issued credits
+  agent_creation    // Deducted when registering a new agent (Sybil resistance)
+  nation_creation   // Deducted when registering a new nation (Sybil resistance)
+  task_send         // Deducted when creating a new task
+  task_message      // Deducted per message in a multi-turn conversation
+  relay_charge      // Charged to carrier_only agents for relay traffic (TURN-style)
+  refund            // Refund for failed delivery
+}
+
+model CreditTransaction {
+  id          String                @id @default(cuid())
+  userId      String
+  user        User                  @relation(fields: [userId], references: [id])
+  amount      Int                   // positive = credit, negative = debit
+  type        CreditTransactionType
+  balance     Int                   // balance after this transaction
+  description String?
+  taskId      String?               // reference to task if type = task_send/refund
+  createdAt   DateTime              @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Nation {
+  id               String      @id @default(cuid())
+  code             String      @unique
+  type             NationType  @default(open)
+  displayName      String
+  description      String?
+  badge            String?
+  isPublic         Boolean     @default(true)
+  isActive         Boolean     @default(true)
+  provisionalUntil DateTime?                       // null = graduated; set = must reach 10 agents by this date
+  verifiedDomain   String?                         // domain verified by owner
+  domainVerifiedAt DateTime?                       // when domain was verified
+  publicKey        String?                         // Ed25519 public key (org/carrier nations for delegation certs)
+  ownerId          String
+  owner            User        @relation(fields: [ownerId], references: [id])
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  
+  agents           Agent[]
+  delegations      NationDelegation[]
+}
+
+enum NationType {
+  carrier   // Owned by a carrier. Non-portable. Agent loses number on departure.
+  org       // Owned by an organization. Delegated to 1+ carriers. Not individually portable.
+  open      // No owner. Managed by registry. Freely portable between carriers.
+}
+
+// ── Nation Delegation (org/carrier → carrier authorization) ──
+
+model NationDelegation {
+  id               String    @id @default(cuid())
+  nationCode       String
+  nation           Nation    @relation(fields: [nationCode], references: [code])
+  carrierDomain    String                           // e.g. "moltphone.ai"
+  carrierPublicKey String                           // Carrier's Ed25519 public key (base64url SPKI DER)
+  signature        String                           // Ed25519 signature by nation owner's key
+  issuedAt         DateTime  @default(now())
+  expiresAt        DateTime?                        // null = no expiry
+  revokedAt        DateTime?                        // null = active
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([nationCode, carrierDomain])
+  @@index([nationCode])
+}
+
+enum InboundPolicy {
+  public
+  registered_only
+  allowlist
+}
+
+enum ForwardCondition {
+  always
+  when_offline
+  when_busy
+  when_dnd
+}
+
+enum DirectConnectionPolicy {
+  direct_on_consent
+  direct_on_accept
+  carrier_only
+}
+
+// ── Agent ────────────────────────────────────────────────
+
+model Agent {
+  id                   String        @id @default(cuid())
+  moltNumber          String        @unique @map("phoneNumber")
+  nationCode           String
+  nation               Nation        @relation(fields: [nationCode], references: [code])
+  ownerId              String?                          // null = unclaimed (agent self-signup)
+  owner                User?         @relation(fields: [ownerId], references: [id])
+  
+  // ── Claim lifecycle (hybrid signup) ──
+  claimToken           String?       @unique            // Secret token for human to claim this agent
+  claimExpiresAt       DateTime?                        // Unclaimed agents auto-expire
+  claimedAt            DateTime?                        // null = unclaimed
+  
+  displayName          String
+  description          String?
+  tagline              String?       @db.VarChar(120)    // Short one-liner shown on cards
+  avatarUrl            String?
+  skills               String[]      @default([])
+  specializations      String[]      @default([])        // Owner-defined tags: "code-review", "research", etc.
+  languages            String[]      @default([])        // Spoken languages: "en", "sv", "ja", etc.
+  responseTimeSla      String?       @db.VarChar(40)     // e.g. "< 30s", "< 5m", "< 1h"
+  
+  endpointUrl          String?
+  callEnabled          Boolean       @default(true)  @map("dialEnabled")
+  
+  // Ed25519 public key (SPKI DER, base64url).  Private key lives in the MoltSIM.
+  publicKey            String?
+  
+  awayMessage          String?       @db.VarChar(500)
+  
+  directConnectionPolicy DirectConnectionPolicy @default(direct_on_consent)
+  
+  lastSeenAt           DateTime?
+  
+  inboundPolicy        InboundPolicy @default(public)
+  allowlistAgentIds    String[]      @default([])
+  callPolicyIn         Json?                            // agent-level inbound policy (CallPolicyIn), overrides global
+  callPolicyOut        Json?                            // agent-level outbound policy (CallPolicyOut), overrides global
+  
+  dndEnabled           Boolean       @default(false)
+  
+  maxConcurrentCalls   Int           @default(3)
+  
+  callForwardingEnabled Boolean       @default(false)
+  forwardToAgentId     String?
+  forwardCondition     ForwardCondition @default(when_offline)
+  
+  // Webhook health / circuit breaker
+  webhookFailures      Int           @default(0)
+  isDegraded           Boolean       @default(false)
+  circuitOpenUntil     DateTime?     // null = closed, future = open, past = half-open
+  
+  // Push notifications (A2A)
+  pushEndpointUrl      String?
+
+  // Identity continuity — previous MoltNumbers after porting or key rotation
+  previousNumbers      String[]      @default([])
+  
+  isActive             Boolean       @default(true)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  
+  tasksAsCallee        Task[]        @relation("CalleeAgent")
+  tasksAsCaller        Task[]        @relation("CallerAgent")
+  contacts             Contact[]
+  blocksAsTarget       Block[]       @relation("BlockedAgent")
+  forwardedFrom        Agent[]       @relation("ForwardedTo")
+  forwardTo            Agent?        @relation("ForwardedTo", fields: [forwardToAgentId], references: [id])
+  socialVerifications  SocialVerification[]
+  domainClaims         DomainClaim[]
+  directConnectionsProposed DirectConnection[] @relation("DirectConnectionProposer")
+  directConnectionsReceived DirectConnection[] @relation("DirectConnectionTarget")
+  lexiconEntries       LexiconEntry[]
+  portRequests         PortRequest[]
+}
+
+// ── Number Portability ──────────────────────────────────
+
+enum PortRequestStatus {
+  pending     // Waiting for grace period or carrier action
+  approved    // Carrier approved (manual or auto after grace period)
+  rejected    // Carrier objected with valid reason
+  completed   // Port executed (number unbound, agent deactivated)
+  cancelled   // Agent owner cancelled the request
+}
+
+/// A request to port a MoltNumber from one carrier to another.
+/// Only valid for open-type nations. Org = no individual port-out,
+/// carrier = non-portable.
+model PortRequest {
+  id                String            @id @default(cuid())
+  agentId           String
+  agent             Agent             @relation(fields: [agentId], references: [id])
+  moltNumber        String                              // Snapshot at request time
+  nationCode        String
+  fromCarrierDomain String                              // Current carrier
+  toCarrierDomain   String?                             // Target carrier (null = unknown / any)
+  status            PortRequestStatus @default(pending)
+  requestedAt       DateTime          @default(now())
+  expiresAt         DateTime                            // requestedAt + 7 days (auto-approve deadline)
+  resolvedAt        DateTime?                           // When carrier approved/rejected
+  completedAt       DateTime?                           // When port was fully executed
+  rejectReason      String?                             // Only if status = rejected
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([agentId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+// ── Task (replaces Call) — A2A states ────────────────────
+
+enum TaskStatus {
+  submitted
+  working
+  input_required
+  completed
+  canceled
+  failed
+}
+
+model Task {
+  id             String     @id @default(cuid())
+  taskId         String?    // A2A external task ID (set by caller)
+  sessionId      String?    // A2A session ID for multi-turn
+  callerId       String?
+  caller         Agent?     @relation("CallerAgent", fields: [callerId], references: [id])
+  calleeId       String
+  callee         Agent      @relation("CalleeAgent", fields: [calleeId], references: [id])
+  intent         String     @default("call")
+  status         TaskStatus @default(submitted)
+  forwardingHops String[]   @default([])
+  
+  // Retry / webhook reliability
+  retryCount     Int        @default(0)
+  maxRetries     Int        @default(3)
+  nextRetryAt    DateTime?
+  lastError      String?
+  
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  
+  @@index([status, nextRetryAt])
+  @@index([createdAt, status])      // task-cleanup cron: find old terminal tasks
+  @@index([calleeId])               // per-agent task cap & queries
+  @@index([callerId])               // per-agent task cap & queries
+  
+  messages       TaskMessage[]
+  events         TaskEvent[]
+}
+
+enum MessageDeliveryStatus {
+  sent          // Message created
+  delivered     // Webhook responded successfully
+  seen          // Recipient viewed the message
+}
+
+model TaskMessage {
+  id             String                @id @default(cuid())
+  taskId         String
+  task           Task                  @relation(fields: [taskId], references: [id])
+  role           String
+  // JSON array of typed parts: TextPart | DataPart | FilePart
+  parts          Json                  @default("[]")
+  deliveryStatus MessageDeliveryStatus @default(sent)
+  deliveredAt    DateTime?
+  seenAt         DateTime?
+  createdAt      DateTime              @default(now())
+
+  @@index([taskId])
+}
+
+// TaskEvent: event log for live monitoring / SSE reconnect
+model TaskEvent {
+  id             String   @id @default(cuid())
+  taskId         String
+  task           Task     @relation(fields: [taskId], references: [id])
+  type           String
+  payload        Json     @default("{}")
+  sequenceNumber Int
+  timestamp      DateTime @default(now())
+  
+  @@index([taskId, sequenceNumber])
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  agentId   String
+  agent     Agent    @relation(fields: [agentId], references: [id])
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, agentId])
+}
+
+model Block {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  blockedAgentId  String
+  blockedAgent    Agent    @relation("BlockedAgent", fields: [blockedAgentId], references: [id])
+  reason          String?
+  createdAt       DateTime @default(now())
+  
+  @@unique([userId, blockedAgentId])
+}
+
+model NonceUsed {
+  nonce     String   @id
+  usedAt    DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+// ── Carrier-wide Blocking ───────────────────────────────
+
+enum CarrierBlockType {
+  agent_id
+  molt_number_pattern @map("phone_pattern")
+  nation_code
+  ip_address
+}
+
+model CarrierBlock {
+  id          String           @id @default(cuid())
+  type        CarrierBlockType
+  value       String           // agentId, glob pattern, nation code, or IP/CIDR
+  reason      String?
+  createdBy   String           // admin user ID
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([type, value])
+}
+
+// ── Carrier-wide Allow Policies ─────────────────────────
+
+enum CarrierPolicyType {
+  require_verified_domain
+  require_social_verification
+  minimum_age_hours
+}
+
+model CarrierPolicy {
+  id          String            @id @default(cuid())
+  type        CarrierPolicyType
+  value       String            @default("")  // e.g. hours for minimum_age
+  reason      String?           // human-readable explanation shown to callers
+  createdBy   String            // admin user ID
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([type])
+}
+
+// ── Social Verification ─────────────────────────────────
+
+enum VerificationProvider {
+  domain
+  x
+  github
+}
+
+enum VerificationStatus {
+  pending
+  verified
+  revoked
+  expired
+}
+
+model SocialVerification {
+  id              String              @id @default(cuid())
+  agentId         String
+  agent           Agent               @relation(fields: [agentId], references: [id])
+  provider        VerificationProvider
+  handleOrDomain  String
+  proofUrl        String?
+  status          VerificationStatus  @default(pending)
+  verifiedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([agentId, provider, handleOrDomain])
+}
+
+// ── Domain Claim (MoltNumber spec) ──────────────────────
+
+enum DomainClaimStatus {
+  pending
+  verified
+  failed
+  expired
+}
+
+model DomainClaim {
+  id           String            @id @default(cuid())
+  agentId      String
+  agent        Agent             @relation(fields: [agentId], references: [id])
+  domain       String
+  token        String
+  status       DomainClaimStatus @default(pending)
+  verifiedAt   DateTime?
+  expiresAt    DateTime
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([agentId, domain])
+}
+
+// ── Constants ────────────────────────────────────────────
+// SIGNUP_CREDITS = 10000 (defined in lib/services/credits.ts)
+
+// ── Direct Connection (privacy proxy upgrade) ───────────
+// Modeled after ICE offer/answer (RFC 8445) for the handshake,
+// TURN allocation (RFC 8656) for the relay phase, and
+// SIP B2BUA (RFC 7092) for carrier-mediated topology hiding.
+
+enum DirectConnectionStatus {
+  proposed   // ICE: offer sent, awaiting answer
+  accepted   // ICE: answer received, upgrade token issued
+  active     // ICE: connectivity check passed, direct link live
+  rejected   // offer declined by target
+  revoked    // either party tore down the connection (re-INVITE BYE analogy)
+  expired    // proposal timed out without response
+}
+
+model DirectConnection {
+  id                String                 @id @default(cuid())
+
+  // The agent that proposed the upgrade (ICE: controlling agent)
+  proposerAgentId   String
+  proposerAgent     Agent                  @relation("DirectConnectionProposer", fields: [proposerAgentId], references: [id])
+
+  // The agent that is the target of the proposal (ICE: controlled agent)
+  targetAgentId     String
+  targetAgent       Agent                  @relation("DirectConnectionTarget", fields: [targetAgentId], references: [id])
+
+  status            DirectConnectionStatus @default(proposed)
+
+  // One-time upgrade token (like a TURN allocation nonce).
+  // Generated by the carrier when status moves to accepted.
+  // The first direct A2A request MUST include this token for verification.
+  upgradeToken      String?                @unique
+  tokenConsumed     Boolean                @default(false)
+
+  // Endpoint URLs shared during the upgrade handshake.
+  // Only populated when status = accepted or active.
+  // Comparable to ICE candidate exchange — each side provides its transport address.
+  proposerEndpoint  String?                // proposer's real A2A endpoint (from endpointUrl)
+  targetEndpoint    String?                // target's real A2A endpoint (from endpointUrl)
+
+  // Lifecycle timestamps
+  proposedAt        DateTime               @default(now())
+  acceptedAt        DateTime?
+  activatedAt       DateTime?              // when upgrade token was first used
+  revokedAt         DateTime?
+  revokedBy         String?                // agent ID that initiated revocation
+
+  // Proposals expire after this time if not accepted (default: 24h)
+  expiresAt         DateTime
+
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  // Only one active/pending connection per agent pair (prevents duplicate proposals)
+  @@unique([proposerAgentId, targetAgentId])
+  @@index([proposerAgentId, status])
+  @@index([targetAgentId, status])
+  @@index([upgradeToken])
+}
+
+// ── Lexicon Pack (agent terminology dictionary) ─────────
+
+enum LexiconEntryType {
+  vocabulary   // Single canonical term (Wispr 1-column)
+  correction   // Misspelling → correct term (Wispr 2-column)
+}
+
+model LexiconEntry {
+  id        String           @id @default(cuid())
+  agentId   String
+  agent     Agent            @relation(fields: [agentId], references: [id])
+  type      LexiconEntryType
+  term      String           @db.VarChar(100) // The canonical/correct term
+  variant   String           @default("") @db.VarChar(100) // For corrections: the misspelling. Empty for vocabulary.
+  createdAt DateTime         @default(now())
+
+  @@unique([agentId, type, term, variant])
+  @@index([agentId])
+}
+
+// ═══════════════════════════════════════════════════════════
+// REGISTRY — MoltNumber Registry (Phase 1: same DB, separate logic)
+//
+// The registry is a conceptually independent service that maps
+// MoltNumbers to carrier endpoints. In production this becomes
+// a separate service at moltnumber.org. For now it shares the
+// carrier's database but has its own models and API routes.
+// ═══════════════════════════════════════════════════════════
+
+/// A carrier registered with the MoltNumber registry.
+model RegistryCarrier {
+  id              String   @id @default(cuid())
+  domain          String   @unique                 // e.g. "moltphone.ai", "clawcarrier.example.com"
+  publicKey       String                            // Ed25519 public key (hex) for carrier cert verification
+  callBaseUrl     String                            @map("dialBaseUrl")   // e.g. "https://call.moltphone.ai"
+  name            String?                           // Human-readable carrier name
+  status          RegistryCarrierStatus @default(active)
+  lastHeartbeatAt DateTime?                         // Updated on every authenticated write; null = never seen
+  registeredAt    DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  numberBindings RegistryNumberBinding[]
+  nationBindings RegistryNationBinding[]
+  auditLogs      RegistryAuditLog[]
+}
+
+/// Audit trail for registry mutations. Tracks who changed what.
+model RegistryAuditLog {
+  id         String   @id @default(cuid())
+  carrierId  String?
+  carrier    RegistryCarrier? @relation(fields: [carrierId], references: [id])
+  action     String                              // e.g. "carrier.register", "number.bind", "carrier.suspend"
+  target     String                              // Domain, MoltNumber, or nation code that was affected
+  detail     String?                             // JSON metadata (old/new values, reason, etc.)
+  ip         String?                             // Source IP address
+  timestamp  DateTime @default(now())
+
+  @@index([carrierId])
+  @@index([action])
+  @@index([timestamp])
+}
+
+enum RegistryCarrierStatus {
+  active
+  suspended   // Temporarily suspended (e.g. abuse)
+  revoked     // Permanently revoked by root authority
+}
+
+/// Maps a MoltNumber to the carrier that routes for it.
+/// This is the core lookup: "given this number, which carrier handles it?"
+model RegistryNumberBinding {
+  id            String   @id @default(cuid())
+  moltNumber    String   @unique                 // The full MoltNumber (e.g. "SOLR-12AB-C3D4-EF56")
+  carrierId     String
+  carrier       RegistryCarrier @relation(fields: [carrierId], references: [id])
+  nationCode    String                            // Denormalized for fast nation-level queries
+  registeredAt  DateTime @default(now())
+
+  @@index([nationCode])
+  @@index([carrierId])
+}
+
+/// Maps a nation code to carrier(s) that are authorized to issue numbers under it.
+/// For open nations: any active carrier can register.
+/// For carrier nations: only the owning carrier.
+/// For org nations (future): requires delegation certificate.
+model RegistryNationBinding {
+  id            String   @id @default(cuid())
+  nationCode    String
+  carrierId     String
+  carrier       RegistryCarrier @relation(fields: [carrierId], references: [id])
+  isPrimary     Boolean  @default(false)          // Primary carrier for this nation (owns it)
+  registeredAt  DateTime @default(now())
+
+  @@unique([nationCode, carrierId])
+  @@index([nationCode])
+}

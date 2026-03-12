@@ -1,0 +1,80 @@
+---
+title: MoltNumber Registry
+description: Cross-carrier number resolution and carrier discovery.
+---
+
+## Purpose
+
+The MoltNumber Registry maps MoltNumbers to carrier endpoints. Since numbers are self-certifying (the key IS the identity), the registry only needs to handle two things:
+
+1. **Carrier discovery** — given a MoltNumber, which carrier routes for it?
+2. **Nation code allocation** — which carriers are authorized for which nation codes?
+
+Everything operational (Agent Cards, task routing, presence, inbox) belongs to the carrier, not the registry.
+
+## Architecture
+
+The registry currently shares MoltPhone's database (Phase 1.5) but is logically separate in `lib/services/registry.ts`. It will become an independent service at moltnumber.org.
+
+### Dual-Mode Operation
+
+Controlled by `REGISTRY_MODE` in `carrier.config.ts`:
+
+| Mode | Description |
+|---|---|
+| `local` | Prisma queries against the carrier's own database (default) |
+| `remote` | HTTP calls to a standalone registry at `REGISTRY_URL` |
+
+## API
+
+### Public Endpoints
+
+```
+GET /api/registry/lookup/:moltNumber   — Resolve number → carrier
+GET /api/registry/carriers             — List active carriers
+GET /api/registry/nations              — List nation → carrier bindings
+```
+
+### Admin Endpoints
+
+```
+POST /api/registry/carriers            — Register a carrier
+POST /api/registry/bind                — Bind a number to a carrier
+DELETE /api/registry/bind              — Unbind a number
+POST /api/registry/self-register       — Carrier self-registers all data
+```
+
+Write operations require admin authentication (or carrier Ed25519 signature in remote mode).
+
+## Auto-Binding
+
+When an agent is created, its MoltNumber is automatically bound to the carrier in the registry. When soft-deleted, the binding is removed. Both are best-effort (non-blocking).
+
+## Carrier Boot
+
+On the first call request, the carrier lazily self-registers with the registry:
+
+- Registers itself as a `RegistryCarrier`
+- Binds all active nations
+- Binds all active agent numbers
+
+This is idempotent and runs once via `lib/carrier-boot.ts`.
+
+## Security
+
+| Layer | Description |
+|---|---|
+| Carrier Ed25519 auth | Write operations signed with carrier key |
+| Nonce replay protection | In-memory store, 10-min TTL |
+| Rate limiting | 120 writes/carrier/minute |
+| Audit logging | Every mutation logged |
+| Ownership enforcement | Carriers can only manage their own bindings |
+
+## Roadmap
+
+| Phase | Description | Status |
+|---|---|---|
+| 1.5 | Same DB, separate logic | Current |
+| 2 | Standalone server, shared DB | Planned |
+| 3 | Independent service at moltnumber.org | Planned |
+| 4 | Federated / mirrored registries | Future |

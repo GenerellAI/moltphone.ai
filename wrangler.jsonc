@@ -1,0 +1,131 @@
+{
+  // Cloudflare Workers configuration for MoltPhone.ai
+  // Built with @opennextjs/cloudflare.
+  //
+  // Build:   npx @opennextjs/cloudflare build
+  // Preview: npx @opennextjs/cloudflare preview
+  // Deploy:  npx @opennextjs/cloudflare deploy
+
+  "name": "moltphone-ai",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat_v2"],
+  "workers_dev": true,
+
+  // Persist Worker logs in Cloudflare dashboard (viewable under Workers → Logs)
+  "observability": {
+    "enabled": false,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": false,
+      "persist": true,
+      "head_sampling_rate": 1
+    }
+  },
+
+  // Assets directory for static files (Next.js _next, images, etc.)
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+
+  // Environment variables set via Cloudflare dashboard (Settings → Variables)
+  // Do NOT put secrets here — use the Cloudflare dashboard or `wrangler secret put <KEY>`.
+  //
+  // Required secrets (set in CF dashboard):
+  //   DATABASE_URL, DATABASE_PROVIDER=neon, NEXTAUTH_SECRET, NEXTAUTH_URL,
+  //   CALL_BASE_URL, CALL_HOST
+  //
+  // Optional:
+  //   CARRIER_PRIVATE_KEY, CARRIER_PUBLIC_KEY,
+  //   UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN,
+  //   S3_BUCKET, S3_ENDPOINT, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY,
+  //   S3_PUBLIC_URL, CRON_SECRET, RESEND_API_KEY, EMAIL_FROM
+  //
+  // IMPORTANT: Set DIFFERENT Upstash credentials for Preview vs Production.
+  // No key-prefix isolation — shared Redis causes nonce collisions and rate-limit bleed.
+  // Create two Upstash databases (moltphone-prod + moltphone-staging) or equivalent.
+
+  // R2 bucket binding for avatar storage
+  // Create with: wrangler r2 bucket create moltphone-avatars
+  "r2_buckets": [
+    {
+      "binding": "AVATARS_BUCKET",
+      "bucket_name": "moltphone-avatars"
+    }
+  ],
+
+  // Cron triggers — Cloudflare Workers scheduled events.
+  // These call the admin endpoints with CRON_SECRET for maintenance jobs.
+  // See: https://developers.cloudflare.com/workers/configuration/cron-triggers/
+  //
+  // Note: CF Workers cron triggers invoke the worker's scheduled() handler,
+  // not HTTP routes directly. We use a fetch-based scheduled handler that
+  // calls our admin API endpoints internally. See .open-next for how
+  // OpenNext handles this. For now, use an external cron service (e.g.
+  // cron-job.org, Upstash QStash, or GitHub Actions) to POST to:
+  //
+  //   POST https://moltphone.ai/api/admin/expire-unclaimed
+  //   POST https://moltphone.ai/api/admin/expire-nations
+  //   POST https://moltphone.ai/api/admin/expire-proposals
+  //   POST https://moltphone.ai/api/admin/expire-port-requests
+  //   POST https://moltphone.ai/api/admin/task-retry-worker
+  //   POST https://moltphone.ai/api/admin/nonce-cleanup
+  //
+  //   Header: Authorization: Bearer <CRON_SECRET>
+  //
+  // Recommended schedule:
+  //   expire-unclaimed:     daily     (0 3 * * *)
+  //   expire-nations:       daily     (0 4 * * *)
+  //   expire-proposals:     hourly    (0 * * * *)
+  //   expire-port-requests: daily     (0 5 * * *)
+  //   task-retry-worker:    every 5m  (*/5 * * * *)
+  //   nonce-cleanup:        hourly    (30 * * * *)
+
+  // Custom domains — requires moltphone.ai zone in the CF account.
+  // Cloudflare automatically provisions SSL and DNS records.
+  "routes": [
+    { "pattern": "moltphone.ai", "custom_domain": true }
+  ],
+
+  // ── Staging / Preview environment ──────────────────────
+  // Non-production branch deploys use this environment.
+  // Set staging secrets with:  npx wrangler secret put DATABASE_URL --env staging
+  //                            npx wrangler secret put UPSTASH_REDIS_REST_URL --env staging
+  //                            npx wrangler secret put UPSTASH_REDIS_REST_TOKEN --env staging
+  //
+  // ── Staging root authority ──────────────────────────────
+  // Staging uses a SEPARATE root keypair from production so that staging
+  // carrier certificates are not valid in production and vice versa.
+  //
+  // The staging root public key is published at:
+  //   https://staging.moltprotocol-org.pages.dev/.well-known/molt-root.json
+  //
+  // Set staging root keys:
+  //   npx wrangler secret put ROOT_PRIVATE_KEY --env staging
+  //   npx wrangler secret put ROOT_PUBLIC_KEY --env staging
+  //   npx wrangler secret put ROOT_ISSUER --env staging  (= "staging.moltprotocol.org")
+  //   npx wrangler secret put CARRIER_PRIVATE_KEY --env staging
+  //   npx wrangler secret put CARRIER_PUBLIC_KEY --env staging
+  //
+  // All other variables inherit from the top-level config.
+  "env": {
+    "staging": {
+      "name": "moltphone-ai-staging",
+      "workers_dev": true,
+      "routes": [],
+      "r2_buckets": [
+        {
+          "binding": "AVATARS_BUCKET",
+          "bucket_name": "moltphone-avatars-staging"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  // Worker name — appears in the Cloudflare dashboard.
+  "name": "moltphone-redirects",
+
+  // Entry point.
+  "main": "src/index.ts",
+
+  // Workers runtime compatibility date.
+  "compatibility_date": "2025-04-01"
+
+  // After deploying, add each domain as a Custom Domain in the
+  // Cloudflare dashboard (DNS → Workers Routes or Custom Domains):
+  //
+  //   moltphone.org
+  //   moltphone.net
+  //   moltcaller.com
+  //   moltdial.com
+  //
+  // (plus www.* variants if desired)
+}

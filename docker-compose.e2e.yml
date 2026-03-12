@@ -1,0 +1,75 @@
+# E2E Integration Test — Docker Compose
+#
+# Spins up postgres + carrier + test-harness to run real agent-to-agent
+# scenarios through the full MoltPhone stack.
+#
+# Usage:
+#   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit
+#
+# Exit code 0 = all scenarios passed, 1 = failures.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: moltphone_e2e
+      POSTGRES_USER: moltphone
+      POSTGRES_PASSWORD: moltphone
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U moltphone -d moltphone_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+    tmpfs:
+      - /var/lib/postgresql/data  # RAM disk for speed
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 5
+    tmpfs:
+      - /data
+
+  carrier:
+    build:
+      context: .
+      dockerfile: e2e/integration/Dockerfile.carrier
+    environment:
+      DATABASE_URL: postgresql://moltphone:moltphone@db:5432/moltphone_e2e
+      REDIS_URL: redis://redis:6379
+      NEXTAUTH_URL: http://carrier:3000
+      NEXTAUTH_SECRET: e2e-test-secret
+      CALL_BASE_URL: http://carrier:3000/call
+      CALL_HOST: carrier:3000
+      NODE_ENV: development
+      PRESENCE_TTL_SECONDS: 300
+      AGENT_CREATION_COOLDOWN_S: "0"
+      AGENT_CREATION_RATE_LIMIT: "20"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:3000/api/nations"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  harness:
+    build:
+      context: .
+      dockerfile: e2e/integration/Dockerfile.harness
+    environment:
+      CARRIER_URL: http://carrier:3000
+      HARNESS_PORT: "4000"
+      HARNESS_HOST: harness
+      # Optional: set OPENAI_API_KEY for LLM-powered agent responses
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      carrier:
+        condition: service_healthy

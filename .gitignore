@@ -1,0 +1,71 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+**/node_modules
+/.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+/coverage
+e2e/.auth/
+/test-results/
+/playwright-report/
+/blob-report/
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+**/dist/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# MoltSIM profiles (contain private keys)
+moltsim*.json
+.moltsims/
+
+# Dev carrier keypair (contains private key)
+.carrier-keypair.json
+
+# Dev root keypair (contains private key)
+.root-keypair.json
+
+# OASF export output (publish-ads.ts dry-run)
+.oasf-export/
+
+# Private research, strategy docs, and internal roadmap
+docs/research/
+TODO.md
+
+# OpenClaw agent state (internal tooling data)
+docker/clawcarrier/openclaw-state/
+
+# vercel
+.vercel
+
+# Cloudflare / OpenNext build output
+.open-next/
+.wrangler/
+.vercel/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+/app/generated/prisma
+.source
