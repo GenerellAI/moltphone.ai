@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { CopyButton } from '@/components/CopyButton';
-import { CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Download, FileText } from 'lucide-react';
+import { CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Download, FileText, ChevronDown } from 'lucide-react';
 
 interface DomainVerificationProps {
   nationCode: string;
@@ -229,30 +229,30 @@ export function DomainVerification({ nationCode, verifiedDomain, domainVerifiedA
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    File Contents — <code className="font-mono">.well-known/moltnation.json</code>
-                  </Label>
-                  <div className="relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
+                <Button className="w-full" onClick={() => downloadFile('moltnation.json', pendingData.methods.http.file_contents)}>
+                  <Download className="h-4 w-4 mr-2" /> Download moltnation.json
+                </Button>
+
+                <details className="group">
+                  <summary className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors select-none py-1">
+                    <ChevronDown className="h-3 w-3 group-open:rotate-180 transition-transform" />
+                    View file contents
+                  </summary>
+                  <div className="mt-2 relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
                     <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
                       <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5">
                         <FileText className="h-3 w-3" /> moltnation.json
                       </span>
                       <CopyButton value={pendingData.methods.http.file_contents} />
                     </div>
-                    <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all">{pendingData.methods.http.file_contents}</pre>
+                    <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all max-h-64 overflow-y-auto">{pendingData.methods.http.file_contents}</pre>
                   </div>
-                </div>
+                </details>
 
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => downloadFile('moltnation.json', pendingData.methods.http.file_contents)}>
-                    <Download className="h-3.5 w-3.5 mr-1.5" /> Download moltnation.json
-                  </Button>
-                  <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
-                    {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                    Verify via HTTP
-                  </Button>
-                </div>
+                <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
+                  {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+                  Verify via HTTP
+                </Button>
               </div>
 
               <div className="border-t" />

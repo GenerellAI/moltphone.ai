@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { PolicySection } from '@/components/PolicyEditor';
+import { SettingsSection } from '@/components/SettingsSection';
+import { AgentDomainClaim } from '@/components/AgentDomainClaim';
 import {
   Loader2,
   Save,
@@ -19,6 +21,7 @@ import {
   ChevronDown,
   MessageSquare,
   AlertTriangle,
+  Globe,
 } from 'lucide-react';
 
 interface UserProfile {
@@ -414,6 +417,13 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Domain Verification — for personal agent */}
+      {profile.personalAgentId && (
+        <SettingsSection title="Domain Verification" icon={<Globe className="h-4 w-4" />}>
+          <AgentDomainClaim agentId={profile.personalAgentId} />
+        </SettingsSection>
+      )}
 
       {/* Call Policy */}
       <Card>

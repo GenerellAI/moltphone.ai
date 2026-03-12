@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CopyButton } from '@/components/CopyButton';
-import { CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Trash2, Download, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Trash2, Download, FileText, ChevronDown } from 'lucide-react';
 
 function downloadFile(filename: string, content: string) {
   const blob = new Blob([content], { type: filename.endsWith('.json') ? 'application/json' : 'text/plain' });
@@ -54,7 +54,7 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
   const [success, setSuccess] = useState<string | null>(null);
   const [ownedAgents, setOwnedAgents] = useState<OwnedAgent[]>([]);
   const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
-  const [showAgentPicker, setShowAgentPicker] = useState(false);
+
 
   const fetchClaims = useCallback(async () => {
     try {
@@ -228,38 +228,26 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
 
         {/* Include additional agents in verification file */}
         {ownedAgents.length > 0 && !pendingData && (
-          <div className="space-y-2">
-            <button
-              type="button"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              onClick={() => setShowAgentPicker(!showAgentPicker)}
-            >
-              {showAgentPicker ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              Include additional agents in verification file ({selectedAgentIds.size} selected)
-            </button>
-            {showAgentPicker && (
-              <div className="rounded-md border bg-muted/30 p-3 space-y-2">
-                <p className="text-[11px] text-muted-foreground">
-                  Select other agents you own to include in the same <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10px]">moltnumber.json</code> file.
-                  This lets you verify one domain for multiple agents at once.
-                </p>
-                {ownedAgents.map(a => (
-                  <label key={a.id} className="flex items-center gap-2.5 py-1 cursor-pointer group">
-                    <Checkbox
-                      checked={selectedAgentIds.has(a.id)}
-                      onCheckedChange={(checked) => {
-                        const next = new Set(selectedAgentIds);
-                        if (checked) next.add(a.id);
-                        else next.delete(a.id);
-                        setSelectedAgentIds(next);
-                      }}
-                    />
-                    <span className="text-xs font-medium group-hover:text-foreground">{a.displayName}</span>
-                    <span className="text-[11px] font-mono text-muted-foreground">{a.moltNumber}</span>
-                  </label>
-                ))}
-              </div>
-            )}
+          <div className="rounded-md border p-3 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold">Include additional agents</span>
+              <span className="text-[10px] text-muted-foreground">— one file, multiple MoltNumbers</span>
+            </div>
+            {ownedAgents.map(a => (
+              <label key={a.id} className="flex items-center gap-2.5 py-1 cursor-pointer group">
+                <Checkbox
+                  checked={selectedAgentIds.has(a.id)}
+                  onCheckedChange={(checked) => {
+                    const next = new Set(selectedAgentIds);
+                    if (checked) next.add(a.id);
+                    else next.delete(a.id);
+                    setSelectedAgentIds(next);
+                  }}
+                />
+                <span className="text-xs font-medium group-hover:text-foreground">{a.displayName}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{a.moltNumber}</span>
+              </label>
+            ))}
           </div>
         )}
 
@@ -281,30 +269,30 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                  File Contents — <code className="font-mono">.well-known/moltnumber.json</code>
-                </Label>
-                <div className="relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
+              <Button className="w-full" onClick={() => downloadFile('moltnumber.json', pendingData.methods.http.file_contents)}>
+                <Download className="h-4 w-4 mr-2" /> Download moltnumber.json
+              </Button>
+
+              <details className="group">
+                <summary className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors select-none py-1">
+                  <ChevronDown className="h-3 w-3 group-open:rotate-180 transition-transform" />
+                  View file contents
+                </summary>
+                <div className="mt-2 relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
                   <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
                     <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5">
                       <FileText className="h-3 w-3" /> moltnumber.json
                     </span>
                     <CopyButton value={pendingData.methods.http.file_contents} />
                   </div>
-                  <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all">{pendingData.methods.http.file_contents}</pre>
+                  <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all max-h-64 overflow-y-auto">{pendingData.methods.http.file_contents}</pre>
                 </div>
-              </div>
+              </details>
 
-              <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => downloadFile('moltnumber.json', pendingData.methods.http.file_contents)}>
-                  <Download className="h-3.5 w-3.5 mr-1.5" /> Download moltnumber.json
-                </Button>
-                <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
-                  {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                  Verify via HTTP
-                </Button>
-              </div>
+              <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
+                {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+                Verify via HTTP
+              </Button>
             </div>
 
             <div className="border-t" />
