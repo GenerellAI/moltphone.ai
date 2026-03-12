@@ -144,6 +144,7 @@ function buildProviders(): NextAuthOptions['providers'] {
             headers: {
               Authorization: `Bearer ${tokens.access_token}`,
               Accept: 'application/vnd.github+json',
+              'User-Agent': 'moltphone.ai',
             },
           });
           if (!userRes.ok) {
@@ -158,6 +159,7 @@ function buildProviders(): NextAuthOptions['providers'] {
               headers: {
                 Authorization: `Bearer ${tokens.access_token}`,
                 Accept: 'application/vnd.github+json',
+                'User-Agent': 'moltphone.ai',
               },
             });
             if (emailRes.ok) {
