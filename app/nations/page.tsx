@@ -26,7 +26,16 @@ export default async function NationsPage() {
           <Link key={nation.code} href={`/nations/${nation.code}`}>
             <Card className="p-5 hover:border-primary/50 transition-colors cursor-pointer h-full">
               <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">{nation.badge || '🌐'}</span>
+                {nation.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={nation.avatarUrl}
+                    alt={nation.displayName}
+                    className="rounded-lg object-cover w-10 h-10"
+                  />
+                ) : (
+                  <span className="text-2xl">{nation.badge || '🌐'}</span>
+                )}
                 <div>
                   <div className="font-mono font-bold text-lg">{nation.code}</div>
                   <div className="text-sm text-muted-foreground">{nation.displayName}</div>

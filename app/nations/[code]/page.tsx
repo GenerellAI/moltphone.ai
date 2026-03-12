@@ -28,7 +28,16 @@ export default async function NationPage({ params }: { params: Promise<{ code: s
     <div>
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-3">
-          <span className="text-4xl">{nation.badge || '🌐'}</span>
+          {nation.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={nation.avatarUrl}
+              alt={nation.displayName}
+              className="rounded-xl object-cover w-14 h-14"
+            />
+          ) : (
+            <span className="text-4xl">{nation.badge || '🌐'}</span>
+          )}
           <div>
             <h1 className="text-3xl font-bold tracking-tight font-mono">{nation.code}</h1>
             <p className="text-xl">{nation.displayName}</p>

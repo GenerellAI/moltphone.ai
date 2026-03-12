@@ -39,6 +39,8 @@ import {
   UserPlus,
   X,
   Search,
+  ImagePlus,
+  Upload,
 } from 'lucide-react';
 import {
   Dialog,
@@ -212,6 +214,7 @@ interface AdminNation {
   displayName: string;
   description: string | null;
   badge: string | null;
+  avatarUrl: string | null;
   isPublic: boolean;
   isActive: boolean;
   provisionalUntil: string | null;
@@ -467,13 +470,26 @@ function NationsTab() {
   const [editData, setEditData] = useState<{
     displayName: string;
     description: string;
+    badge: string;
     type: string;
     isPublic: boolean;
     memberUserIds: string[];
     adminUserIds: string[];
-  }>({ displayName: '', description: '', type: 'open', isPublic: true, memberUserIds: [], adminUserIds: [] });
+  }>({ displayName: '', description: '', badge: '', type: 'open', isPublic: true, memberUserIds: [], adminUserIds: [] });
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState<string | null>(null); // nation code being uploaded
+
+  // Create nation dialog
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newNation, setNewNation] = useState({
+    code: '', type: 'open', displayName: '', description: '', badge: '', isPublic: true, ownerId: '',
+  });
+
+  // Delete confirmation
+  const [deleteNation, setDeleteNation] = useState<AdminNation | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setError(null);
@@ -529,11 +545,107 @@ function NationsTab() {
     setToggling(null);
   }
 
+  async function handleCreate() {
+    setCreating(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        code: newNation.code.toUpperCase(),
+        type: newNation.type,
+        displayName: newNation.displayName,
+        isPublic: newNation.isPublic,
+      };
+      if (newNation.description) payload.description = newNation.description;
+      if (newNation.badge) payload.badge = newNation.badge;
+      if (newNation.ownerId) payload.ownerId = newNation.ownerId;
+
+      const res = await fetch('/api/admin/nations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setShowCreate(false);
+        setNewNation({ code: '', type: 'open', displayName: '', description: '', badge: '', isPublic: true, ownerId: '' });
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+      }
+    } catch {
+      setError('Network error');
+    }
+    setCreating(false);
+  }
+
+  async function handleDelete() {
+    if (!deleteNation) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/nations', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: deleteNation.code }),
+      });
+      if (res.ok) {
+        setDeleteNation(null);
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Delete failed');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setDeleting(false);
+  }
+
+  async function handleAvatarUpload(nationCode: string, file: File) {
+    setUploadingAvatar(nationCode);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`/api/nations/${nationCode}/avatar`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Upload failed');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setUploadingAvatar(null);
+  }
+
+  async function handleAvatarRemove(nationCode: string) {
+    setUploadingAvatar(nationCode);
+    setError(null);
+    try {
+      const res = await fetch(`/api/nations/${nationCode}/avatar`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Remove failed');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setUploadingAvatar(null);
+  }
+
   function openEdit(nation: AdminNation) {
     setEditNation(nation);
     setEditData({
       displayName: nation.displayName,
       description: nation.description || '',
+      badge: nation.badge || '',
       type: nation.type,
       isPublic: nation.isPublic,
       memberUserIds: [...nation.memberUserIds],
@@ -549,6 +661,7 @@ function NationsTab() {
       const payload: Record<string, unknown> = { code: editNation.code };
       if (editData.displayName !== editNation.displayName) payload.displayName = editData.displayName;
       if (editData.description !== (editNation.description || '')) payload.description = editData.description;
+      if (editData.badge !== (editNation.badge || '')) payload.badge = editData.badge;
       if (editData.type !== editNation.type) payload.type = editData.type;
       if (editData.isPublic !== editNation.isPublic) payload.isPublic = editData.isPublic;
 
@@ -595,10 +708,16 @@ function NationsTab() {
           <h2 className="text-lg font-semibold">Nations</h2>
           <p className="text-sm text-muted-foreground">Manage all nation codes — ownership, type, members, and status</p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData(); }}>
-          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            Create Nation
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData(); }}>
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -619,56 +738,93 @@ function NationsTab() {
           <Card key={nation.code} className={!nation.isActive ? 'opacity-60' : undefined}>
             <CardContent className="py-4">
               <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <code className="text-base font-bold font-mono">{nation.code}</code>
-                    {nation.badge && <span className="text-lg">{nation.badge}</span>}
-                    <span className="text-sm font-medium">{nation.displayName}</span>
-                    <Badge className={`text-xs ${NATION_TYPE_COLORS[nation.type] || ''}`} variant="outline">
-                      {nation.type}
-                    </Badge>
-                    {!nation.isActive && (
-                      <Badge variant="destructive" className="text-xs">Inactive</Badge>
-                    )}
-                    {nation.provisionalUntil && (
-                      <Badge variant="outline" className="text-xs text-amber-600">
-                        Provisional until {new Date(nation.provisionalUntil).toLocaleDateString()}
-                      </Badge>
-                    )}
-                    {nation.verifiedDomain && (
-                      <Badge variant="secondary" className="text-xs">
-                        ✓ {nation.verifiedDomain}
-                      </Badge>
-                    )}
+                {/* Avatar + info */}
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  {/* Nation avatar */}
+                  <div className="relative shrink-0 group">
+                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
+                      {nation.avatarUrl ? (
+                        <img src={nation.avatarUrl} alt={nation.displayName} className="h-full w-full object-cover" />
+                      ) : nation.badge ? (
+                        <span className="text-lg">{nation.badge}</span>
+                      ) : (
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    {/* Upload overlay */}
+                    <label
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                      title="Upload avatar"
+                    >
+                      {uploadingAvatar === nation.code ? (
+                        <Loader2 className="h-4 w-4 text-white animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5 text-white" />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleAvatarUpload(nation.code, file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
                   </div>
 
-                  <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-                    <span className="flex items-center gap-1">
-                      <Crown className="h-3 w-3" />
-                      {nation.owner.name || nation.owner.email}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Bot className="h-3 w-3" />
-                      {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
-                    </span>
-                    {nation.adminUserIds.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {nation.adminUserIds.length} admin{nation.adminUserIds.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    {nation.memberUserIds.length > 0 && (
-                      <span className="flex items-center gap-1">
-                        <UserPlus className="h-3 w-3" />
-                        {nation.memberUserIds.length} member{nation.memberUserIds.length !== 1 ? 's' : ''}
-                      </span>
-                    )}
-                    <span>{nation.isPublic ? 'Public' : 'Private'}</span>
-                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <code className="text-base font-bold font-mono">{nation.code}</code>
+                      {nation.badge && <span className="text-lg">{nation.badge}</span>}
+                      <span className="text-sm font-medium">{nation.displayName}</span>
+                      <Badge className={`text-xs ${NATION_TYPE_COLORS[nation.type] || ''}`} variant="outline">
+                        {nation.type}
+                      </Badge>
+                      {!nation.isActive && (
+                        <Badge variant="destructive" className="text-xs">Inactive</Badge>
+                      )}
+                      {nation.provisionalUntil && (
+                        <Badge variant="outline" className="text-xs text-amber-600">
+                          Provisional until {new Date(nation.provisionalUntil).toLocaleDateString()}
+                        </Badge>
+                      )}
+                      {nation.verifiedDomain && (
+                        <Badge variant="secondary" className="text-xs">
+                          ✓ {nation.verifiedDomain}
+                        </Badge>
+                      )}
+                    </div>
 
-                  {nation.description && (
-                    <p className="mt-1 text-xs text-muted-foreground truncate max-w-xl">{nation.description}</p>
-                  )}
+                    <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <Crown className="h-3 w-3" />
+                        {nation.owner.name || nation.owner.email}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Bot className="h-3 w-3" />
+                        {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
+                      </span>
+                      {nation.adminUserIds.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3 w-3" />
+                          {nation.adminUserIds.length} admin{nation.adminUserIds.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {nation.memberUserIds.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <UserPlus className="h-3 w-3" />
+                          {nation.memberUserIds.length} member{nation.memberUserIds.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      <span>{nation.isPublic ? 'Public' : 'Private'}</span>
+                    </div>
+
+                    {nation.description && (
+                      <p className="mt-1 text-xs text-muted-foreground truncate max-w-xl">{nation.description}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
@@ -693,6 +849,16 @@ function NationsTab() {
                     ) : (
                       <Power className="h-3.5 w-3.5 text-emerald-600" />
                     )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => setDeleteNation(nation)}
+                    disabled={nation._count.agents > 0}
+                    title={nation._count.agents > 0 ? `Cannot delete — has ${nation._count.agents} agent(s)` : 'Delete Nation'}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </Button>
                 </div>
               </div>
@@ -732,12 +898,60 @@ function NationsTab() {
 
       {/* Edit Nation Dialog */}
       <Dialog open={!!editNation} onOpenChange={open => { if (!open) setEditNation(null); }}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Nation — {editNation?.code}</DialogTitle>
             <DialogDescription>Update nation settings, type, and access controls.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Avatar upload */}
+            {editNation && (
+              <div className="space-y-2">
+                <Label>Avatar</Label>
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden border shrink-0">
+                    {editNation.avatarUrl ? (
+                      <img src={editNation.avatarUrl} alt={editNation.displayName} className="h-full w-full object-cover" />
+                    ) : editNation.badge ? (
+                      <span className="text-2xl">{editNation.badge}</span>
+                    ) : (
+                      <Globe className="h-6 w-6 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="cursor-pointer">
+                      <Button variant="outline" size="sm" asChild>
+                        <span>
+                          {uploadingAvatar === editNation.code ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                          ) : (
+                            <ImagePlus className="h-3.5 w-3.5 mr-1.5" />
+                          )}
+                          Upload
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file && editNation) handleAvatarUpload(editNation.code, file);
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                    {editNation.avatarUrl && (
+                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => handleAvatarRemove(editNation.code)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Remove
+                      </Button>
+                    )}
+                    <p className="text-xs text-muted-foreground">Max 256 KB. JPEG, PNG, WebP, GIF.</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Display Name</Label>
               <Input value={editData.displayName} onChange={e => setEditData(d => ({ ...d, displayName: e.target.value }))} />
@@ -746,7 +960,11 @@ function NationsTab() {
               <Label>Description</Label>
               <Input value={editData.description} onChange={e => setEditData(d => ({ ...d, description: e.target.value }))} />
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Badge / Emoji</Label>
+                <Input value={editData.badge} onChange={e => setEditData(d => ({ ...d, badge: e.target.value }))} placeholder="🌐" maxLength={10} />
+              </div>
               <div className="space-y-2">
                 <Label>Type</Label>
                 <Select value={editData.type} onValueChange={v => setEditData(d => ({ ...d, type: v }))}>
@@ -790,6 +1008,114 @@ function NationsTab() {
             <Button onClick={handleSaveEdit} disabled={saving}>
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Nation Dialog */}
+      <Dialog open={showCreate} onOpenChange={open => { if (!open) setShowCreate(false); }}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Nation</DialogTitle>
+            <DialogDescription>Create a new nation code. Admin-created nations skip credit costs and provisional periods.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Nation Code</Label>
+                <Input
+                  value={newNation.code}
+                  onChange={e => setNewNation(d => ({ ...d, code: e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4) }))}
+                  placeholder="ABCD"
+                  maxLength={4}
+                  className="font-mono uppercase"
+                />
+                <p className="text-xs text-muted-foreground">Exactly 4 uppercase letters. Cannot be changed later.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={newNation.type} onValueChange={v => setNewNation(d => ({ ...d, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="org">Org</SelectItem>
+                    <SelectItem value="carrier">Carrier</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={newNation.displayName} onChange={e => setNewNation(d => ({ ...d, displayName: e.target.value }))} placeholder="My Nation" />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input value={newNation.description} onChange={e => setNewNation(d => ({ ...d, description: e.target.value }))} placeholder="A short description…" />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Badge / Emoji</Label>
+                <Input value={newNation.badge} onChange={e => setNewNation(d => ({ ...d, badge: e.target.value }))} placeholder="🌐" maxLength={10} />
+              </div>
+              <div className="space-y-2">
+                <Label>Visibility</Label>
+                <Select value={newNation.isPublic ? 'public' : 'private'} onValueChange={v => setNewNation(d => ({ ...d, isPublic: v === 'public' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="private">Private</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Owner</Label>
+              <UserSearchPicker
+                users={users}
+                selectedId={newNation.ownerId}
+                onChange={id => setNewNation(d => ({ ...d, ownerId: id }))}
+              />
+              <p className="text-xs text-muted-foreground">Leave blank to assign to yourself.</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={handleCreate} disabled={creating || newNation.code.length !== 4 || !newNation.displayName}>
+              {creating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Nation Dialog */}
+      <Dialog open={!!deleteNation} onOpenChange={open => { if (!open) setDeleteNation(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Nation — {deleteNation?.code}</DialogTitle>
+            <DialogDescription>
+              This will permanently delete <strong>{deleteNation?.displayName}</strong> ({deleteNation?.code}) and all associated delegation certificates. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteNation && deleteNation._count.agents > 0 && (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="py-3">
+                <p className="text-sm text-destructive">
+                  Cannot delete — this nation has {deleteNation._count.agents} agent(s). Deactivate it or remove agents first.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteNation(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting || (deleteNation?._count.agents ?? 0) > 0}
+            >
+              {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
