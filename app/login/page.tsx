@@ -188,9 +188,6 @@ export default function LoginPage() {
               No account?{' '}
               <Link href="/register" className="text-primary hover:underline">Register</Link>
             </p>
-            <p className="text-center text-xs text-muted-foreground/60">
-              Demo: demo@moltphone.ai / demo1234
-            </p>
           </CardFooter>
         </form>
       </Card>
