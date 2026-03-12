@@ -252,27 +252,16 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
         )}
 
         {pendingData && (
-          <div className="space-y-6 pt-2">
-            {/* Method 1: HTTP Well-Known */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold">Option 1 — HTTP Well-Known File</h4>
-              <p className="text-xs text-muted-foreground">
-                Create a file named <code className="text-[11px] bg-muted px-1 py-0.5 rounded font-mono">moltnumber.json</code> and
-                serve it at the following URL on your domain:
-              </p>
-
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">File URL</Label>
-                <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                  <code className="text-xs font-mono flex-1 break-all select-all">{pendingData.methods.http.url}</code>
-                  <CopyButton value={pendingData.methods.http.url} />
-                </div>
+          <div className="space-y-5 pt-2">
+            {/* Step 1: Download */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold">1</span>
+                <h4 className="text-sm font-semibold">Download the verification file</h4>
               </div>
-
               <Button className="w-full" onClick={() => downloadFile('moltnumber.json', pendingData.methods.http.file_contents)}>
                 <Download className="h-4 w-4 mr-2" /> Download moltnumber.json
               </Button>
-
               <details className="group">
                 <summary className="flex items-center gap-1.5 cursor-pointer text-[11px] text-muted-foreground hover:text-foreground transition-colors select-none py-1">
                   <ChevronDown className="h-3 w-3 group-open:rotate-180 transition-transform" />
@@ -288,48 +277,70 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
                   <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all max-h-64 overflow-y-auto">{pendingData.methods.http.file_contents}</pre>
                 </div>
               </details>
-
-              <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
-                {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                Verify via HTTP
-              </Button>
             </div>
 
-            <div className="border-t" />
-
-            {/* Method 2: DNS TXT */}
-            <div className="space-y-3">
-              <h4 className="text-sm font-semibold">Option 2 — DNS TXT Record</h4>
+            {/* Step 2: Upload */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold">2</span>
+                <h4 className="text-sm font-semibold">Upload it to your domain</h4>
+              </div>
               <p className="text-xs text-muted-foreground">
-                Add a <code className="text-[11px] bg-muted px-1 py-0.5 rounded font-mono">TXT</code> record to your DNS configuration.
+                Place the file at the following URL on your web server:
               </p>
-
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Record Name</Label>
-                <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                  <code className="text-xs font-mono flex-1 select-all">{pendingData.methods.dns.record}</code>
-                  <CopyButton value={pendingData.methods.dns.record} />
-                </div>
+              <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
+                <code className="text-xs font-mono flex-1 break-all select-all">{pendingData.methods.http.url}</code>
+                <CopyButton value={pendingData.methods.http.url} />
               </div>
+            </div>
 
-              <div className="space-y-1">
-                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Record Value</Label>
-                <div className="relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
-                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
-                    <span className="text-[10px] font-mono text-zinc-400">TXT record</span>
-                    <CopyButton value={pendingData.methods.dns.value} />
-                  </div>
-                  <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all">{pendingData.methods.dns.value}</pre>
-                </div>
+            {/* Step 3: Verify */}
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-2">
+                <span className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold">3</span>
+                <h4 className="text-sm font-semibold">Verify ownership</h4>
               </div>
-
-              <Button size="sm" variant="outline" onClick={() => handleVerify('dns')} disabled={verifying}>
-                {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                Verify via DNS
+              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleVerify('http')} disabled={verifying}>
+                {verifying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                Verify Domain
               </Button>
             </div>
 
-            <p className="text-xs text-muted-foreground">
+            {/* Alternative: DNS */}
+            <details className="group border-t pt-4">
+              <summary className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground hover:text-foreground transition-colors select-none">
+                <ChevronDown className="h-3.5 w-3.5 group-open:rotate-180 transition-transform" />
+                Alternative: verify via DNS TXT record
+              </summary>
+              <div className="mt-3 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  If you don&apos;t have a web server, add a <code className="text-[11px] bg-muted px-1 py-0.5 rounded font-mono">TXT</code> record to your DNS instead.
+                </p>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Record Name</Label>
+                  <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
+                    <code className="text-xs font-mono flex-1 select-all">{pendingData.methods.dns.record}</code>
+                    <CopyButton value={pendingData.methods.dns.record} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Record Value</Label>
+                  <div className="relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
+                      <span className="text-[10px] font-mono text-zinc-400">TXT record</span>
+                      <CopyButton value={pendingData.methods.dns.value} />
+                    </div>
+                    <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all">{pendingData.methods.dns.value}</pre>
+                  </div>
+                </div>
+                <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => handleVerify('dns')} disabled={verifying}>
+                  {verifying ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                  Verify via DNS
+                </Button>
+              </div>
+            </details>
+
+            <p className="text-[11px] text-muted-foreground">
               Verification expires {pendingData.expires_at ? new Date(pendingData.expires_at).toLocaleString() : 'in 48 hours'}.
             </p>
           </div>

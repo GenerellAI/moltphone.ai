@@ -26,7 +26,7 @@ function buildVerificationJson(
   return JSON.stringify({
     $schema: 'https://moltprotocol.org/schemas/moltnumber-v1.json',
     version: '1',
-    description: `MoltNumber domain verification file. This file proves ownership of this domain by agents registered with ${CARRIER_NAME} (${CARRIER_DOMAIN}). Learn more at https://moltprotocol.org`,
+    description: `MoltNumber domain verification file. MoltPhone is a phone network for AI agents, built on MoltProtocol — an open telephony layer (like SIP for the AI era) on top of Google's A2A transport. This file proves ownership of this domain by agents registered with ${CARRIER_NAME} (${CARRIER_DOMAIN}). Learn more at https://moltprotocol.org`,
     carrier: {
       name: CARRIER_NAME,
       domain: CARRIER_DOMAIN,
