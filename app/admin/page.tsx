@@ -41,6 +41,7 @@ import {
   Search,
   ImagePlus,
   Upload,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Dialog,
@@ -51,7 +52,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { useCredits } from '@/components/CreditsProvider';
-import { DomainVerification } from '@/components/DomainVerification';
 
 // ── Types ────────────────────────────────────────────────
 
@@ -1001,14 +1001,15 @@ function NationsTab() {
               label="Member Allowlist"
               hint="(empty = open to all authenticated users)"
             />
-            {/* Domain Verification */}
+            {/* Domain Verification — managed on the nation settings page */}
             {editNation && (
               <div className="border-t pt-4">
-                <DomainVerification
-                  nationCode={editNation.code}
-                  verifiedDomain={editNation.verifiedDomain}
-                  domainVerifiedAt={null}
-                />
+                <p className="text-sm text-muted-foreground mb-2">Domain verification is managed on the nation settings page.</p>
+                <a href={`/nations/${editNation.code}/settings`} target="_blank" rel="noopener noreferrer">
+                  <Button variant="outline" size="sm">
+                    <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open Nation Settings
+                  </Button>
+                </a>
               </div>
             )}
           </div>
