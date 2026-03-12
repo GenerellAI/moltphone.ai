@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { CopyButton } from '@/components/CopyButton';
-import { Globe, CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Trash2 } from 'lucide-react';
+import { Globe, CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Trash2, Download } from 'lucide-react';
 
 interface DomainClaim {
   id: string;
@@ -239,10 +239,24 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
                   <pre className="text-xs font-mono flex-1 whitespace-pre-wrap">{pendingData.methods.http.file_contents}</pre>
                   <CopyButton value={pendingData.methods.http.file_contents} />
                 </div>
-                <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying} className="mt-1">
-                  {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                  Verify via HTTP
-                </Button>
+                <div className="flex gap-2 mt-1">
+                  <Button size="sm" variant="outline" onClick={() => {
+                    const blob = new Blob([pendingData.methods.http.file_contents], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'moltnumber.txt';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}>
+                    <Download className="h-3.5 w-3.5 mr-1.5" />
+                    Download moltnumber.txt
+                  </Button>
+                  <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
+                    {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+                    Verify via HTTP
+                  </Button>
+                </div>
               </div>
 
               <div className="border-t" />

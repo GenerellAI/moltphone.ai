@@ -10,8 +10,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, CheckCircle2, ArrowLeft, Key, Copy, Check, Shield, Phone, Settings2, MessageSquare, GitFork, AlertTriangle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ArrowLeft, Key, Copy, Check, Shield, Phone, Settings2, MessageSquare, GitFork, AlertTriangle, Globe } from 'lucide-react';
 import { PolicySection } from '@/components/PolicyEditor';
+import { AgentDomainClaim } from '@/components/AgentDomainClaim';
 
 interface AgentSettings {
   id: string;
@@ -276,6 +277,20 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
           </CardContent>
         </form>
       </Card>
+
+      {/* ── Domain Verification ───────────────────────── */}
+      {!isPersonalAgent && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
+              <Globe className="h-4 w-4" /> Domain Verification
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AgentDomainClaim agentId={agentId!} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Endpoint & Messaging ──────────────────────── */}
       {!isPersonalAgent && (
