@@ -366,11 +366,6 @@ function NationsTab() {
     setSaving(false);
   }
 
-  function getUserLabel(userId: string) {
-    const u = users.find(u => u.id === userId);
-    return u ? (u.name || u.email) : userId.slice(0, 12) + '…';
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center py-12">
