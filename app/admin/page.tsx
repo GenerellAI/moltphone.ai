@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,6 +38,7 @@ import {
   Crown,
   UserPlus,
   X,
+  Search,
 } from 'lucide-react';
 import {
   Dialog,
@@ -230,6 +231,221 @@ interface AdminUser {
   role: string;
 }
 
+// ── UserPicker (searchable multi-select) ────────────────
+
+function UserPicker({
+  users,
+  selectedIds,
+  onChange,
+  label,
+  hint,
+  excludeIds = [],
+}: {
+  users: AdminUser[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  label: string;
+  hint?: string;
+  excludeIds?: string[];
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    return users.filter(u =>
+      !selectedIds.includes(u.id) &&
+      !excludeIds.includes(u.id) &&
+      (q === '' ||
+        (u.name?.toLowerCase().includes(q)) ||
+        u.email.toLowerCase().includes(q) ||
+        u.id.toLowerCase().includes(q))
+    );
+  }, [users, selectedIds, excludeIds, query]);
+
+  function addUser(id: string) {
+    onChange([...selectedIds, id]);
+    setQuery('');
+  }
+
+  function removeUser(id: string) {
+    onChange(selectedIds.filter(uid => uid !== id));
+  }
+
+  return (
+    <div className="space-y-2" ref={wrapperRef}>
+      <Label>{label}{hint && <span className="text-xs text-muted-foreground ml-1">{hint}</span>}</Label>
+      {/* Selected chips */}
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedIds.map(id => {
+            const u = users.find(u => u.id === id);
+            return (
+              <Badge key={id} variant="secondary" className="flex items-center gap-1 pl-2 pr-1 py-0.5">
+                <span className="text-xs">{u?.name || u?.email || id.slice(0, 12)}</span>
+                <button
+                  type="button"
+                  onClick={() => removeUser(id)}
+                  className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            );
+          })}
+        </div>
+      )}
+      {/* Search input */}
+      <div className="relative">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          className="pl-8 h-9"
+          placeholder="Search users by name or email…"
+          value={query}
+          onChange={e => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+        />
+      </div>
+      {/* Dropdown results */}
+      {open && (query || filtered.length > 0) && (
+        <div className="border rounded-md bg-popover shadow-md max-h-48 overflow-y-auto">
+          {filtered.length === 0 ? (
+            <p className="text-xs text-muted-foreground px-3 py-2">No matching users</p>
+          ) : (
+            filtered.slice(0, 20).map(u => (
+              <button
+                key={u.id}
+                type="button"
+                className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between text-sm"
+                onClick={() => { addUser(u.id); setOpen(false); }}
+              >
+                <div className="min-w-0">
+                  <span className="font-medium">{u.name || '(no name)'}</span>
+                  <span className="text-muted-foreground ml-2 text-xs">{u.email}</span>
+                </div>
+                {u.role === 'admin' && (
+                  <Badge variant="outline" className="text-xs ml-2 shrink-0">admin</Badge>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Single-user search picker (for transfer) ────────────
+
+function UserSearchPicker({
+  users,
+  selectedId,
+  onChange,
+  excludeIds = [],
+}: {
+  users: AdminUser[];
+  selectedId: string;
+  onChange: (id: string) => void;
+  excludeIds?: string[];
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase();
+    return users.filter(u =>
+      !excludeIds.includes(u.id) &&
+      (q === '' ||
+        (u.name?.toLowerCase().includes(q)) ||
+        u.email.toLowerCase().includes(q) ||
+        u.id.toLowerCase().includes(q))
+    );
+  }, [users, excludeIds, query]);
+
+  const selectedUser = users.find(u => u.id === selectedId);
+
+  return (
+    <div className="space-y-2" ref={wrapperRef}>
+      {selectedId && selectedUser && (
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="flex items-center gap-1 pl-2 pr-1 py-1">
+            <span className="text-sm">{selectedUser.name || selectedUser.email}</span>
+            <span className="text-xs text-muted-foreground ml-1">{selectedUser.email}</span>
+            <button
+              type="button"
+              onClick={() => { onChange(''); setQuery(''); }}
+              className="ml-1 rounded-full hover:bg-muted-foreground/20 p-0.5"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        </div>
+      )}
+      {!selectedId && (
+        <>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              className="pl-8 h-9"
+              placeholder="Search users by name or email…"
+              value={query}
+              onChange={e => { setQuery(e.target.value); setOpen(true); }}
+              onFocus={() => setOpen(true)}
+            />
+          </div>
+          {open && (query || filtered.length > 0) && (
+            <div className="border rounded-md bg-popover shadow-md max-h-48 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-3 py-2">No matching users</p>
+              ) : (
+                filtered.slice(0, 20).map(u => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    className="w-full text-left px-3 py-2 hover:bg-accent flex items-center justify-between text-sm"
+                    onClick={() => { onChange(u.id); setQuery(''); setOpen(false); }}
+                  >
+                    <div className="min-w-0">
+                      <span className="font-medium">{u.name || '(no name)'}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{u.email}</span>
+                    </div>
+                    {u.role === 'admin' && (
+                      <Badge variant="outline" className="text-xs ml-2 shrink-0">admin</Badge>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 const NATION_TYPE_COLORS: Record<string, string> = {
   carrier: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
   org: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
@@ -253,9 +469,9 @@ function NationsTab() {
     description: string;
     type: string;
     isPublic: boolean;
-    memberUserIds: string;
-    adminUserIds: string;
-  }>({ displayName: '', description: '', type: 'open', isPublic: true, memberUserIds: '', adminUserIds: '' });
+    memberUserIds: string[];
+    adminUserIds: string[];
+  }>({ displayName: '', description: '', type: 'open', isPublic: true, memberUserIds: [], adminUserIds: [] });
   const [saving, setSaving] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
 
@@ -320,8 +536,8 @@ function NationsTab() {
       description: nation.description || '',
       type: nation.type,
       isPublic: nation.isPublic,
-      memberUserIds: nation.memberUserIds.join(', '),
-      adminUserIds: nation.adminUserIds.join(', '),
+      memberUserIds: [...nation.memberUserIds],
+      adminUserIds: [...nation.adminUserIds],
     });
   }
 
@@ -336,10 +552,8 @@ function NationsTab() {
       if (editData.type !== editNation.type) payload.type = editData.type;
       if (editData.isPublic !== editNation.isPublic) payload.isPublic = editData.isPublic;
 
-      const memberIds = editData.memberUserIds.split(',').map(s => s.trim()).filter(Boolean);
-      const adminIds = editData.adminUserIds.split(',').map(s => s.trim()).filter(Boolean);
-      if (JSON.stringify(memberIds) !== JSON.stringify(editNation.memberUserIds)) payload.memberUserIds = memberIds;
-      if (JSON.stringify(adminIds) !== JSON.stringify(editNation.adminUserIds)) payload.adminUserIds = adminIds;
+      if (JSON.stringify(editData.memberUserIds) !== JSON.stringify(editNation.memberUserIds)) payload.memberUserIds = editData.memberUserIds;
+      if (JSON.stringify(editData.adminUserIds) !== JSON.stringify(editNation.adminUserIds)) payload.adminUserIds = editData.adminUserIds;
 
       // Only send if there's something to update
       if (Object.keys(payload).length <= 1) {
@@ -499,20 +713,12 @@ function NationsTab() {
           </DialogHeader>
           <div className="space-y-3">
             <Label>New Owner</Label>
-            <Select value={transferUserId} onValueChange={setTransferUserId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a user…" />
-              </SelectTrigger>
-              <SelectContent>
-                {users
-                  .filter(u => u.id !== transferNation?.ownerId)
-                  .map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.name || u.email}{u.role === 'admin' ? ' (admin)' : ''}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
+            <UserSearchPicker
+              users={users}
+              selectedId={transferUserId}
+              onChange={setTransferUserId}
+              excludeIds={transferNation ? [transferNation.ownerId] : []}
+            />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setTransferNation(null)}>Cancel</Button>
@@ -563,22 +769,21 @@ function NationsTab() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Admin User IDs <span className="text-xs text-muted-foreground">(comma-separated)</span></Label>
-              <Input
-                placeholder="cuid1, cuid2"
-                value={editData.adminUserIds}
-                onChange={e => setEditData(d => ({ ...d, adminUserIds: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Member User IDs <span className="text-xs text-muted-foreground">(comma-separated, empty = open to all)</span></Label>
-              <Input
-                placeholder="cuid1, cuid2"
-                value={editData.memberUserIds}
-                onChange={e => setEditData(d => ({ ...d, memberUserIds: e.target.value }))}
-              />
-            </div>
+            <UserPicker
+              users={users}
+              selectedIds={editData.adminUserIds}
+              onChange={ids => setEditData(d => ({ ...d, adminUserIds: ids }))}
+              label="Nation Admins"
+              hint="(can manage settings, members, delegations)"
+              excludeIds={editNation ? [editNation.ownerId] : []}
+            />
+            <UserPicker
+              users={users}
+              selectedIds={editData.memberUserIds}
+              onChange={ids => setEditData(d => ({ ...d, memberUserIds: ids }))}
+              label="Member Allowlist"
+              hint="(empty = open to all authenticated users)"
+            />
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setEditNation(null)}>Cancel</Button>
