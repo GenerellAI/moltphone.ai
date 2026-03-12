@@ -237,12 +237,12 @@ export function DomainVerification({ nationCode, verifiedDomain, domainVerifiedA
                   </div>
                   <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
                     <code className="text-xs font-mono flex-1 break-all">{pendingData.methods.http.url}</code>
-                    <CopyButton text={pendingData.methods.http.url} />
+                    <CopyButton value={pendingData.methods.http.url} />
                   </div>
                   <div className="text-xs text-muted-foreground">With contents:</div>
                   <div className="flex items-start gap-2 bg-muted rounded-md px-3 py-2">
                     <pre className="text-xs font-mono flex-1 whitespace-pre-wrap">{pendingData.methods.http.file_contents}</pre>
-                    <CopyButton text={pendingData.methods.http.file_contents} />
+                    <CopyButton value={pendingData.methods.http.file_contents} />
                   </div>
                   <Button
                     size="sm"
@@ -265,12 +265,12 @@ export function DomainVerification({ nationCode, verifiedDomain, domainVerifiedA
                   </div>
                   <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
                     <code className="text-xs font-mono flex-1">{pendingData.methods.dns.record}</code>
-                    <CopyButton text={pendingData.methods.dns.record} />
+                    <CopyButton value={pendingData.methods.dns.record} />
                   </div>
                   <div className="text-xs text-muted-foreground">With value:</div>
                   <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
                     <code className="text-xs font-mono flex-1 break-all">{pendingData.methods.dns.value}</code>
-                    <CopyButton text={pendingData.methods.dns.value} />
+                    <CopyButton value={pendingData.methods.dns.value} />
                   </div>
                   <Button
                     size="sm"

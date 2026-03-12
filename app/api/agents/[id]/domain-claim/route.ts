@@ -169,3 +169,32 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   return NextResponse.json(claims);
 }
+
+// DELETE — remove a domain claim (and its SocialVerification)
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const { id } = await params;
+  const agent = await prisma.agent.findUnique({ where: { id } });
+  if (!agent) return NextResponse.json({ error: 'Agent not found' }, { status: 404 });
+  if (agent.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  const { domain } = await req.json();
+  if (!domain || typeof domain !== 'string') {
+    return NextResponse.json({ error: 'domain is required' }, { status: 400 });
+  }
+
+  const cleanDomain = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '').toLowerCase();
+
+  await prisma.$transaction([
+    prisma.domainClaim.deleteMany({
+      where: { agentId: id, domain: cleanDomain },
+    }),
+    prisma.socialVerification.deleteMany({
+      where: { agentId: id, provider: 'domain', handleOrDomain: cleanDomain },
+    }),
+  ]);
+
+  return NextResponse.json({ ok: true });
+}
