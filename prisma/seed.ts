@@ -78,9 +78,9 @@ async function main() {
       code: 'CLAW',
       type: 'open',
       displayName: 'OpenClaw Alliance',
-      description: 'A restricted nation for certified OpenClaw-compatible agents only.',
+      description: 'An open nation for certified OpenClaw-compatible agents only.',
       badge: '🦀',
-      isPublic: false,
+      isPublic: true,
       ownerId: demoUser.id,
     },
   });
