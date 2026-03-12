@@ -43,6 +43,7 @@ interface MyNation {
   verifiedDomain: string | null;
   domainVerifiedAt: string | null;
   ownerId: string;
+  createdAt: string;
   role: 'owner' | 'admin' | 'member';
   _count: { agents: number };
 }
@@ -153,44 +154,59 @@ export default function MyAgentsPage() {
       {nations.length > 0 && (
         <section className="mb-8">
           <h2 className="text-lg font-semibold mb-3 text-foreground/80">My Nations</h2>
-          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {nations.map(nation => (
               <Link key={nation.code} href={`/nations/${nation.code}`}>
-                <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer h-full group">
-                  <div className="flex items-center gap-2.5 mb-2">
+                <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer h-full relative">
+                  {/* Settings cogwheel — always visible, top left */}
+                  {nation.role !== 'member' && (
+                    <Link
+                      href={`/nations/${nation.code}`}
+                      className="absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground"
+                      title="Nation settings"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Link>
+                  )}
+
+                  <div className="flex items-center gap-2.5 mb-2" style={{ paddingLeft: nation.role !== 'member' ? '1.25rem' : undefined }}>
                     {nation.avatarUrl ? (
-                      <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+                      <div className="w-9 h-9 rounded-full overflow-hidden shrink-0">
                         <img src={nation.avatarUrl} alt={nation.displayName} className="w-full h-full object-cover" />
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <span className="text-base">{nation.badge || '🌐'}</span>
+                      <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-lg">{nation.badge || '🌐'}</span>
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <div className="font-bold text-sm text-primary font-mono">{nation.code}</div>
                       <div className="text-xs text-muted-foreground truncate">{nation.displayName}</div>
                     </div>
-                    {nation.role !== 'member' && (
-                      <Link
-                        href={`/nations/${nation.code}`}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                        title="Nation settings"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Link>
-                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
+
+                  {/* Description */}
+                  {nation.description && (
+                    <p className="text-[11px] text-muted-foreground line-clamp-2 mb-2">{nation.description}</p>
+                  )}
+
+                  {/* Stats row */}
+                  <div className="flex items-center gap-2.5 text-xs text-muted-foreground">
+                    <span>{nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}</span>
                     {nation.verifiedDomain && nation.domainVerifiedAt && !nation.verifiedDomain.startsWith('pending:') && (
-                      <span className="inline-flex items-center gap-0.5 ml-2 text-emerald-700 dark:text-emerald-400">
+                      <span className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-400">
                         <CheckCircle2 className="h-2.5 w-2.5" />
                         {nation.verifiedDomain}
                       </span>
                     )}
+                    <span className="inline-flex items-center gap-0.5">
+                      <Calendar className="h-3 w-3" />
+                      {new Date(nation.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    </span>
                   </div>
+
+                  {/* Badges */}
                   <div className="flex items-center gap-1.5 mt-1.5">
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">{nation.type}</Badge>
                     {!nation.isPublic && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Private</Badge>}
@@ -222,10 +238,10 @@ export default function MyAgentsPage() {
           {agents.map(agent => (
             <Link key={agent.id} href={`/agents/${agent.id}`}>
               <Card className={`p-4 hover:border-primary transition-colors cursor-pointer h-full relative group ${agent.isPersonalAgent ? 'border-primary/40 bg-primary/[0.02]' : ''}`}>
-                {/* Settings cogwheel — top left */}
+                {/* Settings cogwheel — always visible, top left */}
                 <Link
                   href={`/agents/${agent.id}/settings`}
-                  className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                  className="absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground"
                   title="Agent settings"
                   onClick={e => e.stopPropagation()}
                 >
