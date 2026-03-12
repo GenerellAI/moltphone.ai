@@ -1,10 +1,10 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import GoogleProvider from 'next-auth/providers/google';
-import GitHubProvider from 'next-auth/providers/github';
-// NOTE: We don't use next-auth's built-in TwitterProvider because it relies on
-// openid-client which calls Node.js https.request — unsupported on CF Workers.
-// Instead we define a custom OAuth provider using fetch (see buildProviders).
+// NOTE: We don't use next-auth's built-in GitHubProvider or TwitterProvider
+// because they rely on openid-client which calls Node.js https.request —
+// unsupported on Cloudflare Workers. Instead we define custom OAuth providers
+// using fetch (see buildProviders).
 import { prisma } from './prisma';
 import { rateLimit } from './rate-limit';
 import { generateKeyPair } from './ed25519';
@@ -90,14 +90,99 @@ function buildProviders(): NextAuthOptions['providers'] {
     );
   }
 
-  // Add GitHub OAuth if configured
+  // Add GitHub OAuth if configured.
+  // Custom fetch-based provider — the built-in GitHubProvider uses openid-client
+  // which calls Node.js https.request, unsupported on Cloudflare Workers.
   if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
-    p.push(
-      GitHubProvider({
-        clientId: process.env.GITHUB_CLIENT_ID,
-        clientSecret: process.env.GITHUB_CLIENT_SECRET,
-      }),
-    );
+    const githubClientId = process.env.GITHUB_CLIENT_ID;
+    const githubClientSecret = process.env.GITHUB_CLIENT_SECRET;
+    p.push({
+      id: 'github',
+      name: 'GitHub',
+      type: 'oauth',
+      checks: ['state'],
+      authorization: {
+        url: 'https://github.com/login/oauth/authorize',
+        params: { scope: 'read:user user:email' },
+      },
+      token: {
+        url: 'https://github.com/login/oauth/access_token',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async request({ provider, params }: any) {
+          const res = await fetch('https://github.com/login/oauth/access_token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({
+              client_id: githubClientId,
+              client_secret: githubClientSecret,
+              code: params.code as string,
+              redirect_uri: provider.callbackUrl,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.text();
+            console.error('[auth] GitHub token exchange failed:', res.status, err);
+            throw new Error(`GitHub token exchange failed: ${res.status}`);
+          }
+          const tokens = await res.json();
+          if (tokens.error) {
+            console.error('[auth] GitHub token error:', tokens.error, tokens.error_description);
+            throw new Error(`GitHub token error: ${tokens.error_description || tokens.error}`);
+          }
+          return { tokens };
+        },
+      },
+      userinfo: {
+        url: 'https://api.github.com/user',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async request({ tokens }: any) {
+          // Fetch user profile
+          const userRes = await fetch('https://api.github.com/user', {
+            headers: {
+              Authorization: `Bearer ${tokens.access_token}`,
+              Accept: 'application/vnd.github+json',
+            },
+          });
+          if (!userRes.ok) {
+            console.error('[auth] GitHub userinfo failed:', userRes.status);
+            throw new Error(`GitHub userinfo failed: ${userRes.status}`);
+          }
+          const user = await userRes.json();
+
+          // Fetch email if not public
+          if (!user.email) {
+            const emailRes = await fetch('https://api.github.com/user/emails', {
+              headers: {
+                Authorization: `Bearer ${tokens.access_token}`,
+                Accept: 'application/vnd.github+json',
+              },
+            });
+            if (emailRes.ok) {
+              const emails = await emailRes.json();
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const primary = emails.find((e: any) => e.primary) || emails[0];
+              if (primary) user.email = primary.email;
+            }
+          }
+
+          return user;
+        },
+      },
+      clientId: githubClientId,
+      clientSecret: githubClientSecret,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      profile(profile: any) {
+        return {
+          id: String(profile.id),
+          name: profile.name || profile.login,
+          email: profile.email,
+          image: profile.avatar_url,
+        };
+      },
+    });
   }
 
   // Add Twitter/X OAuth 2.0 if configured.
