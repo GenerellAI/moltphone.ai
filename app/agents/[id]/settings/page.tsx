@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SettingsSection } from '@/components/SettingsSection';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -188,12 +188,8 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
       )}
 
       {/* ── Profile ────────────────────────────────────── */}
-      <Card>
-        <form onSubmit={handleSave}>
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider">Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
+      <SettingsSection title="Profile" defaultOpen>
+        <form onSubmit={handleSave} className="space-y-5">
             <div className="space-y-2">
               <Label>{isPersonalAgent ? 'Display Name' : 'Agent Name'}</Label>
               {isPersonalAgent ? (
@@ -274,34 +270,20 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
             <Button type="submit" disabled={saving} className="w-full" size="lg">
               {saving ? 'Saving…' : 'Save Settings'}
             </Button>
-          </CardContent>
         </form>
-      </Card>
+      </SettingsSection>
 
       {/* ── Domain Verification ───────────────────────── */}
       {!isPersonalAgent && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-              <Globe className="h-4 w-4" /> Domain Verification
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <AgentDomainClaim agentId={agentId!} />
-          </CardContent>
-        </Card>
+        <SettingsSection title="Domain Verification" icon={<Globe className="h-4 w-4" />}>
+          <AgentDomainClaim agentId={agentId!} />
+        </SettingsSection>
       )}
 
       {/* ── Endpoint & Messaging ──────────────────────── */}
       {!isPersonalAgent && (
-        <Card>
-          <form onSubmit={handleSave}>
-            <CardHeader>
-              <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-                <MessageSquare className="h-4 w-4" /> Endpoint & Messaging
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
+        <SettingsSection title="Endpoint & Messaging" icon={<MessageSquare className="h-4 w-4" />}>
+          <form onSubmit={handleSave} className="space-y-5">
               <div className="space-y-2">
                 <Label>Agent Endpoint</Label>
                 <Input type="url" value={form.endpointUrl || ''} onChange={e => setForm(f => ({ ...f, endpointUrl: e.target.value }))}
@@ -318,20 +300,13 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
               <Button type="submit" disabled={saving} className="w-full" size="lg">
                 {saving ? 'Saving…' : 'Save Settings'}
               </Button>
-            </CardContent>
           </form>
-        </Card>
+        </SettingsSection>
       )}
 
       {/* ── Call Behavior ─────────────────────────────── */}
-      <Card>
-        <form onSubmit={handleSave}>
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-              <Settings2 className="h-4 w-4" /> Call Behavior
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
+      <SettingsSection title="Call Behavior" icon={<Settings2 className="h-4 w-4" />}>
+        <form onSubmit={handleSave} className="space-y-5">
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <Label htmlFor="call" className="cursor-pointer">Call Gateway Enabled</Label>
@@ -389,19 +364,12 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
             <Button type="submit" disabled={saving} className="w-full" size="lg">
               {saving ? 'Saving…' : 'Save Settings'}
             </Button>
-          </CardContent>
         </form>
-      </Card>
+      </SettingsSection>
 
       {/* ── Call Forwarding ───────────────────────────── */}
-      <Card>
-        <form onSubmit={handleSave}>
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-              <GitFork className="h-4 w-4" /> Call Forwarding
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
+      <SettingsSection title="Call Forwarding" icon={<GitFork className="h-4 w-4" />}>
+        <form onSubmit={handleSave} className="space-y-5">
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
                 <Label htmlFor="fwd" className="cursor-pointer">Enable Call Forwarding</Label>
@@ -437,18 +405,11 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
             <Button type="submit" disabled={saving} className="w-full" size="lg">
               {saving ? 'Saving…' : 'Save Settings'}
             </Button>
-          </CardContent>
         </form>
-      </Card>
+      </SettingsSection>
 
       {/* ── Call Policy (Inbound + Outbound) ──────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-            <Phone className="h-4 w-4" /> Call Policy
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <SettingsSection title="Call Policy" icon={<Phone className="h-4 w-4" />}>
           <PolicySection
             scope={agentId!}
             agentName={agent.displayName}
@@ -465,18 +426,12 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
               } catch { /* ignore — next full save will catch it */ }
             }}
           />
-        </CardContent>
-      </Card>
+      </SettingsSection>
 
       {/* MoltSIM Provisioning */}
       {!isPersonalAgent && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-              <Key className="h-4 w-4" /> MoltSIM
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SettingsSection title="MoltSIM" icon={<Key className="h-4 w-4" />}>
+          <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Provision a new MoltSIM to generate a fresh Ed25519 keypair.
               This immediately revokes the previous MoltSIM. Your MoltNumber stays the same.
@@ -501,19 +456,13 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
                 {provisioning ? 'Provisioning…' : 'Provision New MoltSIM'}
               </Button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsSection>
       )}
 
       {/* Public Key */}
       {agent.publicKey && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-              <Shield className="h-4 w-4" /> Public Key
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <SettingsSection title="Public Key" icon={<Shield className="h-4 w-4" />}>
             <p className="text-xs text-muted-foreground mb-2">Ed25519 public key (SPKI DER, base64url). Shared with callers to verify your signatures.</p>
             <div className="rounded-lg border bg-muted/50 p-3 relative group">
               <code className="text-primary text-xs font-mono break-all select-all">{agent.publicKey}</code>
@@ -522,19 +471,13 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
                 {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+        </SettingsSection>
       )}
 
       {/* Danger Zone — not shown for personal agent */}
       {!isPersonalAgent && (
-        <Card className="border-destructive/30">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2 text-destructive">
-              <AlertTriangle className="h-4 w-4" /> Danger Zone
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+        <SettingsSection title="Danger Zone" icon={<AlertTriangle className="h-4 w-4" />} className="border-destructive/30">
+          <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               Permanently delete this agent, its MoltNumber, and revoke its MoltSIM. All task history will be lost. This action cannot be undone.
             </p>
@@ -577,8 +520,8 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
                 {deletingAgent ? 'Deleting…' : 'Delete Agent'}
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </SettingsSection>
       )}
     </div>
   );

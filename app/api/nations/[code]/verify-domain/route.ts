@@ -4,12 +4,10 @@
  * GET  /api/nations/:code/verify-domain — Get current verification status.
  *
  * Nation domain verification proves the nation owner controls a domain.
- * Uses the same well-known/TXT approach as agent domain claims, but binds
- * the nation code instead of a MoltNumber.
+ * Uses JSON well-known files or DNS TXT records.
  *
- * Well-known file format:
- *   moltnation: <NATION_CODE>
- *   token: <RANDOM_TOKEN>
+ * Well-known file (JSON):
+ *   .well-known/moltnation.json — structured JSON with nation code and token
  *
  * DNS TXT record:
  *   _moltnation.<domain>  TXT  "moltnation=<CODE> token=<TOKEN>"
@@ -21,6 +19,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isNationAdmin } from '@/lib/nation-admin';
 import { validateWebhookUrl } from '@/lib/ssrf';
+import { CARRIER_DOMAIN, CARRIER_NAME, CARRIER_URL } from '@/carrier.config';
 import crypto from 'crypto';
 import { Resolver } from 'dns/promises';
 
@@ -34,11 +33,47 @@ function generateToken(): string {
 
 function buildWellKnownUrl(domain: string): string {
   const clean = domain.replace(/^https?:\/\//, '').replace(/\/+$/, '');
-  return `https://${clean}/.well-known/moltnation.txt`;
+  return `https://${clean}/.well-known/moltnation.json`;
 }
 
+/** Build the JSON file contents for nation domain verification */
+function buildVerificationJson(nationCode: string, nationName: string, token: string, expiresAt: string): string {
+  return JSON.stringify({
+    $schema: 'https://moltprotocol.org/schemas/moltnation-v1.json',
+    version: '1',
+    description: `MoltNation domain verification file. This file proves ownership of this domain by the nation ${nationCode} registered with ${CARRIER_NAME} (${CARRIER_DOMAIN}).`,
+    carrier: {
+      name: CARRIER_NAME,
+      domain: CARRIER_DOMAIN,
+      url: CARRIER_URL,
+    },
+    protocol: {
+      name: 'MoltProtocol',
+      url: 'https://moltprotocol.org',
+    },
+    verification: {
+      token,
+      nation_code: nationCode,
+      expires_at: expiresAt,
+    },
+    nation: {
+      code: nationCode,
+      display_name: nationName,
+    },
+  }, null, 2);
+}
+
+/** Parse the well-known file — supports both new JSON and legacy plain-text formats */
 function parseWellKnownFile(body: string): { nation: string | null; token: string | null } {
   const result: { nation: string | null; token: string | null } = { nation: null, token: null };
+  // Try JSON first
+  try {
+    const json = JSON.parse(body);
+    if (json?.verification?.nation_code) result.nation = json.verification.nation_code;
+    if (json?.verification?.token) result.token = json.verification.token;
+    if (result.nation && result.token) return result;
+  } catch { /* Not JSON, try plain text */ }
+  // Legacy plain-text format
   for (const line of body.split('\n')) {
     const trimmed = line.trim();
     const nationMatch = trimmed.match(/^moltnation:\s*(.+)$/i);
@@ -108,12 +143,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
     },
   });
 
+  const fileContents = buildVerificationJson(
+    code.toUpperCase(),
+    nation.displayName,
+    token,
+    expiresAt.toISOString(),
+  );
+
   return NextResponse.json({
     domain: cleanDomain,
     methods: {
       http: {
         url: buildWellKnownUrl(cleanDomain),
-        file_contents: `moltnation: ${code.toUpperCase()}\ntoken: ${token}`,
+        file_contents: fileContents,
       },
       dns: {
         record: `_moltnation.${cleanDomain}`,
@@ -197,43 +239,68 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ code
       }
     }
   } else {
-    // HTTP well-known verification (default)
-    const url = buildWellKnownUrl(domain);
-    const ssrfCheck = await validateWebhookUrl(url);
+    // HTTP well-known verification (default) — try .json first, fall back to .txt
+    const jsonUrl = buildWellKnownUrl(domain);
+    const txtUrl = jsonUrl.replace(/\.json$/, '.txt');
+    const ssrfCheck = await validateWebhookUrl(jsonUrl);
     if (!ssrfCheck.ok) {
       return NextResponse.json({ error: `SSRF blocked: ${ssrfCheck.reason}` }, { status: 400 });
     }
 
+    let fileBody: string | null = null;
+    let usedUrl = jsonUrl;
+
     try {
+      // Try .json first
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-      const response = await fetch(url, {
+      const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+      const response = await fetch(jsonUrl, {
         signal: controller.signal,
         headers: { 'User-Agent': 'MoltNation-Verifier/1.0' },
       });
-      clearTimeout(timeout);
+      clearTimeout(timer);
 
-      if (!response.ok) {
-        return NextResponse.json({ error: `HTTP ${response.status} from ${url}` }, { status: 422 });
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength <= MAX_RESPONSE_BYTES) {
+          fileBody = new TextDecoder().decode(buffer);
+        }
       }
+    } catch { /* Ignore — will try .txt fallback */ }
 
-      const buffer = await response.arrayBuffer();
-      if (buffer.byteLength > MAX_RESPONSE_BYTES) {
-        return NextResponse.json({ error: 'Response too large' }, { status: 422 });
-      }
-      const fileBody = new TextDecoder().decode(buffer);
-      const parsed = parseWellKnownFile(fileBody);
+    if (!fileBody) {
+      try {
+        // Fallback to .txt
+        usedUrl = txtUrl;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+        const response = await fetch(txtUrl, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'MoltNation-Verifier/1.0' },
+        });
+        clearTimeout(timer);
 
-      if (parsed.nation === code.toUpperCase() && parsed.token === token) {
-        valid = true;
-      } else {
-        reason = parsed.nation !== code.toUpperCase()
-          ? 'Nation code mismatch'
-          : 'Token mismatch';
+        if (!response.ok) {
+          return NextResponse.json({ error: `HTTP ${response.status} — no moltnation.json or moltnation.txt found at ${domain}` }, { status: 422 });
+        }
+        const buffer = await response.arrayBuffer();
+        if (buffer.byteLength > MAX_RESPONSE_BYTES) {
+          return NextResponse.json({ error: 'Response too large' }, { status: 422 });
+        }
+        fileBody = new TextDecoder().decode(buffer);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Fetch failed';
+        return NextResponse.json({ error: `Could not fetch ${usedUrl}: ${message}` }, { status: 422 });
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Fetch failed';
-      return NextResponse.json({ error: `Could not fetch ${url}: ${message}` }, { status: 422 });
+    }
+
+    const parsed = parseWellKnownFile(fileBody);
+    if (parsed.nation === code.toUpperCase() && parsed.token === token) {
+      valid = true;
+    } else {
+      reason = parsed.nation !== code.toUpperCase()
+        ? 'Nation code mismatch'
+        : 'Token mismatch';
     }
   }
 

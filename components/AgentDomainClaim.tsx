@@ -5,9 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CopyButton } from '@/components/CopyButton';
-import { Globe, CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Trash2, Download } from 'lucide-react';
+import { CheckCircle2, Loader2, ExternalLink, AlertTriangle, X, Trash2, Download, FileText, ChevronDown, ChevronUp } from 'lucide-react';
+
+function downloadFile(filename: string, content: string) {
+  const blob = new Blob([content], { type: filename.endsWith('.json') ? 'application/json' : 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 interface DomainClaim {
   id: string;
@@ -27,6 +37,13 @@ interface InitiateResponse {
   expires_at: string;
 }
 
+interface OwnedAgent {
+  id: string;
+  moltNumber: string;
+  displayName: string;
+  nationCode: string;
+}
+
 export function AgentDomainClaim({ agentId }: { agentId: string }) {
   const [domain, setDomain] = useState('');
   const [claims, setClaims] = useState<DomainClaim[]>([]);
@@ -35,6 +52,9 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
   const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [ownedAgents, setOwnedAgents] = useState<OwnedAgent[]>([]);
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set());
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
 
   const fetchClaims = useCallback(async () => {
     try {
@@ -48,7 +68,21 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
     }
   }, [agentId]);
 
-  useEffect(() => { fetchClaims(); }, [fetchClaims]);
+  /** Fetch other agents owned by the user (excluding the current one) */
+  const fetchOwnedAgents = useCallback(async () => {
+    try {
+      const res = await fetch('/api/agents/mine');
+      if (res.ok) {
+        const data = await res.json();
+        const agents = (Array.isArray(data) ? data : data.agents || []) as OwnedAgent[];
+        setOwnedAgents(agents.filter((a: OwnedAgent) => a.id !== agentId));
+      }
+    } catch {
+      // Ignore
+    }
+  }, [agentId]);
+
+  useEffect(() => { fetchClaims(); fetchOwnedAgents(); }, [fetchClaims, fetchOwnedAgents]);
 
   const verifiedClaims = claims.filter(c => c.status === 'verified');
   const pendingClaims = claims.filter(c => c.status === 'pending');
@@ -59,10 +93,11 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
     setError(null);
     setSuccess(null);
     try {
+      const includeAgentIds = selectedAgentIds.size > 0 ? Array.from(selectedAgentIds) : undefined;
       const res = await fetch(`/api/agents/${agentId}/domain-claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain: domain.trim() }),
+        body: JSON.stringify({ domain: domain.trim(), includeAgentIds }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -125,35 +160,23 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Globe className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-sm font-semibold">Domain Verification</h3>
-      </div>
       <p className="text-xs text-muted-foreground">
         Prove you own a domain by placing a verification file on it. Verified domains appear as badges on your agent&apos;s profile.
       </p>
 
       {error && (
-        <Card className="border-destructive/50 bg-destructive/5">
-          <CardContent className="py-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
-            <p className="text-sm text-destructive flex-1">{error}</p>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setError(null)}>
-              <X className="h-3 w-3" />
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+          <p className="text-sm text-destructive flex-1">{error}</p>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setError(null)}><X className="h-3 w-3" /></Button>
+        </div>
       )}
       {success && (
-        <Card className="border-emerald-500/50 bg-emerald-500/5">
-          <CardContent className="py-3 flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-            <p className="text-sm text-emerald-700 dark:text-emerald-400 flex-1">{success}</p>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSuccess(null)}>
-              <X className="h-3 w-3" />
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-md border border-emerald-500/50 bg-emerald-500/5 px-3 py-2 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <p className="text-sm text-emerald-700 dark:text-emerald-400 flex-1">{success}</p>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setSuccess(null)}><X className="h-3 w-3" /></Button>
+        </div>
       )}
 
       {/* Verified domains */}
@@ -162,24 +185,14 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
           {verifiedClaims.map(claim => (
             <div key={claim.id} className="flex items-center gap-3 py-1.5">
               <Badge variant="default" className="bg-emerald-600 text-sm gap-1.5">
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                {claim.domain}
+                <CheckCircle2 className="h-3.5 w-3.5" /> {claim.domain}
               </Badge>
-              <a
-                href={`https://${claim.domain}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
-              >
+              <a href={`https://${claim.domain}`} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
                 Visit <ExternalLink className="h-3 w-3" />
               </a>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                onClick={() => handleRemoveClaim(claim.domain)}
-                title="Remove domain"
-              >
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                onClick={() => handleRemoveClaim(claim.domain)} title="Remove domain">
                 <Trash2 className="h-3 w-3" />
               </Button>
             </div>
@@ -199,92 +212,139 @@ export function AgentDomainClaim({ agentId }: { agentId: string }) {
         <div className="space-y-1.5">
           <Label className="text-xs">Domain</Label>
           <div className="flex gap-2">
-            <Input
-              value={domain}
+            <Input value={domain}
               onChange={e => setDomain(e.target.value.toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, ''))}
-              placeholder="example.com"
-              className="h-9 font-mono text-sm"
-              disabled={loading || !!pendingData}
-            />
+              placeholder="example.com" className="h-9 font-mono text-sm"
+              disabled={loading || !!pendingData} />
             {!pendingData ? (
               <Button size="sm" onClick={handleInitiate} disabled={loading || !domain.trim()}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Verify Domain'}
               </Button>
             ) : (
-              <Button size="sm" variant="outline" onClick={() => { setPendingData(null); setDomain(''); }}>
-                Change
-              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setPendingData(null); setDomain(''); }}>Change</Button>
             )}
           </div>
         </div>
 
-        {/* Pending instructions */}
+        {/* Include additional agents in verification file */}
+        {ownedAgents.length > 0 && !pendingData && (
+          <div className="space-y-2">
+            <button
+              type="button"
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              onClick={() => setShowAgentPicker(!showAgentPicker)}
+            >
+              {showAgentPicker ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              Include additional agents in verification file ({selectedAgentIds.size} selected)
+            </button>
+            {showAgentPicker && (
+              <div className="rounded-md border bg-muted/30 p-3 space-y-2">
+                <p className="text-[11px] text-muted-foreground">
+                  Select other agents you own to include in the same <code className="bg-muted px-1 py-0.5 rounded font-mono text-[10px]">moltnumber.json</code> file.
+                  This lets you verify one domain for multiple agents at once.
+                </p>
+                {ownedAgents.map(a => (
+                  <label key={a.id} className="flex items-center gap-2.5 py-1 cursor-pointer group">
+                    <Checkbox
+                      checked={selectedAgentIds.has(a.id)}
+                      onCheckedChange={(checked) => {
+                        const next = new Set(selectedAgentIds);
+                        if (checked) next.add(a.id);
+                        else next.delete(a.id);
+                        setSelectedAgentIds(next);
+                      }}
+                    />
+                    <span className="text-xs font-medium group-hover:text-foreground">{a.displayName}</span>
+                    <span className="text-[11px] font-mono text-muted-foreground">{a.moltNumber}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {pendingData && (
-          <Card>
-            <CardContent className="py-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Place a verification file on your domain, then click Verify.
+          <div className="space-y-6 pt-2">
+            {/* Method 1: HTTP Well-Known */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold">Option 1 — HTTP Well-Known File</h4>
+              <p className="text-xs text-muted-foreground">
+                Create a file named <code className="text-[11px] bg-muted px-1 py-0.5 rounded font-mono">moltnumber.json</code> and
+                serve it at the following URL on your domain:
               </p>
 
-              {/* Method 1: HTTP */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Method 1: HTTP File</div>
-                <div className="text-xs text-muted-foreground">Create a file at:</div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">File URL</Label>
                 <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                  <code className="text-xs font-mono flex-1 break-all">{pendingData.methods.http.url}</code>
+                  <code className="text-xs font-mono flex-1 break-all select-all">{pendingData.methods.http.url}</code>
                   <CopyButton value={pendingData.methods.http.url} />
                 </div>
-                <div className="text-xs text-muted-foreground">With contents:</div>
-                <div className="flex items-start gap-2 bg-muted rounded-md px-3 py-2">
-                  <pre className="text-xs font-mono flex-1 whitespace-pre-wrap">{pendingData.methods.http.file_contents}</pre>
-                  <CopyButton value={pendingData.methods.http.file_contents} />
-                </div>
-                <div className="flex gap-2 mt-1">
-                  <Button size="sm" variant="outline" onClick={() => {
-                    const blob = new Blob([pendingData.methods.http.file_contents], { type: 'text/plain' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'moltnumber.txt';
-                    a.click();
-                    URL.revokeObjectURL(url);
-                  }}>
-                    <Download className="h-3.5 w-3.5 mr-1.5" />
-                    Download moltnumber.txt
-                  </Button>
-                  <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
-                    {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                    Verify via HTTP
-                  </Button>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  File Contents — <code className="font-mono">.well-known/moltnumber.json</code>
+                </Label>
+                <div className="relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
+                    <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1.5">
+                      <FileText className="h-3 w-3" /> moltnumber.json
+                    </span>
+                    <CopyButton value={pendingData.methods.http.file_contents} />
+                  </div>
+                  <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all">{pendingData.methods.http.file_contents}</pre>
                 </div>
               </div>
 
-              <div className="border-t" />
-
-              {/* Method 2: DNS */}
-              <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase text-muted-foreground">Method 2: DNS TXT Record</div>
-                <div className="text-xs text-muted-foreground">Add a TXT record to:</div>
-                <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                  <code className="text-xs font-mono flex-1">{pendingData.methods.dns.record}</code>
-                  <CopyButton value={pendingData.methods.dns.record} />
-                </div>
-                <div className="text-xs text-muted-foreground">With value:</div>
-                <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
-                  <code className="text-xs font-mono flex-1 break-all">{pendingData.methods.dns.value}</code>
-                  <CopyButton value={pendingData.methods.dns.value} />
-                </div>
-                <Button size="sm" variant="outline" onClick={() => handleVerify('dns')} disabled={verifying} className="mt-1">
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => downloadFile('moltnumber.json', pendingData.methods.http.file_contents)}>
+                  <Download className="h-3.5 w-3.5 mr-1.5" /> Download moltnumber.json
+                </Button>
+                <Button size="sm" onClick={() => handleVerify('http')} disabled={verifying}>
                   {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
-                  Verify via DNS
+                  Verify via HTTP
                 </Button>
               </div>
+            </div>
 
+            <div className="border-t" />
+
+            {/* Method 2: DNS TXT */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold">Option 2 — DNS TXT Record</h4>
               <p className="text-xs text-muted-foreground">
-                Verification expires {pendingData.expires_at ? new Date(pendingData.expires_at).toLocaleString() : 'in 48 hours'}.
+                Add a <code className="text-[11px] bg-muted px-1 py-0.5 rounded font-mono">TXT</code> record to your DNS configuration.
               </p>
-            </CardContent>
-          </Card>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Record Name</Label>
+                <div className="flex items-center gap-2 bg-muted rounded-md px-3 py-2">
+                  <code className="text-xs font-mono flex-1 select-all">{pendingData.methods.dns.record}</code>
+                  <CopyButton value={pendingData.methods.dns.record} />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">Record Value</Label>
+                <div className="relative rounded-md border bg-zinc-950 dark:bg-zinc-900">
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800">
+                    <span className="text-[10px] font-mono text-zinc-400">TXT record</span>
+                    <CopyButton value={pendingData.methods.dns.value} />
+                  </div>
+                  <pre className="px-3 py-3 text-xs font-mono text-zinc-200 whitespace-pre-wrap overflow-x-auto select-all">{pendingData.methods.dns.value}</pre>
+                </div>
+              </div>
+
+              <Button size="sm" variant="outline" onClick={() => handleVerify('dns')} disabled={verifying}>
+                {verifying ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />}
+                Verify via DNS
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Verification expires {pendingData.expires_at ? new Date(pendingData.expires_at).toLocaleString() : 'in 48 hours'}.
+            </p>
+          </div>
         )}
       </div>
     </div>

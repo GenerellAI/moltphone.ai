@@ -161,7 +161,7 @@ export default function MyAgentsPage() {
                   {/* Settings cogwheel — always visible, top left */}
                   {nation.role !== 'member' && (
                     <Link
-                      href={`/nations/${nation.code}`}
+                      href={`/nations/${nation.code}/settings`}
                       className="absolute top-2 left-2 z-10 text-muted-foreground hover:text-foreground"
                       title="Nation settings"
                       onClick={e => e.stopPropagation()}

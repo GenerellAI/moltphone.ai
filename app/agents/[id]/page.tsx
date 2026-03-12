@@ -12,7 +12,6 @@ import { Settings, Globe, Github, ShieldCheck, Clock, Zap, MessageSquare } from 
 import { CopyButton } from '@/components/CopyButton';
 import { AgentChatSection } from '@/components/AgentChatSection';
 import { AgentActions } from '@/components/AgentActions';
-import { AgentDomainClaim } from '@/components/AgentDomainClaim';
 
 export const dynamic = 'force-dynamic';
 
@@ -318,15 +317,6 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
 
       {/* ── Lexicon Pack (hidden for now) ──────────── */}
       {/* <LexiconPanel agentId={agent.id} initialEntries={lexiconEntries} isOwner={isOwner} /> */}
-
-      {/* ── Domain Verification (owner only) ──────────── */}
-      {isOwner && !isPersonalAgent && (
-        <Card>
-          <CardContent className="pt-6">
-            <AgentDomainClaim agentId={agent.id} />
-          </CardContent>
-        </Card>
-      )}
 
       {/* ── Technical Details (collapsible) ───────────── */}
       <details className="group">

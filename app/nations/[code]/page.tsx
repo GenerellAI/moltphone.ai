@@ -4,11 +4,11 @@ import { notFound } from 'next/navigation';
 import { isOnline } from '@/lib/presence';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Wifi, WifiOff, BellOff, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Wifi, WifiOff, BellOff, CheckCircle2, ExternalLink, Settings } from 'lucide-react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { isNationAdmin } from '@/lib/nation-admin';
-import { DomainVerification } from '@/components/DomainVerification';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,18 +71,14 @@ export default async function NationPage({ params }: { params: Promise<{ code: s
         </div>
         {nation.description && <p className="text-muted-foreground mb-3">{nation.description}</p>}
         <p className="text-sm text-muted-foreground">Owned by {nation.owner.name} · {nation._count.agents} agents</p>
+        {isAdmin && (
+          <Link href={`/nations/${nation.code}/settings`} className="mt-3 inline-block">
+            <Button variant="outline" size="sm">
+              <Settings className="h-4 w-4 mr-1" /> Nation Settings
+            </Button>
+          </Link>
+        )}
       </div>
-
-      {/* Domain Verification — visible only to nation owner/admins */}
-      {isAdmin && (
-        <Card className="mb-8 p-5">
-          <DomainVerification
-            nationCode={nation.code}
-            verifiedDomain={nation.verifiedDomain}
-            domainVerifiedAt={nation.domainVerifiedAt?.toISOString() ?? null}
-          />
-        </Card>
-      )}
 
       <h2 className="text-xl font-semibold mb-4">Agents</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
