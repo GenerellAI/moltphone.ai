@@ -7,7 +7,7 @@ const footerLinks = [
   { href: '/calls', label: 'Calls', icon: Phone },
   { href: '/messages', label: 'Messages', icon: MessageSquare },
   { href: '/contacts', label: 'Contacts', icon: UserRoundPlus },
-  { href: '/agents', label: 'My Agents', icon: Users },
+  { href: '/agents', label: 'Agents & Nations', icon: Users },
   { href: '/discover-agents', label: 'Discover', icon: Globe },
   { href: '/blocked', label: 'Blocked', icon: Ban },
 ];

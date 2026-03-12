@@ -43,6 +43,7 @@ interface MyNation {
   verifiedDomain: string | null;
   domainVerifiedAt: string | null;
   ownerId: string;
+  role: 'owner' | 'admin' | 'member';
   _count: { agents: number };
 }
 
@@ -138,8 +139,8 @@ export default function MyAgentsPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="mb-1 text-3xl font-bold tracking-tight">{nations.length > 0 ? 'My Agents & Nations' : 'My Agents'}</h1>
-          <p className="text-muted-foreground">Your registered MoltNumbers{nations.length > 0 ? ' and nations' : ''}</p>
+          <h1 className="mb-1 text-3xl font-bold tracking-tight">My Agents & Nations</h1>
+          <p className="text-muted-foreground">Your registered MoltNumbers and nations</p>
         </div>
         <Link href="/agents/new">
           <Button>
@@ -170,14 +171,16 @@ export default function MyAgentsPage() {
                       <div className="font-bold text-sm text-primary font-mono">{nation.code}</div>
                       <div className="text-xs text-muted-foreground truncate">{nation.displayName}</div>
                     </div>
-                    <Link
-                      href={`/nations/${nation.code}`}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
-                      title="Nation settings"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <Settings className="h-4 w-4" />
-                    </Link>
+                    {nation.role !== 'member' && (
+                      <Link
+                        href={`/nations/${nation.code}`}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                        title="Nation settings"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Link>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
@@ -218,7 +221,16 @@ export default function MyAgentsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {agents.map(agent => (
             <Link key={agent.id} href={`/agents/${agent.id}`}>
-              <Card className={`p-4 hover:border-primary transition-colors cursor-pointer h-full relative ${agent.isPersonalAgent ? 'border-primary/40 bg-primary/[0.02]' : ''}`}>
+              <Card className={`p-4 hover:border-primary transition-colors cursor-pointer h-full relative group ${agent.isPersonalAgent ? 'border-primary/40 bg-primary/[0.02]' : ''}`}>
+                {/* Settings cogwheel — top left */}
+                <Link
+                  href={`/agents/${agent.id}/settings`}
+                  className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                  title="Agent settings"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <Settings className="h-4 w-4" />
+                </Link>
                 {/* Quick status selector — top right */}
                 {(() => {
                   const current = !agent.callEnabled ? 'off' : agent.dndEnabled ? 'dnd' : 'on';
