@@ -266,6 +266,22 @@ describe('POST /api/agents/signup', () => {
     expect(body.error).toContain('Carrier');
   });
 
+  it('rejects org nation self-signup when memberUserIds is set', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      ...TEST_NATION,
+      type: 'org',
+      isPublic: true,
+      memberUserIds: ['some-user-id'],
+    });
+
+    const req = buildRequest('POST', '/api/agents/signup', { body: VALID_BODY });
+    const res = await signup(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(body.error).toContain('member');
+  });
+
   it('rejects private carrier nation for self-signup', async () => {
     mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'carrier', isPublic: false });
 

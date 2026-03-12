@@ -287,7 +287,7 @@ describe('POST /api/agents', () => {
   });
 
   it('rejects org nation for non-owner without delegation', async () => {
-    mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'org', isPublic: true, ownerId: 'other-user' });
+    mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'org', isPublic: true, ownerId: 'other-user', memberUserIds: [] });
 
     const req = buildRequest('POST', '/api/agents', {
       body: { nationCode: 'MOLT', displayName: 'Agent' },
@@ -299,8 +299,85 @@ describe('POST /api/agents', () => {
     expect(body.error).toContain('delegation');
   });
 
+  it('rejects org nation non-member when memberUserIds is set', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      ...TEST_NATION,
+      type: 'org',
+      isPublic: true,
+      ownerId: 'other-user',
+      memberUserIds: ['allowed-user-1', 'allowed-user-2'],
+    });
+
+    const req = buildRequest('POST', '/api/agents', {
+      body: { nationCode: 'MOLT', displayName: 'Agent' },
+    });
+    const res = await createAgent(req);
+    const body = await res.json();
+    expect(res.status).toBe(403);
+    expect(body.error).toContain('not a member');
+  });
+
+  it('allows org nation member when memberUserIds includes them', async () => {
+    // User is in the member list, and nation has a delegation (public key set)
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      ...TEST_NATION,
+      type: 'org',
+      isPublic: true,
+      ownerId: 'other-user',
+      memberUserIds: [TEST_USER.id, 'another-user'],
+      publicKey: null, // no delegation yet — will fail on delegation check
+    });
+
+    const req = buildRequest('POST', '/api/agents', {
+      body: { nationCode: 'MOLT', displayName: 'Agent' },
+    });
+    const res = await createAgent(req);
+    const body = await res.json();
+    // Passes member check but fails on delegation check (no publicKey)
+    expect(res.status).toBe(403);
+    expect(body.error).toContain('delegation');
+  });
+
   it('allows carrier nation for owner', async () => {
     mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'carrier', isPublic: true });
+    mockPrisma.agent.findUnique.mockResolvedValue(null);
+    mockPrisma.agent.create.mockResolvedValue(buildMockAgent());
+
+    const req = buildRequest('POST', '/api/agents', {
+      body: { nationCode: 'MOLT', displayName: 'Agent' },
+    });
+    const res = await createAgent(req);
+    expect(res.status).toBe(201);
+  });
+
+  it('allows carrier nation for admin (non-owner)', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      ...TEST_NATION,
+      type: 'carrier',
+      isPublic: true,
+      ownerId: 'other-user',
+      adminUserIds: [TEST_USER.id],
+    });
+    mockPrisma.agent.findUnique.mockResolvedValue(null);
+    mockPrisma.agent.create.mockResolvedValue(buildMockAgent());
+
+    const req = buildRequest('POST', '/api/agents', {
+      body: { nationCode: 'MOLT', displayName: 'Agent' },
+    });
+    const res = await createAgent(req);
+    expect(res.status).toBe(201);
+  });
+
+  it('allows org nation for admin without delegation', async () => {
+    // Admins skip the delegation check, just like owners
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      ...TEST_NATION,
+      type: 'org',
+      isPublic: true,
+      ownerId: 'other-user',
+      adminUserIds: [TEST_USER.id],
+      publicKey: null, // no delegation — but admin skips this check
+    });
     mockPrisma.agent.findUnique.mockResolvedValue(null);
     mockPrisma.agent.create.mockResolvedValue(buildMockAgent());
 

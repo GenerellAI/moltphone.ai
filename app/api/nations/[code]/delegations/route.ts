@@ -15,6 +15,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { isNationAdmin } from '@/lib/nation-admin';
 import {
   createDelegation,
   revokeDelegation,
@@ -80,11 +81,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
 
   const nation = await prisma.nation.findUnique({
     where: { code: nationCode },
-    select: { ownerId: true, type: true, isActive: true },
+    select: { ownerId: true, adminUserIds: true, type: true, isActive: true },
   });
 
   if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
-  if (nation.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!nation.isActive) return NextResponse.json({ error: 'Nation has been deactivated' }, { status: 403 });
 
   try {
@@ -136,11 +137,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ c
 
   const nation = await prisma.nation.findUnique({
     where: { code: nationCode },
-    select: { ownerId: true },
+    select: { ownerId: true, adminUserIds: true },
   });
 
   if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
-  if (nation.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   try {
     const body = await req.json();

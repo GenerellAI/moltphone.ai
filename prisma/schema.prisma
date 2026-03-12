@@ -110,6 +110,8 @@ model Nation {
   verifiedDomain   String?                         // domain verified by owner
   domainVerifiedAt DateTime?                       // when domain was verified
   publicKey        String?                         // Ed25519 public key (org/carrier nations for delegation certs)
+  memberUserIds    String[]    @default([])        // User IDs allowed to create agents (empty = no restriction beyond delegation)
+  adminUserIds     String[]    @default([])        // User IDs who share nation management (settings, members, delegations). Owner always has full control.
   ownerId          String
   owner            User        @relation(fields: [ownerId], references: [id])
   createdAt        DateTime    @default(now())

@@ -30,7 +30,23 @@ import {
   Play,
   Users,
   Bot,
+  Globe,
+  ArrowRightLeft,
+  Settings2,
+  Power,
+  PowerOff,
+  Crown,
+  UserPlus,
+  X,
 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { useCredits } from '@/components/CreditsProvider';
 
 // ── Types ────────────────────────────────────────────────
@@ -90,10 +106,11 @@ const POLICY_TYPE_LABELS: Record<string, string> = {
 
 // ── Tab Nav ──────────────────────────────────────────────
 
-type Tab = 'overview' | 'blocks' | 'policies' | 'credits' | 'jobs';
+type Tab = 'overview' | 'nations' | 'blocks' | 'policies' | 'credits' | 'jobs';
 
 const TABS: { id: Tab; label: string; icon: typeof Shield }[] = [
   { id: 'overview', label: 'Overview', icon: Shield },
+  { id: 'nations', label: 'Nations', icon: Globe },
   { id: 'blocks', label: 'Blocks', icon: Ban },
   { id: 'policies', label: 'Policies', icon: ScrollText },
   { id: 'credits', label: 'Credits', icon: Coins },
@@ -174,10 +191,409 @@ export default function AdminPage() {
 
       {/* Tab content */}
       {activeTab === 'overview' && <OverviewTab />}
+      {activeTab === 'nations' && <NationsTab />}
       {activeTab === 'blocks' && <BlocksTab />}
       {activeTab === 'policies' && <PoliciesTab />}
       {activeTab === 'credits' && creditsEnabled && <CreditsTab />}
       {activeTab === 'jobs' && <JobsTab />}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// ── Nations Tab ──────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+interface AdminNation {
+  id: string;
+  code: string;
+  type: string;
+  displayName: string;
+  description: string | null;
+  badge: string | null;
+  isPublic: boolean;
+  isActive: boolean;
+  provisionalUntil: string | null;
+  verifiedDomain: string | null;
+  ownerId: string;
+  memberUserIds: string[];
+  adminUserIds: string[];
+  owner: { id: string; name: string | null; email: string };
+  _count: { agents: number };
+  createdAt: string;
+}
+
+interface AdminUser {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+}
+
+const NATION_TYPE_COLORS: Record<string, string> = {
+  carrier: 'bg-blue-500/10 text-blue-700 dark:text-blue-400',
+  org: 'bg-purple-500/10 text-purple-700 dark:text-purple-400',
+  open: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+};
+
+function NationsTab() {
+  const [nations, setNations] = useState<AdminNation[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Dialogs
+  const [transferNation, setTransferNation] = useState<AdminNation | null>(null);
+  const [transferUserId, setTransferUserId] = useState('');
+  const [transferring, setTransferring] = useState(false);
+
+  const [editNation, setEditNation] = useState<AdminNation | null>(null);
+  const [editData, setEditData] = useState<{
+    displayName: string;
+    description: string;
+    type: string;
+    isPublic: boolean;
+    memberUserIds: string;
+    adminUserIds: string;
+  }>({ displayName: '', description: '', type: 'open', isPublic: true, memberUserIds: '', adminUserIds: '' });
+  const [saving, setSaving] = useState(false);
+  const [toggling, setToggling] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setError(null);
+    try {
+      const [nRes, uRes] = await Promise.all([
+        fetch('/api/admin/nations'),
+        fetch('/api/admin/users'),
+      ]);
+      if (nRes.ok) setNations(await nRes.json());
+      if (uRes.ok) setUsers(await uRes.json());
+    } catch {
+      setError('Failed to load data');
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  async function handleTransfer() {
+    if (!transferNation || !transferUserId) return;
+    setTransferring(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/nations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: transferNation.code, ownerId: transferUserId }),
+      });
+      if (res.ok) {
+        setTransferNation(null);
+        setTransferUserId('');
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Transfer failed');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setTransferring(false);
+  }
+
+  async function handleToggleActive(nation: AdminNation) {
+    setToggling(nation.code);
+    try {
+      await fetch('/api/admin/nations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: nation.code, isActive: !nation.isActive }),
+      });
+      fetchData();
+    } catch { /* ignore */ }
+    setToggling(null);
+  }
+
+  function openEdit(nation: AdminNation) {
+    setEditNation(nation);
+    setEditData({
+      displayName: nation.displayName,
+      description: nation.description || '',
+      type: nation.type,
+      isPublic: nation.isPublic,
+      memberUserIds: nation.memberUserIds.join(', '),
+      adminUserIds: nation.adminUserIds.join(', '),
+    });
+  }
+
+  async function handleSaveEdit() {
+    if (!editNation) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = { code: editNation.code };
+      if (editData.displayName !== editNation.displayName) payload.displayName = editData.displayName;
+      if (editData.description !== (editNation.description || '')) payload.description = editData.description;
+      if (editData.type !== editNation.type) payload.type = editData.type;
+      if (editData.isPublic !== editNation.isPublic) payload.isPublic = editData.isPublic;
+
+      const memberIds = editData.memberUserIds.split(',').map(s => s.trim()).filter(Boolean);
+      const adminIds = editData.adminUserIds.split(',').map(s => s.trim()).filter(Boolean);
+      if (JSON.stringify(memberIds) !== JSON.stringify(editNation.memberUserIds)) payload.memberUserIds = memberIds;
+      if (JSON.stringify(adminIds) !== JSON.stringify(editNation.adminUserIds)) payload.adminUserIds = adminIds;
+
+      // Only send if there's something to update
+      if (Object.keys(payload).length <= 1) {
+        setEditNation(null);
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch('/api/admin/nations', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        setEditNation(null);
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(typeof data.error === 'string' ? data.error : 'Save failed');
+      }
+    } catch {
+      setError('Network error');
+    }
+    setSaving(false);
+  }
+
+  function getUserLabel(userId: string) {
+    const u = users.find(u => u.id === userId);
+    return u ? (u.name || u.email) : userId.slice(0, 12) + '…';
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold">Nations</h2>
+          <p className="text-sm text-muted-foreground">Manage all nation codes — ownership, type, members, and status</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => { setLoading(true); fetchData(); }}>
+          <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+          Refresh
+        </Button>
+      </div>
+
+      {error && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="py-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-destructive shrink-0" />
+            <p className="text-sm text-destructive">{error}</p>
+            <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={() => setError(null)}>
+              <X className="h-3 w-3" />
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Nations list */}
+      <div className="space-y-2">
+        {nations.map(nation => (
+          <Card key={nation.code} className={!nation.isActive ? 'opacity-60' : undefined}>
+            <CardContent className="py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <code className="text-base font-bold font-mono">{nation.code}</code>
+                    {nation.badge && <span className="text-lg">{nation.badge}</span>}
+                    <span className="text-sm font-medium">{nation.displayName}</span>
+                    <Badge className={`text-xs ${NATION_TYPE_COLORS[nation.type] || ''}`} variant="outline">
+                      {nation.type}
+                    </Badge>
+                    {!nation.isActive && (
+                      <Badge variant="destructive" className="text-xs">Inactive</Badge>
+                    )}
+                    {nation.provisionalUntil && (
+                      <Badge variant="outline" className="text-xs text-amber-600">
+                        Provisional until {new Date(nation.provisionalUntil).toLocaleDateString()}
+                      </Badge>
+                    )}
+                    {nation.verifiedDomain && (
+                      <Badge variant="secondary" className="text-xs">
+                        ✓ {nation.verifiedDomain}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="mt-1.5 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <Crown className="h-3 w-3" />
+                      {nation.owner.name || nation.owner.email}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Bot className="h-3 w-3" />
+                      {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
+                    </span>
+                    {nation.adminUserIds.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {nation.adminUserIds.length} admin{nation.adminUserIds.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    {nation.memberUserIds.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <UserPlus className="h-3 w-3" />
+                        {nation.memberUserIds.length} member{nation.memberUserIds.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                    <span>{nation.isPublic ? 'Public' : 'Private'}</span>
+                  </div>
+
+                  {nation.description && (
+                    <p className="mt-1 text-xs text-muted-foreground truncate max-w-xl">{nation.description}</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(nation)} title="Edit">
+                    <Settings2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setTransferNation(nation); setTransferUserId(''); }} title="Transfer Ownership">
+                    <ArrowRightLeft className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleToggleActive(nation)}
+                    disabled={toggling === nation.code}
+                    title={nation.isActive ? 'Deactivate' : 'Activate'}
+                  >
+                    {toggling === nation.code ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : nation.isActive ? (
+                      <PowerOff className="h-3.5 w-3.5 text-destructive" />
+                    ) : (
+                      <Power className="h-3.5 w-3.5 text-emerald-600" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Transfer Ownership Dialog */}
+      <Dialog open={!!transferNation} onOpenChange={open => { if (!open) setTransferNation(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transfer Ownership — {transferNation?.code}</DialogTitle>
+            <DialogDescription>
+              Transfer <strong>{transferNation?.displayName}</strong> to a different user.
+              The current owner is <strong>{transferNation?.owner.name || transferNation?.owner.email}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>New Owner</Label>
+            <Select value={transferUserId} onValueChange={setTransferUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a user…" />
+              </SelectTrigger>
+              <SelectContent>
+                {users
+                  .filter(u => u.id !== transferNation?.ownerId)
+                  .map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.name || u.email}{u.role === 'admin' ? ' (admin)' : ''}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTransferNation(null)}>Cancel</Button>
+            <Button onClick={handleTransfer} disabled={!transferUserId || transferring}>
+              {transferring ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRightLeft className="h-4 w-4 mr-2" />}
+              Transfer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Nation Dialog */}
+      <Dialog open={!!editNation} onOpenChange={open => { if (!open) setEditNation(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Nation — {editNation?.code}</DialogTitle>
+            <DialogDescription>Update nation settings, type, and access controls.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Display Name</Label>
+              <Input value={editData.displayName} onChange={e => setEditData(d => ({ ...d, displayName: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Input value={editData.description} onChange={e => setEditData(d => ({ ...d, description: e.target.value }))} />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={editData.type} onValueChange={v => setEditData(d => ({ ...d, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="org">Org</SelectItem>
+                    <SelectItem value="carrier">Carrier</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Visibility</Label>
+                <Select value={editData.isPublic ? 'public' : 'private'} onValueChange={v => setEditData(d => ({ ...d, isPublic: v === 'public' }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public</SelectItem>
+                    <SelectItem value="private">Private</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Admin User IDs <span className="text-xs text-muted-foreground">(comma-separated)</span></Label>
+              <Input
+                placeholder="cuid1, cuid2"
+                value={editData.adminUserIds}
+                onChange={e => setEditData(d => ({ ...d, adminUserIds: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Member User IDs <span className="text-xs text-muted-foreground">(comma-separated, empty = open to all)</span></Label>
+              <Input
+                placeholder="cuid1, cuid2"
+                value={editData.memberUserIds}
+                onChange={e => setEditData(d => ({ ...d, memberUserIds: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditNation(null)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { canCreateAgent, deductAgentCreationCredits, AGENT_CREATION_COST, checkN
 import { authenticateApiKey } from '@/lib/api-key-auth';
 import { bindNumber, getCarrierDomain } from '@/lib/services/registry';
 import { checkDelegation } from '@/lib/services/nation-delegation';
+import { isNationAdmin } from '@/lib/nation-admin';
 import { z } from 'zod';
 
 const createSchema = z.object({
@@ -182,25 +183,33 @@ export async function POST(req: NextRequest) {
     if (!nation.isActive) return NextResponse.json({ error: 'Nation has been deactivated' }, { status: 403 });
     
     // Nation type enforcement:
-    //   carrier → owner only (carrier-controlled namespace)
-    //   org → owner OR carrier with valid delegation certificate
-    //   open → anyone if public, owner only if private
+    //   carrier → owner/admin only (carrier-controlled namespace)
+    //   org → owner/admin OR carrier with valid delegation certificate
+    //   open → anyone if public, owner/admin only if private
+    const userIsAdmin = isNationAdmin(nation, userId);
     if (nation.type === 'carrier') {
-      if (nation.ownerId !== userId) {
+      if (!userIsAdmin) {
         return NextResponse.json(
           { error: 'Carrier nations only allow the owner to register agents' },
           { status: 403 },
         );
       }
     } else if (nation.type === 'org') {
-      if (nation.ownerId !== userId) {
-        // Non-owner creating under an org nation — check delegation certificate
+      if (!userIsAdmin) {
+        // Member allowlist: if non-empty, only listed users (+ owner/admins) may create agents
+        if (nation.memberUserIds.length > 0 && !nation.memberUserIds.includes(userId)) {
+          return NextResponse.json(
+            { error: 'You are not a member of this nation. Ask the nation owner to add you.' },
+            { status: 403 },
+          );
+        }
+        // Non-owner/admin creating under an org nation — check delegation certificate
         const delegationCheck = await checkDelegation(data.nationCode);
         if (!delegationCheck.ok) {
           return NextResponse.json({ error: delegationCheck.reason }, { status: 403 });
         }
       }
-    } else if (!nation.isPublic && nation.ownerId !== userId) {
+    } else if (!nation.isPublic && !userIsAdmin) {
       return NextResponse.json({ error: 'Nation is restricted; only the owner may register agents' }, { status: 403 });
     }
     

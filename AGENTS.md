@@ -250,6 +250,8 @@ The full schema lives in `prisma/schema.prisma`. Key Agent fields:
   | `verifiedDomain`   | `String?`   | Domain verified by the nation owner                       |
   | `domainVerifiedAt` | `DateTime?` | When domain was verified                                  |
   | `publicKey`        | `String?`   | Ed25519 public key for signing delegation certificates (org/carrier nations) |
+  | `memberUserIds`  | `String[]`  | User IDs allowed to create agents. Empty = no restriction beyond delegation. Owner always allowed. |
+  | `adminUserIds`   | `String[]`  | User IDs who share nation management (settings, members, delegations). Owner always has full control. |
 
 - **NationDelegation** — Delegation certificate binding a nation to a carrier. One delegation per (nationCode, carrierDomain) pair. Fields: `nationCode`, `carrierDomain`, `carrierPublicKey`, `signature` (Ed25519 by nation owner), `issuedAt`, `expiresAt?`, `revokedAt?`.
 
@@ -1164,11 +1166,66 @@ DELETE /api/nations/:code/delegations     → Revoke a delegation (owner-only)
 
 #### Delegation Enforcement
 
-| Nation Type | Agent Creation by Owner | Agent Creation by Others | Self-Signup |
-| ----------- | ---------------------- | ----------------------- | ----------- |
-| `carrier`   | ✓ Always               | ✗ Rejected              | ✗ Rejected  |
-| `org`       | ✓ Always               | ✓ If carrier has active delegation | ✓ If carrier has active delegation |
-| `open`      | ✓ Always               | ✓ If nation is public    | ✓ If nation is public |
+| Nation Type | Agent Creation by Owner/Admin | Agent Creation by Others | Self-Signup |
+| ----------- | ----------------------------- | ----------------------- | ----------- |
+| `carrier`   | ✓ Always                      | ✗ Rejected              | ✗ Rejected  |
+| `org`       | ✓ Always                      | ✓ If carrier has active delegation AND (memberUserIds empty OR user in list) | ✓ If carrier has active delegation AND memberUserIds empty |
+| `open`      | ✓ Always                      | ✓ If nation is public    | ✓ If nation is public |
+
+#### Member Allowlist
+
+Org nations can restrict agent creation to specific users via `memberUserIds`.
+When the array is **empty** (default), any authenticated user can create agents
+(subject to delegation). When **non-empty**, only the listed user IDs (plus the
+nation owner and admins) may create agents. Self-signup is blocked entirely when
+a member allowlist is active.
+
+```
+PATCH /api/nations/:code
+Authorization: Bearer <session>
+
+{ "memberUserIds": ["user-cuid-1", "user-cuid-2"] }
+```
+
+To clear the restriction: `{ "memberUserIds": [] }`
+
+#### Shared Ownership
+
+Nation owners can share management responsibilities via `adminUserIds`.
+Admins have the same permissions as the owner for:
+- Updating nation settings (name, description, badge, visibility)
+- Managing `memberUserIds`
+- Generating Ed25519 keypairs
+- Creating and revoking delegation certificates
+- Domain verification
+- Creating agents (skip delegation check)
+
+Admins **cannot**:
+- Transfer ownership (`ownerId`)
+- Add or remove other admins (`adminUserIds`)
+
+```
+PATCH /api/nations/:code
+Authorization: Bearer <session>
+
+{ "adminUserIds": ["user-cuid-1", "user-cuid-2"] }
+```
+
+To remove all admins: `{ "adminUserIds": [] }`
+
+#### Ownership Transfer
+
+The primary owner can transfer the nation to another user:
+
+```
+PATCH /api/nations/:code
+Authorization: Bearer <session>
+
+{ "ownerId": "new-owner-cuid" }
+```
+
+Only the current `ownerId` can perform this operation. The new owner must be
+an existing user. Admins cannot transfer ownership.
 
 ### Registration Certificate (Carrier → Agent)
 

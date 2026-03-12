@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { isNationAdmin } from '@/lib/nation-admin';
 import { validateWebhookUrl } from '@/lib/ssrf';
 import crypto from 'crypto';
 import { Resolver } from 'dns/promises';
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   const { code } = await params;
   const nation = await prisma.nation.findUnique({ where: { code: code.toUpperCase() } });
   if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
-  if (nation.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { domain } = await req.json();
   if (!domain || typeof domain !== 'string') {
@@ -133,7 +134,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ code
   const { code } = await params;
   const nation = await prisma.nation.findUnique({ where: { code: code.toUpperCase() } });
   if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
-  if (nation.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   // Parse pending verification data
   if (!nation.verifiedDomain?.startsWith('pending:')) {

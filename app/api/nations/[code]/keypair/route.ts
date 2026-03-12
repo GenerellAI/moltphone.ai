@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { requireHttps } from '@/lib/require-https';
+import { isNationAdmin } from '@/lib/nation-admin';
 import { generateNationKeypair } from '@/lib/services/nation-delegation';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ code: string }> }) {
@@ -29,11 +30,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
 
   const nation = await prisma.nation.findUnique({
     where: { code: nationCode },
-    select: { ownerId: true, type: true, isActive: true, publicKey: true },
+    select: { ownerId: true, adminUserIds: true, type: true, isActive: true, publicKey: true },
   });
 
   if (!nation) return NextResponse.json({ error: 'Nation not found' }, { status: 404 });
-  if (nation.ownerId !== session.user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   if (!nation.isActive) return NextResponse.json({ error: 'Nation has been deactivated' }, { status: 403 });
 
   if (nation.type !== 'org' && nation.type !== 'carrier') {

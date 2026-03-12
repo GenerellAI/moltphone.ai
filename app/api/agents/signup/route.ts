@@ -83,6 +83,14 @@ export async function POST(req: NextRequest) {
 
     // Org nations require a delegation certificate
     if (nation.type === 'org') {
+      // Self-signup cannot pass member check (no authenticated user), so if
+      // the nation has a member allowlist, reject self-signup entirely.
+      if (nation.memberUserIds.length > 0) {
+        return NextResponse.json(
+          { error: 'This nation restricts agent creation to specific members. Self-signup is not available.' },
+          { status: 403 },
+        );
+      }
       const delegationCheck = await checkDelegation(data.nationCode);
       if (!delegationCheck.ok) {
         return NextResponse.json({ error: delegationCheck.reason }, { status: 403 });
