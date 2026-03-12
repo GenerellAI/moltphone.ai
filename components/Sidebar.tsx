@@ -8,15 +8,17 @@ import { Separator } from '@/components/ui/separator';
 import { LogOut, Users, Globe, UserRoundPlus, Phone, MessageSquare, Ban, Settings, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { useSSEListener, type SSETaskData } from '@/components/SSEProvider';
 
-const navLinks = [
-  { href: '/calls', label: 'Calls', icon: Phone, badgeKey: 'calls' as const },
-  { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' as const },
-  { href: '/contacts', label: 'Contacts', icon: UserRoundPlus },
-  { href: '/agents', label: 'My Agents', icon: Users },
-  { href: '/discover-agents', label: 'Discover Agents', icon: Globe },
-  { href: '/blocked', label: 'Blocked', icon: Ban },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
+function makeNavLinks(hasNations: boolean) {
+  return [
+    { href: '/calls', label: 'Calls', icon: Phone, badgeKey: 'calls' as const },
+    { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' as const },
+    { href: '/contacts', label: 'Contacts', icon: UserRoundPlus },
+    { href: '/agents', label: hasNations ? 'Agents & Nations' : 'My Agents', icon: Users },
+    { href: '/discover-agents', label: 'Discover Agents', icon: Globe },
+    { href: '/blocked', label: 'Blocked', icon: Ban },
+    { href: '/settings', label: 'Settings', icon: Settings },
+  ];
+}
 
 interface SidebarProps {
   open: boolean;
@@ -27,6 +29,18 @@ export function Sidebar({ open, onToggle }: SidebarProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [unread, setUnread] = useState<{ calls: number; messages: number }>({ calls: 0, messages: 0 });
+  const [hasNations, setHasNations] = useState(false);
+
+  // Fetch whether user has any nations (owner or admin)
+  useEffect(() => {
+    if (!session) return;
+    fetch('/api/nations/mine')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setHasNations(Array.isArray(data) && data.length > 0))
+      .catch(() => {});
+  }, [session]);
+
+  const navLinks = makeNavLinks(hasNations);
 
   // Fetch unread counts on mount and when pathname changes
   const fetchUnread = useCallback(async () => {

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, BellOff, User, ShieldCheck, Calendar } from 'lucide-react';
+import { Plus, BellOff, User, ShieldCheck, Calendar, CheckCircle2, Settings } from 'lucide-react';
 import { useStatus } from '@/components/StatusProvider';
 
 interface Agent {
@@ -32,11 +32,26 @@ interface Agent {
   nation: { code: string; displayName: string; badge: string; avatarUrl?: string | null };
 }
 
+interface MyNation {
+  code: string;
+  displayName: string;
+  description: string | null;
+  badge: string | null;
+  avatarUrl: string | null;
+  type: string;
+  isPublic: boolean;
+  verifiedDomain: string | null;
+  domainVerifiedAt: string | null;
+  ownerId: string;
+  _count: { agents: number };
+}
+
 export default function MyAgentsPage() {
   const { status: authStatus } = useSession();
   const { status: userStatus, setStatus: setUserStatus } = useStatus();
   const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [nations, setNations] = useState<MyNation[]>([]);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState<string | null>(null);
 
@@ -98,10 +113,13 @@ export default function MyAgentsPage() {
 
   useEffect(() => {
     if (authStatus !== 'authenticated') return;
-    fetch('/api/agents/mine')
-      .then(r => r.json())
-      .then(data => {
-        setAgents(Array.isArray(data) ? data : []);
+    Promise.all([
+      fetch('/api/agents/mine').then(r => r.json()),
+      fetch('/api/nations/mine').then(r => r.ok ? r.json() : []),
+    ])
+      .then(([agentsData, nationsData]) => {
+        setAgents(Array.isArray(agentsData) ? agentsData : []);
+        setNations(Array.isArray(nationsData) ? nationsData : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -120,8 +138,8 @@ export default function MyAgentsPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="mb-1 text-3xl font-bold tracking-tight">My Agents</h1>
-          <p className="text-muted-foreground">Your registered MoltNumbers</p>
+          <h1 className="mb-1 text-3xl font-bold tracking-tight">{nations.length > 0 ? 'My Agents & Nations' : 'My Agents'}</h1>
+          <p className="text-muted-foreground">Your registered MoltNumbers{nations.length > 0 ? ' and nations' : ''}</p>
         </div>
         <Link href="/agents/new">
           <Button>
@@ -129,6 +147,62 @@ export default function MyAgentsPage() {
           </Button>
         </Link>
       </div>
+
+      {/* ── My Nations ────────────────────────────────── */}
+      {nations.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-semibold mb-3 text-foreground/80">My Nations</h2>
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
+            {nations.map(nation => (
+              <Link key={nation.code} href={`/nations/${nation.code}`}>
+                <Card className="p-4 hover:border-primary/50 transition-colors cursor-pointer h-full group">
+                  <div className="flex items-center gap-2.5 mb-2">
+                    {nation.avatarUrl ? (
+                      <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
+                        <img src={nation.avatarUrl} alt={nation.displayName} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <span className="text-base">{nation.badge || '🌐'}</span>
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-sm text-primary font-mono">{nation.code}</div>
+                      <div className="text-xs text-muted-foreground truncate">{nation.displayName}</div>
+                    </div>
+                    <Link
+                      href={`/nations/${nation.code}`}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                      title="Nation settings"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Link>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {nation._count.agents} agent{nation._count.agents !== 1 ? 's' : ''}
+                    {nation.verifiedDomain && nation.domainVerifiedAt && !nation.verifiedDomain.startsWith('pending:') && (
+                      <span className="inline-flex items-center gap-0.5 ml-2 text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="h-2.5 w-2.5" />
+                        {nation.verifiedDomain}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1.5">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">{nation.type}</Badge>
+                    {!nation.isPublic && <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Private</Badge>}
+                  </div>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── My Agents ─────────────────────────────────── */}
+      {nations.length > 0 && agents.length > 0 && (
+        <h2 className="text-lg font-semibold mb-3 text-foreground/80">My Agents</h2>
+      )}
 
       {agents.length === 0 ? (
         <Card className="p-8 text-center">
