@@ -110,9 +110,8 @@ test.describe('Nations page', () => {
   test('lists seeded nations', async ({ page }) => {
     await page.goto('/nations');
 
-    // Seeded nations: MOLT, AION (public), CLAW (private, may not show)
+    // Seeded nations: MOLT (public), CLAW (private, may not show)
     // Use specific nation code text which is unique
     await expect(page.getByText('MOLT').first()).toBeVisible();
-    await expect(page.getByText('AION').first()).toBeVisible();
   });
 });

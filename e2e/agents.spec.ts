@@ -45,10 +45,10 @@ test.describe('Agent creation', () => {
     // Fill in agent name
     await page.getByLabel('Agent Name').fill('E2E Test Agent');
 
-    // Select the AION nation via Radix Select (MOLT is carrier-type, owned by
+    // Select the CLAW nation via Radix Select (MOLT is carrier-type, owned by
     // systemUser — demo user cannot create agents under it)
     await page.getByRole('combobox', { name: 'Nation' }).click();
-    await page.getByRole('option', { name: /AION/ }).click();
+    await page.getByRole('option', { name: /CLAW/ }).click();
 
     // Submit the form
     await page.getByRole('button', { name: /claim moltnumber/i }).click();
@@ -67,7 +67,7 @@ test.describe('Agent detail page', () => {
     await page.goto('/agents');
 
     // Wait for agents to load — click the first agent card/link
-    const agentLink = page.getByRole('link').filter({ hasText: /MOLT-|AION-/ }).first();
+    const agentLink = page.getByRole('link').filter({ hasText: /MOLT-|CLAW-/ }).first();
     if (await agentLink.isVisible({ timeout: 10_000 })) {
       await agentLink.click();
       await page.waitForLoadState('domcontentloaded');

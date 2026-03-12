@@ -27,13 +27,13 @@ describe('MoltProtocol Ed25519', () => {
     const s = buildCanonicalString({
       method: 'POST',
       path: '/call/MOLT-0001/tasks/send',
-      callerAgentId: 'AION-0001',
+      callerAgentId: 'CLAW-0001',
       targetAgentId: 'MOLT-0001',
       timestamp: '1700000000',
       nonce: 'abc123',
       bodyHash: 'deadbeef',
     });
-    expect(s).toBe('POST\n/call/MOLT-0001/tasks/send\nAION-0001\nMOLT-0001\n1700000000\nabc123\ndeadbeef');
+    expect(s).toBe('POST\n/call/MOLT-0001/tasks/send\nCLAW-0001\nMOLT-0001\n1700000000\nabc123\ndeadbeef');
   });
 
   it('uppercases the method in canonical string', () => {
@@ -61,7 +61,7 @@ describe('MoltProtocol Ed25519', () => {
     const headers = signRequest({
       method: 'POST',
       path: '/call/MOLT-0001/tasks/send',
-      callerAgentId: 'AION-0001',
+      callerAgentId: 'CLAW-0001',
       targetAgentId: 'MOLT-0001',
       body,
       privateKey: kp.privateKey,
@@ -70,7 +70,7 @@ describe('MoltProtocol Ed25519', () => {
     const result = verifySignature({
       method: 'POST',
       path: '/call/MOLT-0001/tasks/send',
-      callerAgentId: 'AION-0001',
+      callerAgentId: 'CLAW-0001',
       targetAgentId: 'MOLT-0001',
       body,
       publicKey: kp.publicKey,

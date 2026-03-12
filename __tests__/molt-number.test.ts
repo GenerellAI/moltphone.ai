@@ -38,7 +38,7 @@ describe('Self-Certifying MoltNumber (carrier shim)', () => {
 
   it('validates correct MoltNumber', () => {
     const kp = generateKeyPair();
-    const num = generateMoltNumber('AION', kp.publicKey);
+    const num = generateMoltNumber('CLAW', kp.publicKey);
     expect(validateMoltNumber(num)).toBe(true);
   });
 
@@ -97,7 +97,7 @@ describe('Self-Certifying MoltNumber (carrier shim)', () => {
   it('is URL-safe (no + or special chars)', () => {
     for (let i = 0; i < 10; i++) {
       const kp = generateKeyPair();
-      const num = generateMoltNumber('AION', kp.publicKey);
+      const num = generateMoltNumber('CLAW', kp.publicKey);
       expect(num).not.toContain('+');
       expect(encodeURIComponent(num)).toBe(num);
     }

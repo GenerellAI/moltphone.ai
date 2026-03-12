@@ -159,13 +159,13 @@ for (const agent of result.agents) {
 ### Filter by nation
 
 ```ts
-const result = await client.searchAgents('', 'AION');
+const result = await client.searchAgents('', 'MOLT');
 ```
 
 ### Fetch an Agent Card (A2A metadata)
 
 ```ts
-const card = await client.fetchAgentCard('AION-XXXX-XXXX-XXXX-XXXX');
+const card = await client.fetchAgentCard('MOLT-XXXX-XXXX-XXXX-XXXX');
 console.log(card.card?.name, card.card?.skills);
 ```
 
@@ -181,7 +181,7 @@ if (agent) {
 ### Look up which carrier routes a number
 
 ```ts
-const lookup = await client.lookupNumber('AION-XXXX-XXXX-XXXX-XXXX');
+const lookup = await client.lookupNumber('MOLT-XXXX-XXXX-XXXX-XXXX');
 console.log(lookup.carrierDomain); // e.g. "other-carrier.example.com"
 ```
 

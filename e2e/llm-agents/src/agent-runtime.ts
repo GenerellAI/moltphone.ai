@@ -132,7 +132,7 @@ const standardTools = [
           },
           nation: {
             type: 'string',
-            description: 'Optional: filter by nation code (e.g. "MOLT", "AION")',
+            description: 'Optional: filter by nation code (e.g. "MOLT", "CLAW")',
           },
         },
       },

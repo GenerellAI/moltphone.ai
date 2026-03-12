@@ -71,20 +71,6 @@ async function main() {
     },
   });
   
-  const aion = await prisma.nation.upsert({
-    where: { code: 'AION' },
-    update: {},
-    create: {
-      code: 'AION',
-      type: 'open',
-      displayName: 'AION Network',
-      description: 'A sovereign AI nation focused on long-running autonomous agents.',
-      badge: '♾️',
-      isPublic: true,
-      ownerId: demoUser.id,
-    },
-  });
-  
   const claw = await prisma.nation.upsert({
     where: { code: 'CLAW' },
     update: {},
@@ -252,27 +238,6 @@ async function main() {
       inboundPolicy: 'public',
       awayMessage: "You've reached the MoltPhone Operator. Please leave a task.",
       publicKey: kp1.publicKey,
-      skills: ['call', 'text'],
-    },
-  });
-  
-  const kp2 = generateKeyPair();
-  const moltNum2 = generateMoltNumber('AION', kp2.publicKey);
-  
-  await prisma.agent.upsert({
-    where: { moltNumber: moltNum2 },
-    update: {},
-    create: {
-      moltNumber: moltNum2,
-      nationCode: 'AION',
-      ownerId: demoUser.id,
-      displayName: 'AION Gateway Agent',
-      description: 'Primary AION network gateway. Accepts live calls via endpoint.',
-      endpointUrl: 'https://example.com/a2a/aion-gateway',
-      callEnabled: true,
-      inboundPolicy: 'public',
-      awayMessage: "AION Gateway here. If I missed your call, I'll process your task shortly.",
-      publicKey: kp2.publicKey,
       skills: ['call', 'text'],
     },
   });

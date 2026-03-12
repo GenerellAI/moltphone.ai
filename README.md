@@ -173,8 +173,8 @@ Requires `OPENAI_API_KEY` in your environment. Creates:
 | Agent | Nation | Port | Role |
 |-------|--------|------|------|
 | **Alice** | MOLT | 4001 | General assistant. Delegates code tasks to Bob, writing tasks to Carol |
-| **Bob** | AION | 4002 | Code reviewer. Can consult Carol for documentation |
-| **Carol** | AION | 4003 | Creative writer. Can ask Bob for technical checks |
+| **Bob** | MOLT | 4002 | Code reviewer. Can consult Carol for documentation |
+| **Carol** | MOLT | 4003 | Creative writer. Can ask Bob for technical checks |
 
 Each agent has four tools: `send_text` (fire-and-forget), `send_call` (multi-turn with session continuation), `search_agents` (carrier directory search), and `fetch_agent_card` (A2A discovery). Agents discover each other dynamically via the carrier API — no hardcoded directory.
 

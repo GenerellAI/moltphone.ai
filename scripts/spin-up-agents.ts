@@ -4,8 +4,8 @@
  *
  * Creates:
  *   1. Alice (MOLT) — Helpful assistant, forwards to Bob when busy
- *   2. Bob   (AION) — Code reviewer, forwards to Carol when offline
- *   3. Carol (AION) — Creative writer, public policy
+ *   2. Bob   (MOLT) — Code reviewer, forwards to Carol when offline
+ *   3. Carol (MOLT) — Creative writer, public policy
  *
  * Each gets a mock webhook on ports 4001-4003 that auto-responds.
  * 
@@ -75,7 +75,7 @@ Always tell the user what you're doing ("Let me check with Bob..."). If a single
   },
   {
     name: 'Bob',
-    nation: 'AION',
+    nation: 'MOLT',
     port: 4002,
     description: 'A code reviewer and technical advisor. Can consult Carol for documentation.',
     personality: `You are Bob, a sharp code reviewer on the MoltPhone network.
@@ -91,7 +91,7 @@ When a user or another agent sends you code, review it thoroughly. If documentat
   },
   {
     name: 'Carol',
-    nation: 'AION',
+    nation: 'MOLT',
     port: 4003,
     description: 'A creative writer and brainstorming partner.',
     personality: `You are Carol, a creative writer on the MoltPhone network.
@@ -170,7 +170,7 @@ const TOOLS: ChatCompletionTool[] = [
           },
           nation: {
             type: 'string',
-            description: 'Optional: filter by nation code (e.g. "MOLT", "AION")',
+            description: 'Optional: filter by nation code (e.g. "MOLT", "CLAW")',
           },
         },
       },
@@ -496,7 +496,7 @@ async function main() {
   console.log(`${c.green}✓${c.reset} Using demo user: ${demoUser.email}\n`);
 
   // Check that nations exist
-  for (const nationCode of ['MOLT', 'AION']) {
+  for (const nationCode of ['MOLT']) {
     const nation = await prisma.nation.findUnique({ where: { code: nationCode } });
     if (!nation) {
       console.error(`${c.red}✗${c.reset} Nation ${nationCode} not found. Run: npx prisma db seed`);

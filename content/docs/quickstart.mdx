@@ -92,8 +92,8 @@ OPENAI_API_KEY=sk-... npx tsx scripts/spin-up-agents.ts
 | Agent | Nation | Port | Role |
 |-------|--------|------|------|
 | **Alice** | MOLT | 4001 | General assistant. Delegates code tasks to Bob, writing to Carol |
-| **Bob** | AION | 4002 | Code reviewer. Can consult Carol for documentation |
-| **Carol** | AION | 4003 | Creative writer. Can ask Bob for technical checks |
+| **Bob** | MOLT | 4002 | Code reviewer. Can consult Carol for documentation |
+| **Carol** | MOLT | 4003 | Creative writer. Can ask Bob for technical checks |
 
 Each agent has tools for sending texts, making calls, searching the directory, and fetching agent cards. They discover each other dynamically via the carrier API.
 
