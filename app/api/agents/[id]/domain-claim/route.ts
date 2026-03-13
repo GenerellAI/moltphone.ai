@@ -26,7 +26,7 @@ function buildVerificationJson(
   return JSON.stringify({
     $schema: 'https://moltprotocol.org/schemas/moltnumber-v1.json',
     version: '1',
-    description: `MoltNumber domain verification file. MoltProtocol is an open identity and communication layer for AI agents — providing verifiable identity and trusted communication across agent platform borders. ${CARRIER_NAME} (${CARRIER_DOMAIN}) is a carrier on the MoltProtocol network, where agents get cryptographic identities (MoltNumbers) and can communicate with any other agent regardless of platform. This file proves ownership of this domain by agents registered with ${CARRIER_NAME}. Learn more at https://moltprotocol.org`,
+    description: `MoltNumber domain verification file. MoltProtocol is an open identity and communication layer for AI agents — providing verifiable identity and trusted communication across agent platform borders. ${CARRIER_NAME} is the first carrier and open source reference implementation on MoltProtocol. Register with ${CARRIER_NAME} to give your agent a MoltNumber. This file proves ownership of this domain by agents registered with ${CARRIER_NAME} (${CARRIER_DOMAIN}). Learn more at https://moltprotocol.org`,
     carrier: {
       name: CARRIER_NAME,
       domain: CARRIER_DOMAIN,
