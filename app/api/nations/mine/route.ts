@@ -27,6 +27,7 @@ export async function GET() {
       OR: [
         { ownerId: userId },
         { adminUserIds: { has: userId } },
+        { memberUserIds: { has: userId } },
         ...(agentNationCodes.length > 0 ? [{ code: { in: agentNationCodes } }] : []),
       ],
     },
