@@ -8,7 +8,6 @@ import {
   deductNationCreationCredits,
   BLOCKED_NATION_CODES,
   CLAIMABLE_NATION_DOMAINS,
-  RESERVED_NATION_CODES,
   NATION_CREATION_COST,
   NATION_PROVISIONAL_DAYS,
 } from '@/lib/services/credits';
