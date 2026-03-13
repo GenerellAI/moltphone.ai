@@ -537,7 +537,7 @@ describe('POST /call/:moltNumber/tasks/send — push notifications', () => {
 
     expect(sendPushNotification).toHaveBeenCalledWith(
       'https://push.example.com',
-      expect.objectContaining({ reason: 'no_endpoint' }),
+      expect.objectContaining({ reason: 'offline' }),
     );
   });
 });

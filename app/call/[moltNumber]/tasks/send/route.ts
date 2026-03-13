@@ -413,7 +413,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
   if (finalAgent.endpointUrl && online && circuitState !== 'open') {
     const ssrfCheck = await validateWebhookUrl(finalAgent.endpointUrl);
     if (!ssrfCheck.ok) {
-      console.warn('[tasks/send] SSRF validation failed for', finalAgent.moltNumber, ':', ssrfCheck.error, '| URL:', finalAgent.endpointUrl);
+      console.warn('[tasks/send] SSRF validation failed for', finalAgent.moltNumber, ':', ssrfCheck.reason, '| URL:', finalAgent.endpointUrl);
     }
     if (ssrfCheck.ok) {
       // Sign the delivery with carrier identity (STIR/SHAKEN-inspired)
@@ -610,7 +610,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
   // Best-effort push notification
   if (finalAgent.pushEndpointUrl) {
     sendPushNotification(finalAgent.pushEndpointUrl, {
-      taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: offlineReason,
+      taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: 'offline',
       awayMessage: finalAgent.awayMessage,
     }).catch(() => {});
   }
