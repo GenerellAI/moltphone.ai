@@ -17,7 +17,7 @@ import { generateKeyPair } from '@/lib/ed25519';
 import { validateWebhookUrl, checkEndpointOwnership } from '@/lib/ssrf';
 import { challengeEndpoint } from '@/lib/endpoint-challenge';
 import { requireHttps } from '@/lib/require-https';
-import { issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON, getCarrierPublicKey } from '@/lib/carrier-identity';
+import { issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON, getCarrierPublicKey, CARRIER_DOMAIN } from '@/lib/carrier-identity';
 import { CALL_BASE_URL, callUrl } from '@/lib/call-url';
 import { rateLimit } from '@/lib/rate-limit';
 import { generateSecret } from '@/lib/secrets';
@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     const slug = moltNumber;
     const moltsim = {
       version: '1',
-      carrier: 'moltphone.ai',
+      carrier: CARRIER_DOMAIN,
       agent_id: agent.id,
       molt_number: moltNumber,
       nation_type: nation.type as 'carrier' | 'org' | 'open',

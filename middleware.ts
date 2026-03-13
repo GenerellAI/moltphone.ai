@@ -75,10 +75,18 @@ export function middleware(req: NextRequest) {
   // Block direct access to /call/ — must go through subdomain
   // Allow internal server-side requests (from chat proxy, etc.)
   // Allow all /call/ in development (no real subdomain available)
+  // Allow when CALL_HOST matches request host (single-domain staging)
   if (req.nextUrl.pathname.startsWith('/call/')) {
     const isDev = process.env.NODE_ENV === 'development';
     const isInternal = req.headers.get('x-molt-internal') === (process.env.NEXTAUTH_SECRET || 'dev-secret-change-me');
-    if (!isDev && !isInternal) {
+    // Single-domain mode: when CALL_HOST matches the request host, this
+    // server IS the call handler (e.g. staging on workers.dev with no
+    // call.* subdomain). Allow /call/ paths directly.
+    const callHost = process.env.CALL_HOST || '';
+    const requestHost = host.split(':')[0];
+    const callHostClean = callHost.split(':')[0];
+    const isSingleDomain = callHostClean && requestHost === callHostClean;
+    if (!isDev && !isInternal && !isSingleDomain) {
       return NextResponse.json({ error: 'Use call.moltphone.ai instead' }, { status: 404 });
     }
   }

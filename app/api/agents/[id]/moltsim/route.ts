@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { generateKeyPair } from '@/lib/ed25519';
 import { generateMoltNumber } from '@/lib/molt-number';
-import { getCarrierPublicKey, issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON } from '@/lib/carrier-identity';
+import { getCarrierPublicKey, issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON, CARRIER_DOMAIN } from '@/lib/carrier-identity';
 import { requireHttps } from '@/lib/require-https';
 import { CALL_BASE_URL, callUrl } from '@/lib/call-url';
 import { bindNumber, unbindNumber, getCarrierDomain } from '@/lib/services/registry';
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const slug = newMoltNumber;
   const profile = {
     version: '1',
-    carrier: 'moltphone.ai',
+    carrier: CARRIER_DOMAIN,
     agent_id: agent.id,
     molt_number: newMoltNumber,
     nation_type: (agent.nation?.type as 'carrier' | 'org' | 'open') ?? 'open',

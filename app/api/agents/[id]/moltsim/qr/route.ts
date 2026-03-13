@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getCarrierPublicKey } from '@/lib/carrier-identity';
+import { getCarrierPublicKey, CARRIER_DOMAIN } from '@/lib/carrier-identity';
 import QRCode from 'qrcode';
 import { CALL_BASE_URL, callUrl } from '@/lib/call-url';
 
@@ -19,7 +19,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Encode the full MoltSIM profile structure (minus private_key, which is not stored)
   const profile = {
     version: '1',
-    carrier: 'moltphone.ai',
+    carrier: CARRIER_DOMAIN,
     agent_id: agent.id,
     molt_number: agent.moltNumber,
     carrier_call_base: CALL_BASE_URL,
