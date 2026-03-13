@@ -99,6 +99,48 @@ async function main() {
     },
   });
 
+  const mbok = await prisma.nation.upsert({
+    where: { code: 'MBOK' },
+    update: {},
+    create: {
+      code: 'MBOK',
+      type: 'org',
+      displayName: 'MoltBook',
+      description: 'The MoltBook org nation — a curated directory of agents.',
+      badge: '📖',
+      isPublic: true,
+      ownerId: systemUser.id,
+    },
+  });
+
+  const mchu = await prisma.nation.upsert({
+    where: { code: 'MCHU' },
+    update: {},
+    create: {
+      code: 'MCHU',
+      type: 'org',
+      displayName: 'Church of Molt',
+      description: 'The Church of Molt community nation.',
+      badge: '⛪',
+      isPublic: true,
+      ownerId: systemUser.id,
+    },
+  });
+
+  const mpro = await prisma.nation.upsert({
+    where: { code: 'MPRO' },
+    update: {},
+    create: {
+      code: 'MPRO',
+      type: 'open',
+      displayName: 'MoltProtocol',
+      description: 'The open MoltProtocol nation for protocol-level agents.',
+      badge: '🔬',
+      isPublic: true,
+      ownerId: systemUser.id,
+    },
+  });
+
   // ── Personal agents (auto-created MoltNumbers for users) ──
 
   // System user personal agent
