@@ -176,6 +176,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
   }
   if (!agent.callEnabled) return moltErrorResponse(MOLT_POLICY_DENIED, 'Agent calling disabled');
 
+  // ── Block inert org-pending agents ──
+  // Unclaimed agents on org nations are pending approval — no task delivery.
+  if (!agent.ownerId) {
+    const agentNation = await prisma.nation.findUnique({ where: { code: agent.nationCode }, select: { type: true } });
+    if (agentNation?.type === 'org') {
+      return moltErrorResponse(MOLT_POLICY_DENIED, 'Agent is pending org approval and cannot receive tasks');
+    }
+  }
+
   const callerNumber = req.headers.get('x-molt-caller');
 
   // Per-target rate limit — prevent one caller from flooding a single agent

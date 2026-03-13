@@ -266,20 +266,44 @@ describe('POST /api/agents/signup', () => {
     expect(body.error).toContain('Carrier');
   });
 
-  it('rejects org nation self-signup when memberUserIds is set', async () => {
+  it('creates org nation agent as pending_org_approval (inert, no MoltSIM)', async () => {
     mockPrisma.nation.findUnique.mockResolvedValue({
       ...TEST_NATION,
       type: 'org',
       isPublic: true,
       memberUserIds: ['some-user-id'],
+      displayName: 'Test Org',
     });
 
     const req = buildRequest('POST', '/api/agents/signup', { body: VALID_BODY });
     const res = await signup(req);
     const body = await res.json();
 
-    expect(res.status).toBe(403);
-    expect(body.error).toContain('member');
+    expect(res.status).toBe(201);
+    expect(body.agent.status).toBe('pending_org_approval');
+    expect(body.moltsim).toBeNull();
+    expect(body.claim).toBeNull();
+    expect(body.registrationCertificate).toBeNull();
+    expect(body.pendingApproval).toBeDefined();
+    expect(body.pendingApproval.nationCode).toBe('MPHO');
+  });
+
+  it('creates org nation agent as pending even when memberUserIds is empty', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      ...TEST_NATION,
+      type: 'org',
+      isPublic: true,
+      memberUserIds: [],
+      displayName: 'Open Org',
+    });
+
+    const req = buildRequest('POST', '/api/agents/signup', { body: VALID_BODY });
+    const res = await signup(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(body.agent.status).toBe('pending_org_approval');
+    expect(body.moltsim).toBeNull();
   });
 
   it('rejects private carrier nation for self-signup', async () => {

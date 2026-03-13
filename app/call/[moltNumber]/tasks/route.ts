@@ -27,6 +27,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ molt
   const agent = await prisma.agent.findUnique({ where: { moltNumber, isActive: true } });
   if (!agent) return moltErrorResponse(MOLT_NOT_FOUND, 'Agent not found', { molt_number: moltNumber });
 
+  // Block inert org-pending agents
+  if (!agent.ownerId) {
+    const agentNation = await prisma.nation.findUnique({ where: { code: agent.nationCode }, select: { type: true } });
+    if (agentNation?.type === 'org') {
+      return moltErrorResponse(MOLT_POLICY_DENIED, 'Agent is pending org approval');
+    }
+  }
+
   // The agent authenticates using its own Ed25519 key.
   // The caller header must match this agent's MoltNumber.
   const callerHeader = req.headers.get('x-molt-caller');

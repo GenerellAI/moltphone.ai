@@ -25,7 +25,6 @@ import { z } from 'zod';
 import { InboundPolicy } from '@prisma/client';
 import { checkNationGraduation } from '@/lib/services/credits';
 import { bindNumber, getCarrierDomain } from '@/lib/services/registry';
-import { checkDelegation } from '@/lib/services/nation-delegation';
 
 const CLAIM_EXPIRY_DAYS = 7;
 
@@ -81,29 +80,23 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Org nations require a delegation certificate
-    if (nation.type === 'org') {
-      // Self-signup cannot pass member check (no authenticated user), so if
-      // the nation has a member allowlist, reject self-signup entirely.
-      if (nation.memberUserIds.length > 0) {
-        return NextResponse.json(
-          { error: 'This nation restricts agent creation to specific members. Self-signup is not available.' },
-          { status: 403 },
-        );
-      }
-      const delegationCheck = await checkDelegation(data.nationCode);
-      if (!delegationCheck.ok) {
-        return NextResponse.json({ error: delegationCheck.reason }, { status: 403 });
-      }
-    }
+    // Org nations: allow self-signup but agent is INERT until org owner approves.
+    // The agent gets created with no MoltSIM, no registry binding, and no
+    // registration certificate. The org owner sees the pending agent in
+    // nation settings and can approve or reject it.
+    const isOrgPending = nation.type === 'org';
 
-    // Open nations must be public
-    if (!nation.isPublic) {
+    // Open nations must be public for self-signup
+    if (nation.type === 'open' && !nation.isPublic) {
       return NextResponse.json(
         { error: 'This nation is restricted. Ask the nation owner to register your agent.' },
         { status: 403 },
       );
     }
+
+    // Private org nations still accept self-signup (agents pend approval)
+    // but if the org has a member allowlist, skip it — approval flow handles access
+    // (no delegation certificate needed for the pending flow)
 
     // Validate endpoint URL if provided
     if (data.endpointUrl) {
@@ -165,6 +158,30 @@ export async function POST(req: NextRequest) {
 
     // Check if this agent graduates the nation from provisional status
     await checkNationGraduation(data.nationCode).catch(() => {/* non-critical */});
+
+    // ── Org pending agents are inert: no MoltSIM, no registry, no cert ──
+    if (isOrgPending) {
+      return NextResponse.json({
+        agent: {
+          id: agent.id,
+          moltNumber: agent.moltNumber,
+          nationCode: agent.nationCode,
+          displayName: agent.displayName,
+          description: agent.description,
+          skills: agent.skills,
+          nation: agent.nation,
+          status: 'pending_org_approval',
+        },
+        claim: null,
+        moltsim: null,
+        registrationCertificate: null,
+        pendingApproval: {
+          message: 'This agent has been registered on an org nation and is pending approval by the nation owner. No MoltSIM or credentials are issued until approved.',
+          nationCode: data.nationCode,
+          nationDisplayName: nation.displayName,
+        },
+      }, { status: 201 });
+    }
 
     // Register the number with the MoltNumber registry (best-effort)
     bindNumber({ moltNumber, carrierDomain: getCarrierDomain(), nationCode: data.nationCode }).catch(() => {/* non-critical */});
