@@ -58,7 +58,7 @@ export function createMoltAdapter(
   let sessionId: string | null = null;
 
   return {
-    async run({ messages, abortSignal }) {
+    async *run({ messages, abortSignal }) {
       // Only send the last user message (not the full history — that's the agent's job)
       const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
       const text = lastUserMsg?.content
@@ -66,7 +66,8 @@ export function createMoltAdapter(
         .map(p => (p as { type: 'text'; text: string }).text)
         .join('\n') || '';
 
-      const res = await fetch(`/api/agents/${agentId}/chat`, {
+      // Try streaming endpoint first
+      const res = await fetch(`/api/agents/${agentId}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -77,27 +78,77 @@ export function createMoltAdapter(
         signal: abortSignal,
       });
 
-      const data = await res.json();
-
-      // Remember session ID for multi-turn
-      if (data.sessionId) sessionId = data.sessionId;
-
-      // Notify parent of the task ID so it can cancel on hangup
-      if (data.taskId) callbacks?.onTaskCreated?.(data.taskId);
-
-      if (!res.ok) {
-        const errorMsg = data.error || 'Request failed';
-        throw new Error(errorMsg);
+      if (!res.ok || !res.body) {
+        // Fallback to non-streaming endpoint
+        const fallbackRes = await fetch(`/api/agents/${agentId}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, intent: 'call', sessionId }),
+          signal: abortSignal,
+        });
+        const data = await fallbackRes.json();
+        if (data.sessionId) sessionId = data.sessionId;
+        if (data.taskId) callbacks?.onTaskCreated?.(data.taskId);
+        if (!fallbackRes.ok) throw new Error(data.error || 'Request failed');
+        const responseText = extractText(data.response || {});
+        callbacks?.onMessages?.(text, responseText);
+        yield { content: [{ type: 'text' as const, text: responseText }] };
+        return;
       }
 
-      const responseText = extractText(data.response || {});
+      // Read the SSE stream
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let sseBuffer = '';
+      let accumulated = '';
 
-      // Record the exchange for history persistence across navigation
-      callbacks?.onMessages?.(text, responseText);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-      return {
-        content: [{ type: 'text' as const, text: responseText }],
-      };
+        sseBuffer += decoder.decode(value, { stream: true });
+        const lines = sseBuffer.split('\n');
+        sseBuffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            // Track event type (used by the next data: line)
+            continue;
+          }
+          if (line.startsWith('data: ')) {
+            const raw = line.slice(6).trim();
+            if (!raw || raw === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(raw);
+
+              // Token event — append text and yield
+              if (parsed.text !== undefined) {
+                accumulated += parsed.text;
+                yield { content: [{ type: 'text' as const, text: accumulated }] };
+              }
+
+              // Done event — capture metadata
+              if (parsed.taskId) {
+                if (parsed.sessionId) sessionId = parsed.sessionId;
+                callbacks?.onTaskCreated?.(parsed.taskId);
+              }
+
+              // Error event
+              if (parsed.message && !parsed.text && !parsed.taskId) {
+                throw new Error(parsed.message);
+              }
+            } catch (e) {
+              if (e instanceof Error && e.message !== raw) throw e;
+              // Non-JSON or parse error — skip
+            }
+          }
+        }
+      }
+
+      // Record the exchange for history persistence
+      if (accumulated) {
+        callbacks?.onMessages?.(text, accumulated);
+      }
     },
   };
 }
