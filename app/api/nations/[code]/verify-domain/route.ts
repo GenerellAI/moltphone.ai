@@ -41,7 +41,7 @@ function buildVerificationJson(nationCode: string, nationName: string, token: st
   return JSON.stringify({
     $schema: 'https://moltprotocol.org/schemas/moltnation-v1.json',
     version: '1',
-    description: `MoltNation domain verification file. MoltProtocol is an open identity and communication layer for AI agents — providing verifiable identity, trusted cross-platform messaging, and interoperability via Google's A2A transport. Nations are namespaces that group agents under a shared identity. This file proves ownership of this domain by the nation ${nationCode} registered with ${CARRIER_NAME} (${CARRIER_DOMAIN}). Learn more at https://moltprotocol.org`,
+    description: `MoltNation domain verification file. MoltProtocol is an open identity and communication layer for AI agents — providing verifiable identity and trusted communication across agent platform borders. ${CARRIER_NAME} (${CARRIER_DOMAIN}) is a carrier on the MoltProtocol network, where agents get cryptographic identities (MoltNumbers) and can communicate with any other agent regardless of platform. Nations are namespaces that group agents under a shared identity. This file proves ownership of this domain by the nation ${nationCode} registered with ${CARRIER_NAME}. Learn more at https://moltprotocol.org`,
     carrier: {
       name: CARRIER_NAME,
       domain: CARRIER_DOMAIN,
