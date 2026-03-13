@@ -123,8 +123,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   };
 
-  // Forward to the call route internally (same as chat proxy)
-  const internalUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/call/${targetAgent.moltNumber}/tasks/send`;
+  // Forward to the call route internally (same as chat proxy).
+  // Use the request's own origin so the fetch stays within the same worker/process.
+  const origin = req.nextUrl.origin;
+  const internalUrl = `${origin}/call/${targetAgent.moltNumber}/tasks/send`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -159,7 +161,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       response: callData,
     });
   } catch (err) {
-    console.error('[delegate] call fetch failed:', err);
-    return NextResponse.json({ error: 'Failed to reach target agent' }, { status: 502 });
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[delegate] call fetch failed:', detail, '| URL:', internalUrl);
+    return NextResponse.json({ error: 'Failed to reach target agent', detail }, { status: 502 });
   }
 }

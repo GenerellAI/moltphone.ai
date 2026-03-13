@@ -279,6 +279,10 @@ describe('POST /api/agents/claim', () => {
   });
 
   it('keeps callEnabled=false for org nation agents when user is not a member (pending org approval)', async () => {
+    // Org self-signup agents start with callEnabled=false
+    mockPrisma.agent.findFirst.mockResolvedValue(
+      mockUnclaimedAgent({ callEnabled: false }),
+    );
     mockPrisma.nation.findUnique.mockResolvedValue({
       type: 'org',
       displayName: 'Acme Corp',
@@ -300,6 +304,32 @@ describe('POST /api/agents/claim', () => {
     // callEnabled should be false for org nations when user is not a member
     const updateCall = mockPrisma.agent.update.mock.calls[0][0];
     expect(updateCall.data.callEnabled).toBe(false);
+    expect(updateCall.data.ownerId).toBe(TEST_USER.id);
+  });
+
+  it('preserves prior admin approval when non-member claims an org agent', async () => {
+    // Admin approved first (callEnabled=true), then non-member claims
+    mockPrisma.agent.findFirst.mockResolvedValue(
+      mockUnclaimedAgent({ callEnabled: true }),
+    );
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      type: 'org',
+      displayName: 'Acme Corp',
+      ownerId: 'other-user-id',
+      adminUserIds: [],
+      memberUserIds: [],
+    });
+
+    const req = buildRequest('POST', '/api/agents/claim', {
+      body: { claimToken: 'valid-claim-token-123' },
+    });
+    const res = await claimAgent(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    // callEnabled should remain true — claim must not undo prior approval
+    const updateCall = mockPrisma.agent.update.mock.calls[0][0];
+    expect(updateCall.data.callEnabled).toBe(true);
     expect(updateCall.data.ownerId).toBe(TEST_USER.id);
   });
 

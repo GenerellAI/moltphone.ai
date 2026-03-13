@@ -67,8 +67,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   };
 
-  // Forward to the call route internally (server-side, bypasses middleware)
-  const internalUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/call/${agent.moltNumber}/tasks/send`;
+  // Forward to the call route internally (server-side, bypasses middleware).
+  // Use the request's own origin so the fetch stays within the same worker/process.
+  // NEXTAUTH_URL may point externally, which fails on Cloudflare Workers (self-fetch loop).
+  const origin = req.nextUrl.origin;
+  const internalUrl = `${origin}/call/${agent.moltNumber}/tasks/send`;
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -106,7 +109,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       response: callData,
     });
   } catch (err) {
-    console.error('[chat proxy] call fetch failed:', err);
-    return NextResponse.json({ error: 'Failed to reach agent' }, { status: 502 });
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error('[chat proxy] call fetch failed:', detail, '| URL:', internalUrl);
+    return NextResponse.json({ error: 'Failed to reach agent', detail }, { status: 502 });
   }
 }

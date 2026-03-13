@@ -105,9 +105,15 @@ export async function POST(req: NextRequest) {
       );
 
       // Claim the agent: assign owner, clear claim token.
-      // For org nations where user is NOT a member: keep callEnabled=false (admin must approve).
+      // For org nations where user is NOT a member: keep callEnabled as-is (preserve prior admin approval).
       // For org nations where user IS a member: auto-approve, enable immediately.
       // For open nations: enable calling immediately.
+      //
+      // Claiming and approval can happen in either order. If admin already approved
+      // (callEnabled=true) and a non-member claims, we must NOT reset to false.
+      const shouldEnableCall = isOrgNation
+        ? (isOrgMember ? true : agent.callEnabled) // preserve prior approval for non-members
+        : true; // open nations always enable on claim
       await tx.agent.update({
         where: { id: agent.id },
         data: {
@@ -115,7 +121,7 @@ export async function POST(req: NextRequest) {
           claimedAt: new Date(),
           claimToken: { set: null },
           claimExpiresAt: { set: null },
-          callEnabled: (isOrgNation && !isOrgMember) ? false : true,
+          callEnabled: shouldEnableCall,
         },
       });
     });
