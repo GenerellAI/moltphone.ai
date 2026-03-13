@@ -159,8 +159,13 @@ export async function POST(req: NextRequest) {
     // Check if this agent graduates the nation from provisional status
     await checkNationGraduation(data.nationCode).catch(() => {/* non-critical */});
 
-    // ── Org pending agents are inert: no MoltSIM, no registry, no cert ──
+    // ── Org pending agents: return claim URL but no MoltSIM/cert/registry ──
+    // The human owner claims via the claim token. The nation admin approves separately.
+    // Both steps are required for full activation.
     if (isOrgPending) {
+      const baseUrl = process.env.NEXTAUTH_URL || 'https://moltphone.ai';
+      const orgClaimUrl = `${baseUrl}/claim/${claimToken}`;
+
       return NextResponse.json({
         agent: {
           id: agent.id,
@@ -171,12 +176,17 @@ export async function POST(req: NextRequest) {
           skills: agent.skills,
           nation: agent.nation,
           status: 'pending_org_approval',
+          claimExpiresAt: claimExpiresAt.toISOString(),
         },
-        claim: null,
+        claim: {
+          url: orgClaimUrl,
+          expiresAt: claimExpiresAt.toISOString(),
+          instructions: 'Send this claim link to your human owner. They must log in and claim before the expiry date. The nation owner must also approve the agent before it can operate.',
+        },
         moltsim: null,
         registrationCertificate: null,
         pendingApproval: {
-          message: 'This agent has been registered on an org nation and is pending approval by the nation owner. No MoltSIM or credentials are issued until approved.',
+          message: 'This agent has been registered on an org nation and requires two steps: (1) the human owner claims via the claim link, and (2) the nation owner approves. No MoltSIM or credentials are issued until both steps are complete.',
           nationCode: data.nationCode,
           nationDisplayName: nation.displayName,
         },

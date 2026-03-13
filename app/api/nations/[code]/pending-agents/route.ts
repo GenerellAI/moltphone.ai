@@ -1,14 +1,15 @@
 /**
- * GET  /api/nations/:code/pending-agents — List pending (unclaimed) agents on an org nation.
+ * GET  /api/nations/:code/pending-agents — List agents pending approval on an org nation.
  * POST /api/nations/:code/pending-agents — Approve or reject a pending agent.
  *
  * Auth: session-based, must be nation owner or admin.
  *
  * Approval flow:
- *  1. Agent self-signs-up on an org nation → created inert (no MoltSIM/cert/registry).
- *  2. Nation owner views pending agents in settings.
- *  3. Owner approves → agent gets MoltSIM, registry binding, registration cert.
- *     Owner rejects → agent is deactivated.
+ *  1. Agent self-signs-up on an org nation → created with callEnabled=false.
+ *  2. Human owner claims via claim token (separate step).
+ *  3. Nation admin approves → callEnabled=true, registry binding, registration cert.
+ *     Admin rejects → agent is deactivated.
+ *  Both claiming and approval are required for full activation.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -16,9 +17,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { isNationAdmin } from '@/lib/nation-admin';
-import { issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON, getCarrierPublicKey } from '@/lib/carrier-identity';
+import { issueRegistrationCertificate, registrationCertToJSON } from '@/lib/carrier-identity';
 import { bindNumber, getCarrierDomain } from '@/lib/services/registry';
-import { CALL_BASE_URL, callUrl } from '@/lib/call-url';
 import { z } from 'zod';
 
 // ── GET: List pending agents ──
@@ -35,10 +35,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
   if (nation.type !== 'org') return NextResponse.json({ error: 'Only org nations have pending agents' }, { status: 400 });
   if (!isNationAdmin(nation, session.user.id)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
+  // Show org agents pending approval: callEnabled=false means not yet approved.
+  // This includes both unclaimed (ownerId=null) and claimed (ownerId set) agents.
   const pendingAgents = await prisma.agent.findMany({
     where: {
       nationCode,
-      ownerId: null,       // unclaimed
+      callEnabled: false,  // not yet approved by org admin
       isActive: true,
     },
     select: {
@@ -50,6 +52,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cod
       skills: true,
       createdAt: true,
       claimExpiresAt: true,
+      ownerId: true,        // show whether claimed
+      claimedAt: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -82,9 +86,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues }, { status: 400 });
   const { agentId, action } = parsed.data;
 
-  // Find the pending agent
+  // Find the pending agent (callEnabled=false on this org nation)
   const agent = await prisma.agent.findUnique({ where: { id: agentId } });
-  if (!agent || agent.nationCode !== nationCode || agent.ownerId !== null || !agent.isActive) {
+  if (!agent || agent.nationCode !== nationCode || agent.callEnabled !== false || !agent.isActive) {
     return NextResponse.json({ error: 'Pending agent not found' }, { status: 404 });
   }
 
@@ -95,6 +99,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   }
 
   // ── Approve ──
+  // Approval activates the agent on the org nation. It does NOT claim the agent.
+  // The human owner claims separately via the claim token.
+
   // 1. Register the number with the MoltNumber registry
   bindNumber({
     moltNumber: agent.moltNumber,
@@ -109,51 +116,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
     nationCode: agent.nationCode,
   });
 
-  // 3. Build the MoltSIM (note: private key is NOT stored in DB, so we
-  //    cannot rebuild it. The agent will need to re-provision/claim to get
-  //    a new MoltSIM with the private key. We mark it as approved so the
-  //    claim flow works.)
-  //    The approved agent now has callEnabled=false until claimed, but it
-  //    CAN receive tasks (no longer inert).
-
-  // We don't flip callEnabled here — that happens on claim.
-  // The key change: the agent is no longer org-pending because we'll clear
-  // the "inert" status by... well, the agent still has ownerId=null.
-  // The simplest approach: since the org owner is approving, they become
-  // a temporary "sponsor". We set a flag in the agent's metadata or,
-  // better yet, we keep it simple: approved = ownerId set to the approver.
-  // This makes the agent "claimed by the org owner" which is semantically correct.
+  // 3. Enable the agent (callEnabled = true).
+  //    If the agent has already been claimed (ownerId set), it's fully active now.
+  //    If not yet claimed, it can receive tasks but the human still needs to claim.
   await prisma.agent.update({
     where: { id: agentId },
     data: {
-      ownerId: session.user.id,
-      claimedAt: new Date(),
-      // Clear claim token — no longer needed
-      claimToken: null,
-      claimExpiresAt: null,
+      callEnabled: true,
     },
   });
 
-  // Build MoltSIM-like response (without private key — agent must re-provision)
-  const slug = agent.moltNumber;
-  const moltsimPublic = {
-    version: '1',
-    carrier: 'moltphone.ai',
-    agent_id: agent.id,
-    molt_number: agent.moltNumber,
-    nation_type: nation.type as 'carrier' | 'org' | 'open',
-    carrier_call_base: CALL_BASE_URL,
-    inbox_url: callUrl(slug, '/tasks'),
-    task_reply_url: callUrl(slug, '/tasks/:id/reply'),
-    task_cancel_url: callUrl(slug, '/tasks/:id/cancel'),
-    presence_url: callUrl(slug, '/presence/heartbeat'),
-    public_key: agent.publicKey,
-    // private_key NOT included — agent must re-provision from the dashboard
-    carrier_public_key: getCarrierPublicKey(),
-    signature_algorithm: 'Ed25519',
-    registration_certificate: registrationCertToJSON(registrationCert),
-    carrier_certificate: getCarrierCertificateJSON(),
-  };
+  const isClaimed = !!agent.ownerId;
 
   return NextResponse.json({
     ok: true,
@@ -163,9 +136,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
       moltNumber: agent.moltNumber,
       displayName: agent.displayName,
       nationCode: agent.nationCode,
+      claimed: isClaimed,
     },
-    moltsim: moltsimPublic,
     registrationCertificate: registrationCertToJSON(registrationCert),
-    note: 'Agent approved and claimed under your account. The agent can now receive tasks. To enable outbound calling, provision a new MoltSIM from the agent settings page.',
+    note: isClaimed
+      ? 'Agent approved and fully active. The owner can provision a MoltSIM from the agent settings page.'
+      : 'Agent approved. It can now receive tasks, but the human owner still needs to claim it via the claim link.',
   });
 }

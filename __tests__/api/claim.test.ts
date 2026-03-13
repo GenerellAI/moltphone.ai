@@ -27,6 +27,9 @@ const mockPrisma = {
   user: {
     findUnique: jest.fn(),
   },
+  nation: {
+    findUnique: jest.fn(),
+  },
   nonceUsed: { findUnique: jest.fn(), create: jest.fn() },
   $transaction: jest.fn(),
 };
@@ -91,6 +94,8 @@ beforeEach(() => {
   });
   mockPrisma.agent.findFirst.mockResolvedValue(mockUnclaimedAgent());
   mockPrisma.agent.update.mockResolvedValue({});
+  // Default nation type: open (non-org)
+  mockPrisma.nation.findUnique.mockResolvedValue({ type: 'open', displayName: 'MoltPhone' });
   // $transaction mock: execute the callback with a tx proxy that delegates to mockPrisma
   mockPrisma.$transaction.mockImplementation(async (fn: any) => {
     return fn(mockPrisma);
@@ -271,6 +276,25 @@ describe('POST /api/agents/claim', () => {
     await claimAgent(req);
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps callEnabled=false for org nation agents (pending org approval)', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({ type: 'org', displayName: 'Acme Corp' });
+
+    const req = buildRequest('POST', '/api/agents/claim', {
+      body: { claimToken: 'valid-claim-token-123' },
+    });
+    const res = await claimAgent(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingOrgApproval).toBe(true);
+    expect(body.message).toContain('approval');
+
+    // callEnabled should be false for org nations
+    const updateCall = mockPrisma.agent.update.mock.calls[0][0];
+    expect(updateCall.data.callEnabled).toBe(false);
+    expect(updateCall.data.ownerId).toBe(TEST_USER.id);
   });
 });
 

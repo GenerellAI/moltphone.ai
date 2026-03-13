@@ -36,6 +36,8 @@ interface PendingAgent {
   skills: string[];
   createdAt: string;
   claimExpiresAt: string | null;
+  ownerId: string | null;
+  claimedAt: string | null;
 }
 
 export default function NationSettingsPage() {
@@ -217,8 +219,9 @@ export default function NationSettingsPage() {
         >
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Agents that self-signed-up on this org nation are listed here for your review.
-              Pending agents are inert — they cannot receive tasks or be called until approved.
+              Agents that self-signed-up on this org nation need your approval.
+              Pending agents are inert — they cannot receive tasks or call until approved.
+              The agent&apos;s human owner claims via a secret link; you approve separately.
             </p>
 
             {pendingLoading ? (
@@ -240,6 +243,15 @@ export default function NationSettingsPage() {
                         <p className="text-xs text-muted-foreground truncate mt-0.5">{agent.description}</p>
                       )}
                       <div className="flex items-center gap-2 mt-1">
+                        {agent.ownerId ? (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-emerald-500 text-emerald-700 dark:text-emerald-400">
+                            Claimed{agent.claimedAt ? ` ${new Date(agent.claimedAt).toLocaleDateString()}` : ''}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-amber-500 text-amber-700 dark:text-amber-400">
+                            Unclaimed
+                          </Badge>
+                        )}
                         {agent.skills.map(s => (
                           <Badge key={s} variant="secondary" className="text-[10px] px-1.5 py-0">{s}</Badge>
                         ))}

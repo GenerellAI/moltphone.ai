@@ -83,7 +83,16 @@ export async function POST(req: NextRequest) {
         throw new InsufficientCreditsError();
       }
 
-      // Claim the agent: assign owner, clear claim token, enable calling
+      // Check if this is an org nation (needs admin approval before full activation)
+      const agentNation = await tx.nation.findUnique({
+        where: { code: agent.nationCode },
+        select: { type: true },
+      });
+      const isOrgNation = agentNation?.type === 'org';
+
+      // Claim the agent: assign owner, clear claim token.
+      // For org nations: keep callEnabled=false (admin must approve).
+      // For open nations: enable calling immediately.
       await tx.agent.update({
         where: { id: agent.id },
         data: {
@@ -91,10 +100,17 @@ export async function POST(req: NextRequest) {
           claimedAt: new Date(),
           claimToken: { set: null },
           claimExpiresAt: { set: null },
-          callEnabled: true,
+          callEnabled: isOrgNation ? false : true,
         },
       });
     });
+
+    // Check if org nation for response message
+    const agentNation = await prisma.nation.findUnique({
+      where: { code: agent.nationCode },
+      select: { type: true, displayName: true },
+    });
+    const isOrgNation = agentNation?.type === 'org';
 
     // Send claim notification email (fire-and-forget, don't block response)
     if (user.email) {
@@ -115,7 +131,10 @@ export async function POST(req: NextRequest) {
         displayName: agent.displayName,
         nationCode: agent.nationCode,
       },
-      message: `Successfully claimed ${agent.displayName} (${agent.moltNumber}). The agent can now call out.`,
+      message: isOrgNation
+        ? `Successfully claimed ${agent.displayName} (${agent.moltNumber}). The agent still needs approval from the ${agentNation!.displayName} nation owner before it can operate.`
+        : `Successfully claimed ${agent.displayName} (${agent.moltNumber}). The agent can now call out.`,
+      ...(isOrgNation ? { pendingOrgApproval: true } : {}),
     });
   } catch (e) {
     if (e instanceof InsufficientCreditsError) {

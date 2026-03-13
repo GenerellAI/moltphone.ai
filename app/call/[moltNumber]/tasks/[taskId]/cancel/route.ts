@@ -27,13 +27,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
   const agent = await prisma.agent.findUnique({ where: { moltNumber, isActive: true } });
   if (!agent) return moltErrorResponse(MOLT_NOT_FOUND, 'Agent not found', { molt_number: moltNumber });
 
-  // Block inert org-pending agents
-  if (!agent.ownerId) {
-    const agentNation = await prisma.nation.findUnique({ where: { code: agent.nationCode }, select: { type: true } });
-    if (agentNation?.type === 'org') {
-      return moltErrorResponse(MOLT_POLICY_DENIED, 'Agent is pending org approval');
-    }
-  }
+  // Org agents with callEnabled=false are blocked by the agent's own
+  // Ed25519 auth check below (they have no MoltSIM until approved).
 
   const callerHeader = req.headers.get('x-molt-caller');
   const timestamp = req.headers.get('x-molt-timestamp');
