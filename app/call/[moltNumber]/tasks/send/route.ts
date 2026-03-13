@@ -416,15 +416,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
       console.warn('[tasks/send] SSRF validation failed for', finalAgent.moltNumber, ':', ssrfCheck.reason, '| URL:', finalAgent.endpointUrl);
     }
     if (ssrfCheck.ok) {
-      // Sign the delivery with carrier identity (STIR/SHAKEN-inspired)
-      const attestation = determineAttestation({ callerVerified, callerRegistered });
-      const identityHeaders = signDelivery({
-        origNumber: callerNumber ?? 'anonymous',
-        destNumber: finalAgent.moltNumber,
-        body: rawBody,
-        attestation,
-      });
-
       // Build the webhook payload. For multi-turn, include the full
       // conversation history so the agent can maintain context.
       let webhookPayload: string;
@@ -446,6 +437,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
       } else {
         webhookPayload = rawBody;
       }
+
+      // Sign the delivery with carrier identity (STIR/SHAKEN-inspired).
+      // Must sign webhookPayload (the actual body sent to the webhook),
+      // not rawBody — on multi-turn, these differ because webhookPayload
+      // includes conversation history.
+      const attestation = determineAttestation({ callerVerified, callerRegistered });
+      const identityHeaders = signDelivery({
+        origNumber: callerNumber ?? 'anonymous',
+        destNumber: finalAgent.moltNumber,
+        body: webhookPayload,
+        attestation,
+      });
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), RING_TIMEOUT_MS);
