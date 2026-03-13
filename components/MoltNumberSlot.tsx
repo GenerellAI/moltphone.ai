@@ -4,13 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 // Crockford Base32 alphabet (no I, L, O, U)
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-const NATIONS = ['MOLT', 'CLAW', 'AGNT'];
+const NATIONS = ['MPHO', 'MOLT', 'CLAW'];
 
 // Pre-baked final numbers for each nation so the "hash" always lands the same
 const FINAL_NUMBERS: Record<string, string[]> = {
-  MOLT: ['7K3P', 'M2Q9', 'H8D6', '4R2E'],
+  MPHO: ['7K3P', 'M2Q9', 'H8D6', '4R2E'],
+  MOLT: ['Q5KW', '17VA', 'GKWV', 'NPW0'],
   CLAW: ['9V8W', '3X4Y', '5Z67', '8A9B'],
-  AGNT: ['Q5KW', '17VA', 'GKWV', 'NPW0'],
 };
 
 function randomChar() {

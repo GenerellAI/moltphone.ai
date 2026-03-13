@@ -28,6 +28,9 @@ import {
   NATION_CREATION_COOLDOWN_S,
   NATION_MIN_AGENTS_TO_GRADUATE,
   RESERVED_NATION_CODES,
+  BLOCKED_NATION_CODES,
+  CLAIMABLE_NATION_DOMAINS,
+  getClaimableDomain,
 } from '@/lib/services/credits';
 
 const TEST_USER_ID = 'test-user-id';
@@ -39,12 +42,32 @@ beforeEach(() => {
 // ── Reserved codes ───────────────────────────────────────
 
 describe('RESERVED_NATION_CODES', () => {
-  it('includes MOLT, TEST, XXXX, NULL, VOID', () => {
-    expect(RESERVED_NATION_CODES).toContain('MOLT');
+  it('includes MPHO, TEST, XXXX, NULL, VOID in blocked codes', () => {
+    expect(BLOCKED_NATION_CODES).toContain('MPHO');
+    expect(BLOCKED_NATION_CODES).toContain('TEST');
+    expect(BLOCKED_NATION_CODES).toContain('XXXX');
+    expect(BLOCKED_NATION_CODES).toContain('NULL');
+    expect(BLOCKED_NATION_CODES).toContain('VOID');
+  });
+
+  it('RESERVED_NATION_CODES includes all blocked + claimable codes', () => {
+    expect(RESERVED_NATION_CODES).toContain('MPHO');
     expect(RESERVED_NATION_CODES).toContain('TEST');
-    expect(RESERVED_NATION_CODES).toContain('XXXX');
-    expect(RESERVED_NATION_CODES).toContain('NULL');
-    expect(RESERVED_NATION_CODES).toContain('VOID');
+    expect(RESERVED_NATION_CODES).toContain('GOOG');
+    expect(RESERVED_NATION_CODES).toContain('APPL');
+  });
+
+  it('CLAIMABLE_NATION_DOMAINS maps company codes to domains', () => {
+    expect(CLAIMABLE_NATION_DOMAINS['GOOG']).toBe('google.com');
+    expect(CLAIMABLE_NATION_DOMAINS['APPL']).toBe('apple.com');
+    expect(CLAIMABLE_NATION_DOMAINS['MSFT']).toBe('microsoft.com');
+  });
+
+  it('getClaimableDomain returns domain for company codes, null for others', () => {
+    expect(getClaimableDomain('GOOG')).toBe('google.com');
+    expect(getClaimableDomain('CHNA')).toBeNull(); // country, empty string
+    expect(getClaimableDomain('MPHO')).toBeNull(); // not in claimable map
+    expect(getClaimableDomain('FREE')).toBeNull(); // not reserved at all
   });
 });
 

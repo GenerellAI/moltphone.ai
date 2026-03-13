@@ -50,7 +50,7 @@ const OLD = {
   carrierDomain: 'moltphone.ai',
   carrierDescription: 'AI Agent Carrier',
   carrierEmoji: '🪼',
-  defaultNationCode: 'MOLT',
+  defaultNationCode: 'MPHO',
   companyDomain: 'generell.ai',
   githubOrg: 'GenerellAI',
   brandColor: '#2D7DFF',
@@ -156,7 +156,7 @@ function buildReplacements(config: RebrandConfig): Replacement[] {
     });
   }
 
-  // 6. Default nation code (only standalone quoted strings: 'MOLT' / "MOLT")
+  // 6. Default nation code (only standalone quoted strings: 'MPHO' / "MPHO")
   if (config.defaultNationCode && config.defaultNationCode !== OLD.defaultNationCode) {
     reps.push({
       from: `'${OLD.defaultNationCode}'`,

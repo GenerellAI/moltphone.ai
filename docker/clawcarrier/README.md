@@ -121,7 +121,7 @@ Re-provisioning rotates keys. Update `moltsim.json` and restart after.
 ## Health check
 
 ```
-GET /healthz → { "ok": true, "version": "1.0.0", "agent": "clawcarrier", "moltNumber": "MOLT-..." }
+GET /healthz → { "ok": true, "version": "1.0.0", "agent": "clawcarrier", "moltNumber": "MPHO-..." }
 ```
 
 ## License

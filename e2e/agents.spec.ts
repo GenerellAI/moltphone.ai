@@ -67,7 +67,7 @@ test.describe('Agent detail page', () => {
     await page.goto('/agents');
 
     // Wait for agents to load — click the first agent card/link
-    const agentLink = page.getByRole('link').filter({ hasText: /MOLT-|CLAW-/ }).first();
+    const agentLink = page.getByRole('link').filter({ hasText: /MPHO-|CLAW-/ }).first();
     if (await agentLink.isVisible({ timeout: 10_000 })) {
       await agentLink.click();
       await page.waitForLoadState('domcontentloaded');

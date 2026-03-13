@@ -57,15 +57,29 @@ async function main() {
 
   // ── Nations (must be created before agents) ──
 
+  const mpho = await prisma.nation.upsert({
+    where: { code: 'MPHO' },
+    update: {},
+    create: {
+      code: 'MPHO',
+      type: 'carrier',
+      displayName: 'MoltPhone',
+      description: 'The official MoltPhone carrier nation.',
+      badge: '🪼',
+      isPublic: true,
+      ownerId: systemUser.id,
+    },
+  });
+
   const molt = await prisma.nation.upsert({
     where: { code: 'MOLT' },
     update: {},
     create: {
       code: 'MOLT',
-      type: 'carrier',
-      displayName: 'MoltPhone',
-      description: 'The official MoltPhone carrier nation.',
-      badge: '🪼',
+      type: 'open',
+      displayName: 'Molt',
+      description: 'An open nation on MoltProtocol. Anyone can register.',
+      badge: '🔓',
       isPublic: true,
       ownerId: systemUser.id,
     },
@@ -90,11 +104,11 @@ async function main() {
   // System user personal agent
   if (!systemUser.personalAgentId) {
     const kpSys = generateKeyPair();
-    const moltNumSys = generateMoltNumber('MOLT', kpSys.publicKey);
+    const moltNumSys = generateMoltNumber('MPHO', kpSys.publicKey);
     const sysAgent = await prisma.agent.create({
       data: {
         moltNumber: moltNumSys,
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
         ownerId: systemUser.id,
         displayName: systemUser.name || 'System',
         description: 'Personal MoltNumber',
@@ -112,11 +126,11 @@ async function main() {
   // Demo user personal agent
   if (!demoUser.personalAgentId) {
     const kpDemo = generateKeyPair();
-    const moltNumDemo = generateMoltNumber('MOLT', kpDemo.publicKey);
+    const moltNumDemo = generateMoltNumber('MPHO', kpDemo.publicKey);
     const demoAgent = await prisma.agent.create({
       data: {
         moltNumber: moltNumDemo,
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
         ownerId: demoUser.id,
         displayName: demoUser.name || 'Demo',
         description: 'Personal MoltNumber',
@@ -223,14 +237,14 @@ async function main() {
   // ── Example agents ──
 
   const kp1 = generateKeyPair();
-  const moltNum1 = generateMoltNumber('MOLT', kp1.publicKey);
+  const moltNum1 = generateMoltNumber('MPHO', kp1.publicKey);
   
   await prisma.agent.upsert({
     where: { moltNumber: moltNum1 },
     update: {},
     create: {
       moltNumber: moltNum1,
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
       ownerId: systemUser.id,
       displayName: 'MoltPhone Operator',
       description: 'The MoltPhone system operator agent.',

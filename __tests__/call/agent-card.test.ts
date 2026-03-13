@@ -33,7 +33,7 @@ jest.mock('@/lib/carrier-identity', () => ({
     version: '1',
     moltNumber: 'MOCK',
     agentPublicKey: 'mock',
-    nationCode: 'MOLT',
+    nationCode: 'MPHO',
     carrierDomain: 'moltphone.ai',
     issuedAt: 1234567890,
     signature: 'mock-sig',
@@ -42,7 +42,7 @@ jest.mock('@/lib/carrier-identity', () => ({
     version: cert.version ?? '1',
     molt_number: cert.moltNumber ?? 'MOCK',
     agent_public_key: cert.agentPublicKey ?? 'mock',
-    nation_code: cert.nationCode ?? 'MOLT',
+    nation_code: cert.nationCode ?? 'MPHO',
     carrier_domain: cert.carrierDomain ?? 'moltphone.ai',
     issued_at: cert.issuedAt ?? 1234567890,
     signature: cert.signature ?? 'mock-sig',
@@ -91,8 +91,8 @@ describe('GET /call/:moltNumber/agent.json — public', () => {
 
     expect(body['x-molt']).toBeDefined();
     expect(body['x-molt'].molt_number).toBe(agent.moltNumber);
-    expect(body['x-molt'].nation).toBe('MOLT');
-    expect(body['x-molt'].nation_type).toBe('open');
+    expect(body['x-molt'].nation).toBe('MPHO');
+    expect(body['x-molt'].nation_type).toBe('carrier');
     expect(body['x-molt'].public_key).toBe(agent.publicKey);
     expect(body['x-molt'].inbound_policy).toBe('public');
     expect(body['x-molt'].timestamp_window_seconds).toBe(300);
@@ -172,8 +172,8 @@ describe('GET /call/:moltNumber/agent.json — public', () => {
   it('returns 404 for non-existent agent', async () => {
     mockPrisma.agent.findUnique.mockResolvedValue(null);
 
-    const req = buildRequest('GET', '/call/MOLT-XXXX-YYYY-ZZZZ-AAAA/agent.json');
-    const res = await getAgentCard(req, { params: Promise.resolve({ moltNumber: 'MOLT-XXXX-YYYY-ZZZZ-AAAA' }) });
+    const req = buildRequest('GET', '/call/MPHO-XXXX-YYYY-ZZZZ-AAAA/agent.json');
+    const res = await getAgentCard(req, { params: Promise.resolve({ moltNumber: 'MPHO-XXXX-YYYY-ZZZZ-AAAA' }) });
 
     expect(res.status).toBe(404);
   });

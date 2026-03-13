@@ -416,8 +416,75 @@ export async function deductAgentCreationCredits(
 
 // ── Nation Creation Guards ───────────────────────────────
 
-/** Reserved nation codes that cannot be user-created. */
-export const RESERVED_NATION_CODES = ['MOLT', 'TEST', 'XXXX', 'NULL', 'VOID'];
+/** System nation codes that can never be user-created. */
+export const BLOCKED_NATION_CODES = ['MPHO', 'TEST', 'XXXX', 'NULL', 'VOID', 'DEMO', 'GOVT'];
+
+/**
+ * Reserved nation codes mapped to their required domain.
+ * Users can claim these by verifying ownership of the associated domain.
+ */
+export const CLAIMABLE_NATION_DOMAINS: Record<string, string> = {
+  // Big Tech
+  GOOG: 'google.com',
+  GOGL: 'google.com',
+  MSFT: 'microsoft.com',
+  APPL: 'apple.com',
+  AMZN: 'amazon.com',
+  META: 'meta.com',
+  NVDA: 'nvidia.com',
+  TSLA: 'tesla.com',
+  // AI
+  OPAI: 'openai.com',
+  ANTH: 'anthropic.com',
+  DEEP: 'deepseek.com',
+  HUGG: 'huggingface.co',
+  // Social / Consumer
+  SPOT: 'spotify.com',
+  TIKT: 'tiktok.com',
+  BYTE: 'bytedance.com',
+  // Finance
+  VISA: 'visa.com',
+  MAST: 'mastercard.com',
+  PYPL: 'paypal.com',
+  STRP: 'stripe.com',
+  JPMC: 'jpmorganchase.com',
+  GSAC: 'gs.com',
+  // Telecom
+  ATNT: 'att.com',
+  VZON: 'verizon.com',
+  VODA: 'vodafone.com',
+  TELI: 'telia.com',
+  // Logistics
+  FEDX: 'fedex.com',
+  DHLX: 'dhl.com',
+  UPSS: 'ups.com',
+  MAER: 'maersk.com',
+  // Other Major
+  IKEA: 'ikea.com',
+  VOLV: 'volvocars.com',
+  SAAB: 'saab.com',
+  // Countries (no domain — permanently blocked)
+  CHNA: '',
+  INDI: '',
+  JAPN: '',
+  SWED: '',
+  TAIW: '',
+  FRAN: '',
+  AUST: '',
+};
+
+/** All reserved codes (blocked + claimable). */
+export const RESERVED_NATION_CODES = [
+  ...BLOCKED_NATION_CODES,
+  ...Object.keys(CLAIMABLE_NATION_DOMAINS),
+];
+
+/** Check if a nation code is claimable via domain verification. Returns the required domain or null. */
+export function getClaimableDomain(code: string): string | null {
+  const domain = CLAIMABLE_NATION_DOMAINS[code];
+  if (!domain) return null; // blocked or not claimable (empty string = country)
+  return domain;
+}
 
 /**
  * Check whether a user is allowed to create a new nation.

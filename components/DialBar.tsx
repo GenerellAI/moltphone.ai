@@ -179,7 +179,7 @@ export function DialBar() {
                 onKeyDown={e => handleKeyDown(i, e)}
                 onPaste={handlePaste}
                 onClick={clearSelection}
-                placeholder={i === 0 ? 'MOLT' : '0000'}
+                placeholder={i === 0 ? 'MPHO' : '0000'}
                 className={`
                   w-[2.6rem] sm:w-[2.8rem] h-7 text-center font-mono text-xs sm:text-sm text-foreground
                   rounded border border-primary

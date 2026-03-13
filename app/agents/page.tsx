@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, BellOff, User, ShieldCheck, Calendar, CheckCircle2, Settings } from 'lucide-react';
+import { Plus, BellOff, User, ShieldCheck, Calendar, CheckCircle2, Settings, Globe } from 'lucide-react';
 import { useStatus } from '@/components/StatusProvider';
 
 interface Agent {
@@ -143,11 +143,18 @@ export default function MyAgentsPage() {
           <h1 className="mb-1 text-3xl font-bold tracking-tight">My Agents & Nations</h1>
           <p className="text-muted-foreground">Your registered MoltNumbers and nations</p>
         </div>
-        <Link href="/agents/new">
-          <Button>
-            <Plus className="h-4 w-4 mr-1" /> New Agent
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/nations/new">
+            <Button variant="outline">
+              <Globe className="h-4 w-4 mr-1" /> New Nation
+            </Button>
+          </Link>
+          <Link href="/agents/new">
+            <Button>
+              <Plus className="h-4 w-4 mr-1" /> New Agent
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* ── My Nations ────────────────────────────────── */}

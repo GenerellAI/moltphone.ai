@@ -76,10 +76,10 @@ export async function parseJson(response: Response): Promise<unknown> {
 
 export const TEST_NATION = {
   id: 'test-nation-id',
-  code: 'MOLT',
-  type: 'open',
+  code: 'MPHO',
+  type: 'carrier',
   displayName: 'MoltPhone',
-  description: 'The default nation',
+  description: 'The default carrier nation',
   badge: '⚡',
   isPublic: true,
   isActive: true,
@@ -104,12 +104,12 @@ let agentCounter = 0;
 export function buildMockAgent(overrides: Record<string, unknown> = {}) {
   agentCounter++;
   const kp = generateKeyPair();
-  const moltNumber = generateMoltNumber('MOLT', kp.publicKey);
+  const moltNumber = generateMoltNumber('MPHO', kp.publicKey);
 
   return {
     id: `agent-${agentCounter}`,
     moltNumber,
-    nationCode: 'MOLT',
+    nationCode: 'MPHO',
     ownerId: TEST_USER.id,
     displayName: `Test Agent ${agentCounter}`,
     description: 'A test agent',
@@ -135,7 +135,7 @@ export function buildMockAgent(overrides: Record<string, unknown> = {}) {
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
-    nation: { code: 'MOLT', type: 'open', displayName: 'MoltPhone', badge: '⚡' },
+    nation: { code: 'MPHO', type: 'carrier', displayName: 'MoltPhone', badge: '🪼' },
     owner: { id: TEST_USER.id, name: 'Test User' },
     _keyPair: kp, // Keep for signing in tests
     ...overrides,

@@ -6,6 +6,8 @@ import { z } from 'zod';
 import {
   canCreateNation,
   deductNationCreationCredits,
+  BLOCKED_NATION_CODES,
+  CLAIMABLE_NATION_DOMAINS,
   RESERVED_NATION_CODES,
   NATION_CREATION_COST,
   NATION_PROVISIONAL_DAYS,
@@ -52,8 +54,18 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const data = createSchema.parse(body);
     
-    // 1. Reserved code check (expanded)
-    if (RESERVED_NATION_CODES.includes(data.code)) {
+    // 1. Reserved code check
+    if (BLOCKED_NATION_CODES.includes(data.code)) {
+      return NextResponse.json(
+        { error: `${data.code} is a reserved system code and cannot be created` },
+        { status: 400 },
+      );
+    }
+
+    // 1b. Claimable reserved codes require domain verification after creation
+    const claimableDomain = CLAIMABLE_NATION_DOMAINS[data.code];
+    // claimableDomain === '' means country code (blocked)
+    if (claimableDomain === '') {
       return NextResponse.json(
         { error: `${data.code} is a reserved nation code` },
         { status: 400 },
@@ -74,9 +86,13 @@ export async function POST(req: NextRequest) {
     const provisionalUntil = new Date();
     provisionalUntil.setDate(provisionalUntil.getDate() + NATION_PROVISIONAL_DAYS);
 
+    // Claimable reserved codes start private until domain is verified
+    const isClaimable = !!claimableDomain;
+
     const nation = await prisma.nation.create({
       data: {
         ...data,
+        isPublic: isClaimable ? false : data.isPublic,
         ownerId: session.user.id,
         provisionalUntil,
       },
@@ -101,6 +117,7 @@ export async function POST(req: NextRequest) {
       ...nation,
       creditsDeducted: NATION_CREATION_COST,
       creditsRemaining: deduction.balance,
+      ...(isClaimable ? { requiredDomain: claimableDomain, domainVerificationRequired: true } : {}),
     }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) return NextResponse.json({ error: e.issues }, { status: 400 });

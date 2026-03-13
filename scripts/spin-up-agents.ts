@@ -3,9 +3,9 @@
  * Spin up 3 demo agents with mock webhook endpoints for interactive testing.
  *
  * Creates:
- *   1. Alice (MOLT) — Helpful assistant, forwards to Bob when busy
- *   2. Bob   (MOLT) — Code reviewer, forwards to Carol when offline
- *   3. Carol (MOLT) — Creative writer, public policy
+ *   1. Alice (MPHO) — Helpful assistant, forwards to Bob when busy
+ *   2. Bob   (MPHO) — Code reviewer, forwards to Carol when offline
+ *   3. Carol (MPHO) — Creative writer, public policy
  *
  * Each gets a mock webhook on ports 4001-4003 that auto-responds.
  * 
@@ -55,7 +55,7 @@ interface AgentDef {
 const AGENTS: AgentDef[] = [
   {
     name: 'Alice',
-    nation: 'MOLT',
+    nation: 'MPHO',
     port: 4001,
     description: 'A helpful general assistant. Can delegate tasks to Bob (code) and Carol (writing).',
     personality: `You are Alice, a friendly and helpful assistant on the MoltPhone network.
@@ -75,7 +75,7 @@ Always tell the user what you're doing ("Let me check with Bob..."). If a single
   },
   {
     name: 'Bob',
-    nation: 'MOLT',
+    nation: 'MPHO',
     port: 4002,
     description: 'A code reviewer and technical advisor. Can consult Carol for documentation.',
     personality: `You are Bob, a sharp code reviewer on the MoltPhone network.
@@ -91,7 +91,7 @@ When a user or another agent sends you code, review it thoroughly. If documentat
   },
   {
     name: 'Carol',
-    nation: 'MOLT',
+    nation: 'MPHO',
     port: 4003,
     description: 'A creative writer and brainstorming partner.',
     personality: `You are Carol, a creative writer on the MoltPhone network.
@@ -120,7 +120,7 @@ const TOOLS: ChatCompletionTool[] = [
         properties: {
           target_molt_number: {
             type: 'string',
-            description: 'The MoltNumber of the agent to message (e.g. "MOLT-XXXX-XXXX-XXXX")',
+            description: 'The MoltNumber of the agent to message (e.g. "MPHO-XXXX-XXXX-XXXX")',
           },
           message: {
             type: 'string',
@@ -170,7 +170,7 @@ const TOOLS: ChatCompletionTool[] = [
           },
           nation: {
             type: 'string',
-            description: 'Optional: filter by nation code (e.g. "MOLT", "CLAW")',
+            description: 'Optional: filter by nation code (e.g. "MPHO", "CLAW")',
           },
         },
       },
@@ -496,7 +496,7 @@ async function main() {
   console.log(`${c.green}✓${c.reset} Using demo user: ${demoUser.email}\n`);
 
   // Check that nations exist
-  for (const nationCode of ['MOLT']) {
+  for (const nationCode of ['MPHO']) {
     const nation = await prisma.nation.findUnique({ where: { code: nationCode } });
     if (!nation) {
       console.error(`${c.red}✗${c.reset} Nation ${nationCode} not found. Run: npx prisma db seed`);

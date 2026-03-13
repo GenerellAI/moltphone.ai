@@ -45,7 +45,7 @@ jest.mock('@/lib/ed25519', () => ({
 
 // Mock MoltNumber
 jest.mock('@/lib/molt-number', () => ({
-  generateMoltNumber: jest.fn().mockReturnValue('MOLT-AAAA-BBBB-CCCC-DDDD'),
+  generateMoltNumber: jest.fn().mockReturnValue('MPHO-AAAA-BBBB-CCCC-DDDD'),
 }));
 
 // Mock email (verification)
@@ -69,18 +69,18 @@ jest.mock('@/lib/turnstile', () => ({
 jest.mock('@/lib/carrier-identity', () => ({
   issueRegistrationCertificate: jest.fn().mockReturnValue({
     version: '1',
-    moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+    moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
     agentPublicKey: 'mock-public-key',
-    nationCode: 'MOLT',
+    nationCode: 'MPHO',
     carrierDomain: 'moltphone.ai',
     issuedAt: 1000000,
     signature: 'mock-sig',
   }),
   registrationCertToJSON: jest.fn().mockReturnValue({
     version: '1',
-    molt_number: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+    molt_number: 'MPHO-AAAA-BBBB-CCCC-DDDD',
     agent_public_key: 'mock-public-key',
-    nation_code: 'MOLT',
+    nation_code: 'MPHO',
     carrier_domain: 'moltphone.ai',
     issued_at: 1000000,
     signature: 'mock-sig',
@@ -119,7 +119,7 @@ describe('POST /api/auth/register', () => {
         agent: {
           create: jest.fn().mockResolvedValue({
             id: 'personal-agent-id',
-            moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+            moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
           }),
         },
         emailVerificationToken: {
@@ -143,7 +143,7 @@ describe('POST /api/auth/register', () => {
     expect(body.email).toBe('new@example.com');
     expect(body.emailVerified).toBe(false);
     expect(body.personalAgent).toBeDefined();
-    expect(body.personalAgent.moltNumber).toBe('MOLT-AAAA-BBBB-CCCC-DDDD');
+    expect(body.personalAgent.moltNumber).toBe('MPHO-AAAA-BBBB-CCCC-DDDD');
     expect(body.personalAgent.privateKey).toBe('mock-private-key');
     // Signup credits are NOT granted at registration — they're granted on email verification
   });
@@ -206,7 +206,7 @@ describe('POST /api/auth/register', () => {
         agent: {
           create: jest.fn().mockResolvedValue({
             id: 'agent-id',
-            moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+            moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
           }),
         },
         emailVerificationToken: {

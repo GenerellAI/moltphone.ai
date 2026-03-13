@@ -63,16 +63,16 @@ const pastDate = new Date(Date.now() - 1000);
 function mockUnclaimedAgent(overrides: Record<string, any> = {}) {
   return {
     id: 'agent-unclaimed-1',
-    moltNumber: 'MOLT-XXXX-YYYY-ZZZZ-AAAA',
+    moltNumber: 'MPHO-XXXX-YYYY-ZZZZ-AAAA',
     displayName: 'Unclaimed Bot',
-    nationCode: 'MOLT',
+    nationCode: 'MPHO',
     description: 'A self-signed agent',
     skills: ['call', 'text'],
     ownerId: null,
     claimToken: 'valid-claim-token-123',
     claimExpiresAt: futureDate,
     isActive: true,
-    nation: { code: 'MOLT', displayName: 'MoltPhone', badge: '⚡' },
+    nation: { code: 'MPHO', displayName: 'MoltPhone', badge: '⚡' },
     ...overrides,
   };
 }
@@ -114,7 +114,7 @@ describe('POST /api/agents/claim', () => {
     expect(res.status).toBe(200);
     expect(body.ok).toBe(true);
     expect(body.agent.id).toBe('agent-unclaimed-1');
-    expect(body.agent.moltNumber).toBe('MOLT-XXXX-YYYY-ZZZZ-AAAA');
+    expect(body.agent.moltNumber).toBe('MPHO-XXXX-YYYY-ZZZZ-AAAA');
     expect(body.message).toContain('claimed');
   });
 
@@ -258,8 +258,8 @@ describe('POST /api/agents/claim', () => {
     expect(mockSendClaimEmail).toHaveBeenCalledWith(
       'test@example.com',
       'Unclaimed Bot',
-      'MOLT-XXXX-YYYY-ZZZZ-AAAA',
-      'MOLT',
+      'MPHO-XXXX-YYYY-ZZZZ-AAAA',
+      'MPHO',
       'Test User',
     );
   });
@@ -288,7 +288,7 @@ describe('GET /api/agents/claim/preview', () => {
 
     expect(res.status).toBe(200);
     expect(body.agent.id).toBe('agent-unclaimed-1');
-    expect(body.agent.moltNumber).toBe('MOLT-XXXX-YYYY-ZZZZ-AAAA');
+    expect(body.agent.moltNumber).toBe('MPHO-XXXX-YYYY-ZZZZ-AAAA');
     expect(body.agent.displayName).toBe('Unclaimed Bot');
     expect(body.agent.nationName).toBe('MoltPhone');
     expect(body.agent.nationBadge).toBe('⚡');

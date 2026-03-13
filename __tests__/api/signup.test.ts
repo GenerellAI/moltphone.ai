@@ -60,7 +60,7 @@ jest.mock('@/lib/ed25519', () => ({
 
 // Mock molt-number
 jest.mock('@/lib/molt-number', () => ({
-  generateMoltNumber: jest.fn().mockReturnValue('MOLT-AAAA-BBBB-CCCC-DDDD'),
+  generateMoltNumber: jest.fn().mockReturnValue('MPHO-AAAA-BBBB-CCCC-DDDD'),
 }));
 
 // Mock secrets
@@ -72,18 +72,18 @@ jest.mock('@/lib/secrets', () => ({
 jest.mock('@/lib/carrier-identity', () => ({
   issueRegistrationCertificate: jest.fn().mockReturnValue({
     version: '1',
-    moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+    moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
     agentPublicKey: 'mock-public-key-base64',
-    nationCode: 'MOLT',
+    nationCode: 'MPHO',
     carrierDomain: 'moltphone.ai',
     issuedAt: 1234567890,
     signature: 'mock-cert-sig',
   }),
   registrationCertToJSON: jest.fn().mockReturnValue({
     version: '1',
-    molt_number: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+    molt_number: 'MPHO-AAAA-BBBB-CCCC-DDDD',
     agent_public_key: 'mock-public-key-base64',
-    nation_code: 'MOLT',
+    nation_code: 'MPHO',
     carrier_domain: 'moltphone.ai',
     issued_at: 1234567890,
     signature: 'mock-cert-sig',
@@ -119,7 +119,7 @@ import { POST as signup } from '../../app/api/agents/signup/route';
 // ── Setup ────────────────────────────────────────────────
 
 const VALID_BODY = {
-  nationCode: 'MOLT',
+  nationCode: 'MPHO',
   displayName: 'My Autonomous Agent',
   description: 'A test agent',
   endpointUrl: 'https://example.com/webhook',
@@ -129,18 +129,18 @@ const VALID_BODY = {
 
 const mockCreatedAgent = {
   id: 'agent-new-1',
-  moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
-  nationCode: 'MOLT',
+  moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
+  nationCode: 'MPHO',
   displayName: 'My Autonomous Agent',
   description: 'A test agent',
   skills: ['call', 'text'],
   claimExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-  nation: { code: 'MOLT', displayName: 'MoltPhone', badge: '⚡' },
+  nation: { code: 'MPHO', displayName: 'MoltPhone', badge: '⚡' },
 };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, isPublic: true });
+  mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'open', isPublic: true });
   mockPrisma.agent.findUnique.mockResolvedValue(null); // no collision
   mockPrisma.agent.create.mockResolvedValue(mockCreatedAgent);
   mockRateLimit.mockReturnValue({ ok: true });
@@ -161,7 +161,7 @@ describe('POST /api/agents/signup', () => {
 
     // Agent response
     expect(body.agent.id).toBe('agent-new-1');
-    expect(body.agent.moltNumber).toBe('MOLT-AAAA-BBBB-CCCC-DDDD');
+    expect(body.agent.moltNumber).toBe('MPHO-AAAA-BBBB-CCCC-DDDD');
     expect(body.agent.status).toBe('unclaimed');
     expect(body.agent.claimExpiresAt).toBeDefined();
 
@@ -169,7 +169,7 @@ describe('POST /api/agents/signup', () => {
     expect(body.moltsim).toBeDefined();
     expect(body.moltsim.version).toBe('1');
     expect(body.moltsim.carrier).toBe('moltphone.ai');
-    expect(body.moltsim.molt_number).toBe('MOLT-AAAA-BBBB-CCCC-DDDD');
+    expect(body.moltsim.molt_number).toBe('MPHO-AAAA-BBBB-CCCC-DDDD');
     expect(body.moltsim.private_key).toBe('mock-private-key-base64');
     expect(body.moltsim.public_key).toBe('mock-public-key-base64');
     expect(body.moltsim.carrier_public_key).toBe('mock-carrier-pub');
@@ -200,7 +200,7 @@ describe('POST /api/agents/signup', () => {
 
   it('defaults inboundPolicy to public and skills to [call, text]', async () => {
     const req = buildRequest('POST', '/api/agents/signup', {
-      body: { nationCode: 'MOLT', displayName: 'Minimal Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Minimal Agent' },
     });
     await signup(req);
 
@@ -219,7 +219,7 @@ describe('POST /api/agents/signup', () => {
 
   it('rejects missing displayName', async () => {
     const req = buildRequest('POST', '/api/agents/signup', {
-      body: { nationCode: 'MOLT' },
+      body: { nationCode: 'MPHO' },
     });
     const res = await signup(req);
     expect(res.status).toBe(400);
@@ -245,7 +245,7 @@ describe('POST /api/agents/signup', () => {
   });
 
   it('rejects private (non-public) nation', async () => {
-    mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, isPublic: false });
+    mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'open', isPublic: false });
 
     const req = buildRequest('POST', '/api/agents/signup', { body: VALID_BODY });
     const res = await signup(req);
@@ -325,7 +325,7 @@ describe('POST /api/agents/signup', () => {
 
   it('allows signup without endpointUrl', async () => {
     const req = buildRequest('POST', '/api/agents/signup', {
-      body: { nationCode: 'MOLT', displayName: 'No Webhook' },
+      body: { nationCode: 'MPHO', displayName: 'No Webhook' },
     });
     const res = await signup(req);
 

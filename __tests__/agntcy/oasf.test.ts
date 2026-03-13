@@ -276,7 +276,7 @@ describe('GET /call/:moltNumber/oasf.json', () => {
         version: '1',
         moltNumber: 'MOCK',
         agentPublicKey: 'mock',
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
         carrierDomain: 'moltphone.ai',
         issuedAt: 1234567890,
         signature: 'mock-sig',
@@ -285,7 +285,7 @@ describe('GET /call/:moltNumber/oasf.json', () => {
         version: cert.version ?? '1',
         molt_number: cert.moltNumber ?? 'MOCK',
         agent_public_key: cert.agentPublicKey ?? 'mock',
-        nation_code: cert.nationCode ?? 'MOLT',
+        nation_code: cert.nationCode ?? 'MPHO',
         carrier_domain: cert.carrierDomain ?? 'moltphone.ai',
         issued_at: cert.issuedAt ?? 1234567890,
         signature: cert.signature ?? 'mock-sig',
@@ -337,7 +337,7 @@ describe('GET /call/:moltNumber/oasf.json', () => {
     expect(body.modules).toBeDefined();
     expect(body.modules['x-molt']).toBeDefined();
     expect(body.modules['x-molt'].molt_number).toBe(agent.moltNumber);
-    expect(body.modules['x-molt'].nation).toBe('MOLT');
+    expect(body.modules['x-molt'].nation).toBe('MPHO');
     expect(body.modules['x-molt'].public_key).toBe(agent.publicKey);
   });
 

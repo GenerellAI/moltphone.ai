@@ -32,7 +32,7 @@ const DEFAULT_NATION_CODE: string = carrierConfig.DEFAULT_NATION_CODE;
 // Old MoltPhone defaults — what the rebrand script replaces.
 const OLD_NAME = 'MoltPhone';
 const OLD_DOMAIN = 'moltphone.ai';
-const OLD_NATION = 'MOLT';
+const OLD_NATION = 'MPHO';
 
 // ── Scanning rules ───────────────────────────────────────
 
@@ -197,8 +197,8 @@ describe('Rebrand verification', () => {
         const content = fs.readFileSync(path.join(ROOT, relPath), 'utf-8');
         const lines = content.split('\n');
         for (let i = 0; i < lines.length; i++) {
-          // Match 'MOLT' or "MOLT" as standalone quoted strings
-          if (/['"]MOLT['"]/.test(lines[i])) {
+          // Match 'MPHO' or "MPHO" as standalone quoted strings
+          if (/['"]MPHO['"]/.test(lines[i])) {
             stale.push({ file: relPath, line: i + 1, text: lines[i].trim() });
           }
         }

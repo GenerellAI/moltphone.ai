@@ -105,7 +105,7 @@ describe('GET /api/nations', () => {
 
     expect(res.status).toBe(200);
     expect(body).toHaveLength(1);
-    expect(body[0].code).toBe('MOLT');
+    expect(body[0].code).toBe('MPHO');
   });
 
   it('filters by search query', async () => {
@@ -158,9 +158,9 @@ describe('POST /api/nations', () => {
     expect(res.status).toBe(401);
   });
 
-  it('rejects MOLT (reserved)', async () => {
+  it('rejects MPHO (reserved)', async () => {
     const req = buildRequest('POST', '/api/nations', {
-      body: { ...validBody, code: 'MOLT' },
+      body: { ...validBody, code: 'MPHO' },
     });
     const res = await createNation(req);
     expect(res.status).toBe(400);

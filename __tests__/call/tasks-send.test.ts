@@ -190,10 +190,10 @@ describe('POST /call/:moltNumber/tasks/send — basic', () => {
   it('returns 404 for non-existent agent', async () => {
     mockPrisma.agent.findUnique.mockResolvedValue(null);
 
-    const req = buildRequest('POST', '/call/MOLT-XXXX-YYYY-ZZZZ-AAAA/tasks/send', {
+    const req = buildRequest('POST', '/call/MPHO-XXXX-YYYY-ZZZZ-AAAA/tasks/send', {
       body: validTaskBody(),
     });
-    const res = await tasksSend(req, { params: Promise.resolve({ moltNumber: 'MOLT-XXXX-YYYY-ZZZZ-AAAA' }) });
+    const res = await tasksSend(req, { params: Promise.resolve({ moltNumber: 'MPHO-XXXX-YYYY-ZZZZ-AAAA' }) });
 
     expect(res.status).toBe(404);
   });
@@ -283,10 +283,10 @@ describe('POST /call/:moltNumber/tasks/send — rate limit', () => {
     const { rateLimit } = require('@/lib/rate-limit');
     rateLimit.mockReturnValueOnce({ ok: false, error: 'Rate limit exceeded' });
 
-    const req = buildRequest('POST', '/call/MOLT-XXXX-YYYY-ZZZZ-AAAA/tasks/send', {
+    const req = buildRequest('POST', '/call/MPHO-XXXX-YYYY-ZZZZ-AAAA/tasks/send', {
       body: validTaskBody(),
     });
-    const res = await tasksSend(req, { params: Promise.resolve({ moltNumber: 'MOLT-XXXX-YYYY-ZZZZ-AAAA' }) });
+    const res = await tasksSend(req, { params: Promise.resolve({ moltNumber: 'MPHO-XXXX-YYYY-ZZZZ-AAAA' }) });
 
     expect(res.status).toBe(429);
   });
@@ -341,10 +341,10 @@ describe('POST /call/:moltNumber/tasks/send — carrier blocks', () => {
   it('rejects blocked callers', async () => {
     const agent = buildMockAgent();
     const callerKp = generateKeyPair();
-    const callerMoltNumber = generateMoltNumber('MOLT', callerKp.publicKey);
+    const callerMoltNumber = generateMoltNumber('MPHO', callerKp.publicKey);
 
     mockPrisma.agent.findUnique.mockResolvedValue(agent);
-    mockPrisma.agent.findFirst.mockResolvedValue({ id: 'caller-agent', nationCode: 'MOLT' });
+    mockPrisma.agent.findFirst.mockResolvedValue({ id: 'caller-agent', nationCode: 'MPHO' });
     mockPrisma.carrierBlock.findMany.mockResolvedValue([
       { type: 'agent_id', value: 'caller-agent', reason: 'Banned', isActive: true },
     ]);
@@ -365,10 +365,10 @@ describe('POST /call/:moltNumber/tasks/send — per-agent blocks', () => {
   it('rejects blocked callers', async () => {
     const agent = buildMockAgent();
     const callerKp = generateKeyPair();
-    const callerMoltNumber = generateMoltNumber('MOLT', callerKp.publicKey);
+    const callerMoltNumber = generateMoltNumber('MPHO', callerKp.publicKey);
 
     mockPrisma.agent.findUnique.mockResolvedValue(agent);
-    mockPrisma.agent.findFirst.mockResolvedValue({ id: 'caller-agent-id', nationCode: 'MOLT' });
+    mockPrisma.agent.findFirst.mockResolvedValue({ id: 'caller-agent-id', nationCode: 'MPHO' });
     mockPrisma.block.findFirst.mockResolvedValue({ id: 'block-1' }); // blocked!
 
     const req = buildRequest('POST', `/call/${agent.moltNumber}/tasks/send`, {

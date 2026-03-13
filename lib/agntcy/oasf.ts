@@ -169,8 +169,8 @@ export function agentCardToOASF(card: AgentCardInput): OASFRecord {
   const xMolt = card['x-molt'];
 
   // Build the agent.json URL from the task/send URL
-  // card.url = "https://carrier/call/MOLT-XXXX/tasks/send"
-  // agent card = "https://carrier/call/MOLT-XXXX/agent.json"
+  // card.url = "https://carrier/call/MPHO-XXXX/tasks/send"
+  // agent card = "https://carrier/call/MPHO-XXXX/agent.json"
   const agentCardUrl = card.url.replace(/\/tasks\/send$/, '/agent.json');
 
   const record: OASFRecord = {

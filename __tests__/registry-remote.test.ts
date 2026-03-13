@@ -129,17 +129,17 @@ describe('Registry HTTP Client', () => {
   describe('remoteLookupNumber', () => {
     it('resolves a MoltNumber to carrier info', async () => {
       const data = {
-        moltNumber: 'MOLT-1234-5678-9ABC',
-        nationCode: 'MOLT',
+        moltNumber: 'MPHO-1234-5678-9ABC',
+        nationCode: 'MPHO',
         carrier: { domain: 'moltphone.ai', callBaseUrl: 'https://call.moltphone.ai' },
       };
       mockFetch.mockResolvedValue(mockResponse(data));
 
-      const result = await remoteLookupNumber('MOLT-1234-5678-9ABC');
+      const result = await remoteLookupNumber('MPHO-1234-5678-9ABC');
 
       expect(result).toEqual(data);
       expect(mockFetch).toHaveBeenCalledWith(
-        'https://registry.test/api/registry/lookup/MOLT-1234-5678-9ABC',
+        'https://registry.test/api/registry/lookup/MPHO-1234-5678-9ABC',
         expect.any(Object),
       );
     });
@@ -178,13 +178,13 @@ describe('Registry HTTP Client', () => {
 
   describe('remoteBindNumber', () => {
     it('binds a number via POST', async () => {
-      const binding = { moltNumber: 'MOLT-AAAA-BBBB-CCCC' };
+      const binding = { moltNumber: 'MPHO-AAAA-BBBB-CCCC' };
       mockFetch.mockResolvedValue(mockResponse({ binding }));
 
       const result = await remoteBindNumber({
-        moltNumber: 'MOLT-AAAA-BBBB-CCCC',
+        moltNumber: 'MPHO-AAAA-BBBB-CCCC',
         carrierDomain: 'test.com',
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
       });
 
       expect(result).toEqual(binding);
@@ -197,7 +197,7 @@ describe('Registry HTTP Client', () => {
   describe('remoteUnbindNumber', () => {
     it('unbinds via DELETE', async () => {
       mockFetch.mockResolvedValue(mockResponse({ ok: true }));
-      const result = await remoteUnbindNumber('MOLT-AAAA-BBBB-CCCC');
+      const result = await remoteUnbindNumber('MPHO-AAAA-BBBB-CCCC');
       expect(result).toEqual({ count: 1 });
       const [, opts] = mockFetch.mock.calls[0];
       expect(opts.method).toBe('DELETE');
@@ -206,11 +206,11 @@ describe('Registry HTTP Client', () => {
 
   describe('remoteBindNation', () => {
     it('binds a nation via POST to /nations', async () => {
-      const binding = { nationCode: 'MOLT' };
+      const binding = { nationCode: 'MPHO' };
       mockFetch.mockResolvedValue(mockResponse({ binding }));
 
       const result = await remoteBindNation({
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
         carrierDomain: 'test.com',
       });
 
@@ -222,10 +222,10 @@ describe('Registry HTTP Client', () => {
 
   describe('remoteGetNationCarriers', () => {
     it('fetches nation carriers', async () => {
-      const bindings = [{ nationCode: 'MOLT', carrier: { domain: 'a.com' } }];
+      const bindings = [{ nationCode: 'MPHO', carrier: { domain: 'a.com' } }];
       mockFetch.mockResolvedValue(mockResponse({ carriers: bindings }));
 
-      const result = await remoteGetNationCarriers('MOLT');
+      const result = await remoteGetNationCarriers('MPHO');
 
       // Should extract from carriers or nations key
       expect(result).toEqual(bindings);
@@ -281,10 +281,10 @@ describe('Registry dual-mode dispatch (REGISTRY_MODE=remote)', () => {
   });
 
   it('lookupNumber delegates to remote', async () => {
-    const data = { moltNumber: 'MOLT-1111-2222-3333', carrier: { domain: 'a.com' } };
+    const data = { moltNumber: 'MPHO-1111-2222-3333', carrier: { domain: 'a.com' } };
     mockFetch.mockResolvedValue(mockResponse(data));
 
-    const result = await lookupNumber('MOLT-1111-2222-3333');
+    const result = await lookupNumber('MPHO-1111-2222-3333');
 
     expect(result).toEqual(data);
     expect(mockPrisma.registryNumberBinding.findUnique).not.toHaveBeenCalled();
@@ -300,13 +300,13 @@ describe('Registry dual-mode dispatch (REGISTRY_MODE=remote)', () => {
   });
 
   it('bindNumber delegates to remote', async () => {
-    const binding = { moltNumber: 'MOLT-AAAA-BBBB-CCCC' };
+    const binding = { moltNumber: 'MPHO-AAAA-BBBB-CCCC' };
     mockFetch.mockResolvedValue(mockResponse({ binding }));
 
     const result = await bindNumber({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC',
       carrierDomain: 'test.com',
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
     });
 
     expect(result).toEqual(binding);
@@ -316,18 +316,18 @@ describe('Registry dual-mode dispatch (REGISTRY_MODE=remote)', () => {
   it('unbindNumber delegates to remote', async () => {
     mockFetch.mockResolvedValue(mockResponse({ ok: true }));
 
-    const result = await unbindNumber('MOLT-AAAA-BBBB-CCCC');
+    const result = await unbindNumber('MPHO-AAAA-BBBB-CCCC');
 
     expect(result).toEqual({ count: 1 });
     expect(mockPrisma.registryNumberBinding.deleteMany).not.toHaveBeenCalled();
   });
 
   it('bindNation delegates to remote', async () => {
-    const binding = { nationCode: 'MOLT' };
+    const binding = { nationCode: 'MPHO' };
     mockFetch.mockResolvedValue(mockResponse({ binding }));
 
     const result = await bindNation({
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
       carrierDomain: 'test.com',
     });
 
@@ -336,10 +336,10 @@ describe('Registry dual-mode dispatch (REGISTRY_MODE=remote)', () => {
   });
 
   it('getNationCarriers delegates to remote', async () => {
-    const bindings = [{ nationCode: 'MOLT' }];
+    const bindings = [{ nationCode: 'MPHO' }];
     mockFetch.mockResolvedValue(mockResponse({ carriers: bindings }));
 
-    const result = await getNationCarriers('MOLT');
+    const result = await getNationCarriers('MPHO');
 
     expect(result).toEqual(bindings);
     expect(mockPrisma.registryNationBinding.findMany).not.toHaveBeenCalled();
@@ -369,8 +369,8 @@ describe('Registry dual-mode dispatch (REGISTRY_MODE=local)', () => {
 
   it('lookupNumber uses Prisma directly', async () => {
     mockPrisma.registryNumberBinding.findUnique.mockResolvedValue({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC',
-      nationCode: 'MOLT',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC',
+      nationCode: 'MPHO',
       carrier: {
         domain: 'moltphone.ai',
         callBaseUrl: 'https://moltphone.ai/call',
@@ -379,7 +379,7 @@ describe('Registry dual-mode dispatch (REGISTRY_MODE=local)', () => {
       },
     });
 
-    const result = await lookupNumber('MOLT-AAAA-BBBB-CCCC');
+    const result = await lookupNumber('MPHO-AAAA-BBBB-CCCC');
 
     expect(result).toBeTruthy();
     expect(mockPrisma.registryNumberBinding.findUnique).toHaveBeenCalled();

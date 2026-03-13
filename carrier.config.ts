@@ -52,7 +52,7 @@ export const CALL_HOST =
 
 /** The carrier's primary nation code (created in seed). */
 export const DEFAULT_NATION_CODE =
-  process.env.DEFAULT_NATION_CODE || 'MOLT';
+  process.env.DEFAULT_NATION_CODE || 'MPHO';
 
 /** Display name for the default nation. */
 export const DEFAULT_NATION_NAME =

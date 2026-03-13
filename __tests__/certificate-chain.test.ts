@@ -1,7 +1,7 @@
 /**
  * Tests for Certificate Chain — two-level trust hierarchy.
  *
- * Root (moltprotocol.org) → Carrier (moltphone.ai) → Agent (MOLT-XXXX-...)
+ * Root (moltprotocol.org) → Carrier (moltphone.ai) → Agent (MPHO-XXXX-...)
  *
  * Tests cover:
  *   1. Carrier certificate (root signs carrier authorization)

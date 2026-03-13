@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 
 const IS_PROD = process.env.NODE_ENV === 'production';
-const DEFAULT_NATION = process.env.DEFAULT_NATION_CODE || 'MOLT';
+const DEFAULT_NATION = process.env.DEFAULT_NATION_CODE || 'MPHO';
 
 /** Generate an anonymous display name like "User-a3f8b2" */
 function generateAnonName(): string {

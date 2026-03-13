@@ -82,18 +82,18 @@ jest.mock('@/lib/api-key-auth', () => ({
 jest.mock('@/lib/carrier-identity', () => ({
   issueRegistrationCertificate: jest.fn().mockReturnValue({
     version: '1',
-    moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+    moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
     agentPublicKey: 'mock-public-key',
-    nationCode: 'MOLT',
+    nationCode: 'MPHO',
     carrierDomain: 'moltphone.ai',
     issuedAt: 1000000,
     signature: 'mock-sig',
   }),
   registrationCertToJSON: jest.fn().mockReturnValue({
     version: '1',
-    molt_number: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+    molt_number: 'MPHO-AAAA-BBBB-CCCC-DDDD',
     agent_public_key: 'mock-public-key',
-    nation_code: 'MOLT',
+    nation_code: 'MPHO',
     carrier_domain: 'moltphone.ai',
     issued_at: 1000000,
     signature: 'mock-sig',
@@ -179,11 +179,11 @@ describe('GET /api/agents', () => {
   it('filters by nation code', async () => {
     mockPrisma.agent.findMany.mockResolvedValue([]);
 
-    const req = buildRequest('GET', '/api/agents', { searchParams: { nation: 'MOLT' } });
+    const req = buildRequest('GET', '/api/agents', { searchParams: { nation: 'MPHO' } });
     await listAgents(req);
 
     const call = mockPrisma.agent.findMany.mock.calls[0][0];
-    expect(call.where.nationCode).toBe('MOLT');
+    expect(call.where.nationCode).toBe('MPHO');
   });
 
   it('combines search and nation filter', async () => {
@@ -218,13 +218,13 @@ describe('POST /api/agents', () => {
     mockPrisma.agent.create.mockImplementation(async ({ data }: any) => ({
       ...data,
       id: 'new-agent-id',
-      nation: { code: 'MOLT', displayName: 'MoltPhone', badge: '⚡' },
+      nation: { code: 'MPHO', displayName: 'MoltPhone', badge: '⚡' },
       owner: { id: TEST_USER.id, name: 'Test User' },
     }));
 
     const req = buildRequest('POST', '/api/agents', {
       body: {
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
         displayName: 'My Agent',
         description: 'A test agent',
       },
@@ -240,7 +240,7 @@ describe('POST /api/agents', () => {
 
     // Verify the created agent has a valid self-certifying MoltNumber
     const createCall = mockPrisma.agent.create.mock.calls[0][0];
-    expect(createCall.data.moltNumber).toMatch(/^MOLT-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+    expect(createCall.data.moltNumber).toMatch(/^MPHO-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
     expect(createCall.data.publicKey).toBeDefined();
   });
 
@@ -248,7 +248,7 @@ describe('POST /api/agents', () => {
     mockGetServerSession.mockResolvedValue(null);
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     expect(res.status).toBe(401);
@@ -268,7 +268,7 @@ describe('POST /api/agents', () => {
     mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, isPublic: false, ownerId: 'other-user' });
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     expect(res.status).toBe(403);
@@ -278,7 +278,7 @@ describe('POST /api/agents', () => {
     mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'carrier', isPublic: true, ownerId: 'other-user' });
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     const body = await res.json();
@@ -290,7 +290,7 @@ describe('POST /api/agents', () => {
     mockPrisma.nation.findUnique.mockResolvedValue({ ...TEST_NATION, type: 'org', isPublic: true, ownerId: 'other-user', memberUserIds: [] });
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     const body = await res.json();
@@ -309,7 +309,7 @@ describe('POST /api/agents', () => {
     });
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     const body = await res.json();
@@ -329,7 +329,7 @@ describe('POST /api/agents', () => {
     });
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     const body = await res.json();
@@ -344,7 +344,7 @@ describe('POST /api/agents', () => {
     mockPrisma.agent.create.mockResolvedValue(buildMockAgent());
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     expect(res.status).toBe(201);
@@ -362,7 +362,7 @@ describe('POST /api/agents', () => {
     mockPrisma.agent.create.mockResolvedValue(buildMockAgent());
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     expect(res.status).toBe(201);
@@ -382,7 +382,7 @@ describe('POST /api/agents', () => {
     mockPrisma.agent.create.mockResolvedValue(buildMockAgent());
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     expect(res.status).toBe(201);
@@ -393,7 +393,7 @@ describe('POST /api/agents', () => {
     mockPrisma.agent.findUnique.mockResolvedValue({ id: 'existing' }); // collision!
 
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT', displayName: 'Agent' },
+      body: { nationCode: 'MPHO', displayName: 'Agent' },
     });
     const res = await createAgent(req);
     expect(res.status).toBe(409);
@@ -401,7 +401,7 @@ describe('POST /api/agents', () => {
 
   it('validates request body with Zod', async () => {
     const req = buildRequest('POST', '/api/agents', {
-      body: { nationCode: 'MOLT' }, // missing displayName
+      body: { nationCode: 'MPHO' }, // missing displayName
     });
     const res = await createAgent(req);
     expect(res.status).toBe(400);
@@ -414,7 +414,7 @@ describe('POST /api/agents', () => {
 
     const req = buildRequest('POST', '/api/agents', {
       body: {
-        nationCode: 'MOLT',
+        nationCode: 'MPHO',
         displayName: 'Agent',
         endpointUrl: 'http://127.0.0.1:8080',
       },

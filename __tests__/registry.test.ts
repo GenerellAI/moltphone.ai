@@ -93,14 +93,14 @@ describe('Registry Service — bindNumber', () => {
 
   it('binds a number to a carrier', async () => {
     const carrier = { id: 'c1', domain: 'moltphone.ai', status: 'active' };
-    const binding = { id: 'b1', moltNumber: 'MOLT-1234-5678-9ABC', carrierId: 'c1', nationCode: 'MOLT', carrier };
+    const binding = { id: 'b1', moltNumber: 'MPHO-1234-5678-9ABC', carrierId: 'c1', nationCode: 'MPHO', carrier };
     mockPrisma.registryCarrier.findUnique.mockResolvedValue(carrier);
     mockPrisma.registryNumberBinding.upsert.mockResolvedValue(binding);
 
     const result = await bindNumber({
-      moltNumber: 'MOLT-1234-5678-9ABC',
+      moltNumber: 'MPHO-1234-5678-9ABC',
       carrierDomain: 'moltphone.ai',
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
     });
 
     expect(result).toEqual(binding);
@@ -110,9 +110,9 @@ describe('Registry Service — bindNumber', () => {
     mockPrisma.registryCarrier.findUnique.mockResolvedValue(null);
 
     await expect(bindNumber({
-      moltNumber: 'MOLT-1234-5678-9ABC',
+      moltNumber: 'MPHO-1234-5678-9ABC',
       carrierDomain: 'unknown.example.com',
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
     })).rejects.toThrow('Carrier not found or inactive: unknown.example.com');
   });
 });
@@ -123,10 +123,10 @@ describe('Registry Service — unbindNumber', () => {
   it('deletes the binding', async () => {
     mockPrisma.registryNumberBinding.deleteMany.mockResolvedValue({ count: 1 });
 
-    await unbindNumber('MOLT-1234-5678-9ABC');
+    await unbindNumber('MPHO-1234-5678-9ABC');
 
     expect(mockPrisma.registryNumberBinding.deleteMany).toHaveBeenCalledWith({
-      where: { moltNumber: 'MOLT-1234-5678-9ABC' },
+      where: { moltNumber: 'MPHO-1234-5678-9ABC' },
     });
   });
 });
@@ -136,8 +136,8 @@ describe('Registry Service — lookupNumber', () => {
 
   it('returns carrier info for a bound number', async () => {
     mockPrisma.registryNumberBinding.findUnique.mockResolvedValue({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC',
-      nationCode: 'MOLT',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC',
+      nationCode: 'MPHO',
       carrier: {
         domain: 'moltphone.ai',
         callBaseUrl: 'https://moltphone.ai/call',
@@ -146,11 +146,11 @@ describe('Registry Service — lookupNumber', () => {
       },
     });
 
-    const result = await lookupNumber('MOLT-AAAA-BBBB-CCCC');
+    const result = await lookupNumber('MPHO-AAAA-BBBB-CCCC');
 
     expect(result).toEqual({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC',
-      nationCode: 'MOLT',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC',
+      nationCode: 'MPHO',
       carrier: {
         domain: 'moltphone.ai',
         callBaseUrl: 'https://moltphone.ai/call',
@@ -162,14 +162,14 @@ describe('Registry Service — lookupNumber', () => {
   it('returns null for unbound number', async () => {
     mockPrisma.registryNumberBinding.findUnique.mockResolvedValue(null);
 
-    const result = await lookupNumber('MOLT-XXXX-XXXX-XXXX');
+    const result = await lookupNumber('MPHO-XXXX-XXXX-XXXX');
     expect(result).toBeNull();
   });
 
   it('returns null for suspended carrier', async () => {
     mockPrisma.registryNumberBinding.findUnique.mockResolvedValue({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC',
-      nationCode: 'MOLT',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC',
+      nationCode: 'MPHO',
       carrier: {
         domain: 'bad-carrier.example.com',
         callBaseUrl: 'https://bad-carrier.example.com/call',
@@ -178,7 +178,7 @@ describe('Registry Service — lookupNumber', () => {
       },
     });
 
-    const result = await lookupNumber('MOLT-AAAA-BBBB-CCCC');
+    const result = await lookupNumber('MPHO-AAAA-BBBB-CCCC');
     expect(result).toBeNull();
   });
 });
@@ -188,12 +188,12 @@ describe('Registry Service — bindNation', () => {
 
   it('binds a nation to a carrier', async () => {
     const carrier = { id: 'c1', domain: 'moltphone.ai', status: 'active' };
-    const binding = { id: 'nb1', nationCode: 'MOLT', carrierId: 'c1', isPrimary: true, carrier };
+    const binding = { id: 'nb1', nationCode: 'MPHO', carrierId: 'c1', isPrimary: true, carrier };
     mockPrisma.registryCarrier.findUnique.mockResolvedValue(carrier);
     mockPrisma.registryNationBinding.upsert.mockResolvedValue(binding);
 
     const result = await bindNation({
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
       carrierDomain: 'moltphone.ai',
       isPrimary: true,
     });
@@ -210,11 +210,11 @@ describe('Registry Service — selfRegister', () => {
     mockPrisma.registryCarrier.upsert.mockResolvedValue(carrier);
     mockPrisma.registryCarrier.findUnique.mockResolvedValue(carrier);
     mockPrisma.nation.findMany.mockResolvedValue([
-      { code: 'MOLT', type: 'open' },
+      { code: 'MPHO', type: 'open' },
       { code: 'SOLR', type: 'carrier' },
     ]);
     mockPrisma.agent.findMany.mockResolvedValue([
-      { moltNumber: 'MOLT-1111-2222-3333', nationCode: 'MOLT' },
+      { moltNumber: 'MPHO-1111-2222-3333', nationCode: 'MPHO' },
       { moltNumber: 'SOLR-AAAA-BBBB-CCCC', nationCode: 'SOLR' },
     ]);
     mockPrisma.registryNationBinding.upsert.mockResolvedValue({});
@@ -299,16 +299,16 @@ describe('GET /api/registry/lookup/:moltNumber', () => {
     mockPrisma.registryNumberBinding.findUnique.mockResolvedValue(null);
 
     const { GET } = await import('../app/api/registry/lookup/[moltNumber]/route');
-    const req = buildRequest('GET', '/api/registry/lookup/MOLT-XXXX-XXXX-XXXX');
-    const res = await GET(req, { params: Promise.resolve({ moltNumber: 'MOLT-XXXX-XXXX-XXXX' }) });
+    const req = buildRequest('GET', '/api/registry/lookup/MPHO-XXXX-XXXX-XXXX');
+    const res = await GET(req, { params: Promise.resolve({ moltNumber: 'MPHO-XXXX-XXXX-XXXX' }) });
 
     expect(res.status).toBe(404);
   });
 
   it('returns carrier info for bound number', async () => {
     mockPrisma.registryNumberBinding.findUnique.mockResolvedValue({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC',
-      nationCode: 'MOLT',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC',
+      nationCode: 'MPHO',
       carrier: {
         domain: 'moltphone.ai',
         callBaseUrl: 'https://moltphone.ai/call',
@@ -318,8 +318,8 @@ describe('GET /api/registry/lookup/:moltNumber', () => {
     });
 
     const { GET } = await import('../app/api/registry/lookup/[moltNumber]/route');
-    const req = buildRequest('GET', '/api/registry/lookup/MOLT-AAAA-BBBB-CCCC');
-    const res = await GET(req, { params: Promise.resolve({ moltNumber: 'MOLT-AAAA-BBBB-CCCC' }) });
+    const req = buildRequest('GET', '/api/registry/lookup/MPHO-AAAA-BBBB-CCCC');
+    const res = await GET(req, { params: Promise.resolve({ moltNumber: 'MPHO-AAAA-BBBB-CCCC' }) });
     const json = await res.json();
 
     expect(res.status).toBe(200);
@@ -335,7 +335,7 @@ describe('POST /api/registry/bind', () => {
 
     const { POST } = await import('../app/api/registry/bind/route');
     const req = buildRequest('POST', '/api/registry/bind', {
-      body: { moltNumber: 'MOLT-1234-5678-9ABC', carrierDomain: 'moltphone.ai', nationCode: 'MOLT' },
+      body: { moltNumber: 'MPHO-1234-5678-9ABC', carrierDomain: 'moltphone.ai', nationCode: 'MPHO' },
     });
     const res = await POST(req);
 
@@ -362,8 +362,8 @@ describe('POST /api/registry/self-register', () => {
     const carrier = { id: 'c1', domain: 'moltphone.ai', status: 'active' };
     mockPrisma.registryCarrier.upsert.mockResolvedValue(carrier);
     mockPrisma.registryCarrier.findUnique.mockResolvedValue(carrier);
-    mockPrisma.nation.findMany.mockResolvedValue([{ code: 'MOLT', type: 'open' }]);
-    mockPrisma.agent.findMany.mockResolvedValue([{ moltNumber: 'MOLT-1111-2222-3333', nationCode: 'MOLT' }]);
+    mockPrisma.nation.findMany.mockResolvedValue([{ code: 'MPHO', type: 'open' }]);
+    mockPrisma.agent.findMany.mockResolvedValue([{ moltNumber: 'MPHO-1111-2222-3333', nationCode: 'MPHO' }]);
     mockPrisma.registryNationBinding.upsert.mockResolvedValue({});
     mockPrisma.registryNumberBinding.upsert.mockResolvedValue({});
 

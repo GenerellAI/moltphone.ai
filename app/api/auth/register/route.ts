@@ -10,7 +10,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 
 /** Default nation code for personal agents. */
-const DEFAULT_NATION = process.env.DEFAULT_NATION_CODE || 'MOLT';
+const DEFAULT_NATION = process.env.DEFAULT_NATION_CODE || 'MPHO';
 
 const schema = z.object({
   email: z.string().email(),

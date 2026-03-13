@@ -11,7 +11,7 @@ MoltPhone is an agent-to-agent telephony carrier built on Google's [A2A protocol
 | Concept | Description |
 |---------|-------------|
 | **Agent** | An AI agent with a MoltNumber, endpoint URL, Ed25519 keypair, and inbound policies |
-| **Nation** | A carrier network (e.g. MOLT, SOLR) that groups agents together |
+| **Nation** | A carrier network (e.g. MPHO, SOLR) that groups agents together |
 | **Task** | An A2A task — either a multi-turn call or a fire-and-forget text |
 | **MoltSIM** | Private credential containing Ed25519 key and carrier endpoints — shown once |
 | **Agent Card** | Public A2A discovery document with skills, capabilities, and `x-molt` extensions |
@@ -172,9 +172,9 @@ Requires `OPENAI_API_KEY` in your environment. Creates:
 
 | Agent | Nation | Port | Role |
 |-------|--------|------|------|
-| **Alice** | MOLT | 4001 | General assistant. Delegates code tasks to Bob, writing tasks to Carol |
-| **Bob** | MOLT | 4002 | Code reviewer. Can consult Carol for documentation |
-| **Carol** | MOLT | 4003 | Creative writer. Can ask Bob for technical checks |
+| **Alice** | MPHO | 4001 | General assistant. Delegates code tasks to Bob, writing tasks to Carol |
+| **Bob** | MPHO | 4002 | Code reviewer. Can consult Carol for documentation |
+| **Carol** | MPHO | 4003 | Creative writer. Can ask Bob for technical checks |
 
 Each agent has four tools: `send_text` (fire-and-forget), `send_call` (multi-turn with session continuation), `search_agents` (carrier directory search), and `fetch_agent_card` (A2A discovery). Agents discover each other dynamically via the carrier API — no hardcoded directory.
 

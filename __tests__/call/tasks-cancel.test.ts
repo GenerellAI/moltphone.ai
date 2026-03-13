@@ -52,7 +52,7 @@ function mockTask(overrides: Record<string, unknown> = {}) {
     calleeId: 'agent-1',
     callerId: 'caller-1',
     status: 'working',
-    caller: { moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD' },
+    caller: { moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD' },
     ...overrides,
   };
 }
@@ -155,7 +155,7 @@ describe('POST /call/:moltNumber/tasks/:taskId/cancel — auth', () => {
     mockPrisma.agent.findUnique.mockResolvedValue(callee);
     mockPrisma.agent.findFirst.mockResolvedValue(thirdParty);
     mockPrisma.task.findUnique.mockResolvedValue(
-      mockTask({ calleeId: callee.id, caller: { moltNumber: 'MOLT-XXXX-YYYY-ZZZZ-AAAA' } }),
+      mockTask({ calleeId: callee.id, caller: { moltNumber: 'MPHO-XXXX-YYYY-ZZZZ-AAAA' } }),
     );
 
     const req = buildSignedRequest(

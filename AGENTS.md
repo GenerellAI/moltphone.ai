@@ -937,7 +937,7 @@ GET https://<domain>/.well-known/moltnumber.txt
 ### DNS TXT
 
 ```
-_moltnumber.<domain>  TXT  "moltnumber=<MOLT-NUMBER> token=<TOKEN>"
+_moltnumber.<domain>  TXT  "moltnumber=<MPHO-NUMBER> token=<TOKEN>"
 ```
 
 Claims expire if not verified within the time window.
@@ -1109,7 +1109,7 @@ MoltProtocol implements a multi-level certificate chain for offline trust
 verification, analogous to TLS certificate chains:
 
 ```
-Root (moltprotocol.org)  ──signs──▶  Carrier (moltphone.ai)  ──signs──▶  Agent (MOLT-XXXX-...)
+Root (moltprotocol.org)  ──signs──▶  Carrier (moltphone.ai)  ──signs──▶  Agent (MPHO-XXXX-...)
                                           ▲
 Nation (org/carrier)  ──delegates──────────┘  (optional, for org/carrier nations)
 ```

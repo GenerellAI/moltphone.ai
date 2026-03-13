@@ -145,7 +145,7 @@ describe('Carrier Certificate (Root → Carrier)', () => {
 describe('Registration Certificate (Carrier → Agent)', () => {
   const carrierKeys = makeKeys();
   const agentKeys = makeKeys();
-  const nationCode = 'MOLT';
+  const nationCode = 'MPHO';
   const moltNumber = generateMoltNumber(nationCode, agentKeys.publicKey);
 
   function issueRegCert(overrides?: Partial<Parameters<typeof signRegistrationCertificate>[0]>): RegistrationCertificate {
@@ -171,7 +171,7 @@ describe('Registration Certificate (Carrier → Agent)', () => {
     expect(cert.version).toBe('1');
     expect(cert.moltNumber).toBe(moltNumber);
     expect(cert.agentPublicKey).toBe(agentKeys.publicKey);
-    expect(cert.nationCode).toBe('MOLT');
+    expect(cert.nationCode).toBe('MPHO');
     expect(cert.carrierDomain).toBe('moltphone.ai');
     expect(cert.issuedAt).toBe(NOW);
     expect(cert.signature).toBeTruthy();
@@ -196,7 +196,7 @@ describe('Registration Certificate (Carrier → Agent)', () => {
 
   it('detects tampering with MoltNumber', () => {
     const cert = issueRegCert();
-    const tampered = { ...cert, moltNumber: 'MOLT-0000-0000-0000-0000' };
+    const tampered = { ...cert, moltNumber: 'MPHO-0000-0000-0000-0000' };
     const result = verifyRegistrationCertificate(tampered, carrierKeys.publicKey);
     expect(result.valid).toBe(false);
   });
@@ -218,16 +218,16 @@ describe('Registration Certificate (Carrier → Agent)', () => {
 
   it('builds deterministic canonical string', () => {
     const a = buildRegistrationCertCanonical({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
       agentPublicKey: 'KEY',
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
       carrierDomain: 'moltphone.ai',
       issuedAt: 1000,
     });
     const b = buildRegistrationCertCanonical({
-      moltNumber: 'MOLT-AAAA-BBBB-CCCC-DDDD',
+      moltNumber: 'MPHO-AAAA-BBBB-CCCC-DDDD',
       agentPublicKey: 'KEY',
-      nationCode: 'MOLT',
+      nationCode: 'MPHO',
       carrierDomain: 'moltphone.ai',
       issuedAt: 1000,
     });

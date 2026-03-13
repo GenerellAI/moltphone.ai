@@ -13,10 +13,10 @@ describe('Self-Certifying MoltNumber (carrier shim)', () => {
   it('generates valid MoltNumbers without + prefix', () => {
     for (let i = 0; i < 10; i++) {
       const kp = generateKeyPair();
-      const num = generateMoltNumber('MOLT', kp.publicKey);
+      const num = generateMoltNumber('MPHO', kp.publicKey);
       expect(validateMoltNumber(num)).toBe(true);
       // Self-certifying format: NATION-AAAA-BBBB-CCCC-DDDD (no check digit)
-      expect(num).toMatch(/^MOLT-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
+      expect(num).toMatch(/^MPHO-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/);
     }
   });
 
@@ -24,15 +24,15 @@ describe('Self-Certifying MoltNumber (carrier shim)', () => {
     const nums = new Set<string>();
     for (let i = 0; i < 100; i++) {
       const kp = generateKeyPair();
-      nums.add(generateMoltNumber('MOLT', kp.publicKey));
+      nums.add(generateMoltNumber('MPHO', kp.publicKey));
     }
     expect(nums.size).toBe(100);
   });
 
   it('same key always produces same number', () => {
     const kp = generateKeyPair();
-    const num1 = generateMoltNumber('MOLT', kp.publicKey);
-    const num2 = generateMoltNumber('MOLT', kp.publicKey);
+    const num1 = generateMoltNumber('MPHO', kp.publicKey);
+    const num2 = generateMoltNumber('MPHO', kp.publicKey);
     expect(num1).toBe(num2);
   });
 
@@ -44,23 +44,23 @@ describe('Self-Certifying MoltNumber (carrier shim)', () => {
 
   it('rejects invalid format', () => {
     // Old format with check digit (too short)
-    expect(validateMoltNumber('MOLT-1234-5678-9012-3')).toBe(false);
+    expect(validateMoltNumber('MPHO-1234-5678-9012-3')).toBe(false);
     // + prefix is not valid
-    expect(validateMoltNumber('+MOLT-1234-5678-9012-3456')).toBe(false);
+    expect(validateMoltNumber('+MPHO-1234-5678-9012-3456')).toBe(false);
     // Nation code must be exactly 4 uppercase letters
     expect(validateMoltNumber('MOL-1234-5678-9012-3456')).toBe(false);
   });
 
   it('self-certifying: verifyMoltNumber confirms matching key', () => {
     const kp = generateKeyPair();
-    const num = generateMoltNumber('MOLT', kp.publicKey);
+    const num = generateMoltNumber('MPHO', kp.publicKey);
     expect(verifyMoltNumber(num, kp.publicKey)).toBe(true);
   });
 
   it('self-certifying: verifyMoltNumber rejects wrong key', () => {
     const kp1 = generateKeyPair();
     const kp2 = generateKeyPair();
-    const num = generateMoltNumber('MOLT', kp1.publicKey);
+    const num = generateMoltNumber('MPHO', kp1.publicKey);
     expect(verifyMoltNumber(num, kp2.publicKey)).toBe(false);
   });
 
@@ -81,8 +81,8 @@ describe('Self-Certifying MoltNumber (carrier shim)', () => {
   it('excludes ambiguous characters (I, L, O)', () => {
     for (let i = 0; i < 50; i++) {
       const kp = generateKeyPair();
-      const num = generateMoltNumber('MOLT', kp.publicKey);
-      const subscriber = num.replace(/^MOLT-/, '').replace(/-/g, '');
+      const num = generateMoltNumber('MPHO', kp.publicKey);
+      const subscriber = num.replace(/^MPHO-/, '').replace(/-/g, '');
       expect(subscriber).not.toMatch(/[ILO]/);
     }
   });

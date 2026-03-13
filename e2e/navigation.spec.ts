@@ -102,7 +102,7 @@ test.describe('Sidebar navigation', () => {
 
     // The sidebar shows the user's personal agent MoltNumber (seeded)
     // Scope to the sidebar (complementary) to avoid matching main content
-    await expect(page.getByRole('complementary').locator('text=/MOLT-/')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('complementary').locator('text=/MPHO-/')).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -110,8 +110,8 @@ test.describe('Nations page', () => {
   test('lists seeded nations', async ({ page }) => {
     await page.goto('/nations');
 
-    // Seeded nations: MOLT (public), CLAW (private, may not show)
+    // Seeded nations: MPHO (carrier), MOLT (open), CLAW (may not show)
     // Use specific nation code text which is unique
-    await expect(page.getByText('MOLT').first()).toBeVisible();
+    await expect(page.getByText('MPHO').first()).toBeVisible();
   });
 });

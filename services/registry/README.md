@@ -111,10 +111,10 @@ binds nations and numbers in a single request:
   "callBaseUrl": "https://call.moltphone.ai",
   "name": "MoltPhone",
   "nations": [
-    { "nationCode": "MOLT", "isPrimary": true }
+    { "nationCode": "MPHO", "isPrimary": true }
   ],
   "numbers": [
-    { "moltNumber": "MOLT-12AB-C3D4-EF56", "nationCode": "MOLT" }
+    { "moltNumber": "MPHO-12AB-C3D4-EF56", "nationCode": "MPHO" }
   ]
 }
 ```

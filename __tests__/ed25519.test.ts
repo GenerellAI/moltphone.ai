@@ -26,14 +26,14 @@ describe('MoltProtocol Ed25519', () => {
   it('buildCanonicalString joins fields with newlines', () => {
     const s = buildCanonicalString({
       method: 'POST',
-      path: '/call/MOLT-0001/tasks/send',
+      path: '/call/MPHO-0001/tasks/send',
       callerAgentId: 'CLAW-0001',
-      targetAgentId: 'MOLT-0001',
+      targetAgentId: 'MPHO-0001',
       timestamp: '1700000000',
       nonce: 'abc123',
       bodyHash: 'deadbeef',
     });
-    expect(s).toBe('POST\n/call/MOLT-0001/tasks/send\nCLAW-0001\nMOLT-0001\n1700000000\nabc123\ndeadbeef');
+    expect(s).toBe('POST\n/call/MPHO-0001/tasks/send\nCLAW-0001\nMPHO-0001\n1700000000\nabc123\ndeadbeef');
   });
 
   it('uppercases the method in canonical string', () => {
@@ -60,18 +60,18 @@ describe('MoltProtocol Ed25519', () => {
 
     const headers = signRequest({
       method: 'POST',
-      path: '/call/MOLT-0001/tasks/send',
+      path: '/call/MPHO-0001/tasks/send',
       callerAgentId: 'CLAW-0001',
-      targetAgentId: 'MOLT-0001',
+      targetAgentId: 'MPHO-0001',
       body,
       privateKey: kp.privateKey,
     });
 
     const result = verifySignature({
       method: 'POST',
-      path: '/call/MOLT-0001/tasks/send',
+      path: '/call/MPHO-0001/tasks/send',
       callerAgentId: 'CLAW-0001',
-      targetAgentId: 'MOLT-0001',
+      targetAgentId: 'MPHO-0001',
       body,
       publicKey: kp.publicKey,
       timestamp: headers['x-molt-timestamp'],

@@ -126,7 +126,7 @@ const MOLTNUMBER_RE = /^[A-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}-[0-
 
 function validateMoltNumber(number) {
   if (typeof number !== 'string') return { valid: false, reason: 'Not a string' };
-  if (!MOLTNUMBER_RE.test(number)) return { valid: false, reason: 'Does not match MOLT-XXXX-XXXX-XXXX-XXXX format' };
+  if (!MOLTNUMBER_RE.test(number)) return { valid: false, reason: 'Does not match XXXX-XXXX-XXXX-XXXX-XXXX format' };
   return { valid: true };
 }
 
@@ -295,7 +295,7 @@ async function fetchAgentCard(callerNumber, callBase) {
   try {
     const baseUrl = new URL(base);
     // Replace the agent's own number in the path with the caller's number
-    // carrier_call_base looks like: http://host:3000/call/MOLT-XXXX-...
+    // carrier_call_base looks like: http://host:3000/call/MPHO-XXXX-...
     // We need: http://host:3000/call/<callerNumber>/agent.json
     const pathParts = baseUrl.pathname.split('/').filter(Boolean);
     // Find the path prefix (everything before the phone number segment)
