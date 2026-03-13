@@ -4,6 +4,11 @@
  * Requires an authenticated session (user must be logged in).
  * The claim token was given to the agent at self-signup;
  * the agent sends it to its human owner via the claim URL.
+ *
+ * For org nations: if the claiming user is an owner, admin, or member
+ * of the nation, the agent is auto-approved (callEnabled=true) and
+ * a registration certificate + registry binding are issued immediately.
+ * Otherwise, the agent stays callEnabled=false until a nation admin approves.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
@@ -11,6 +16,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { canCreateAgent, deductAgentCreationCredits, AGENT_CREATION_COST } from '@/lib/services/credits';
 import { sendClaimNotificationEmail } from '@/lib/email';
+import { isNationAdmin } from '@/lib/nation-admin';
+import { issueRegistrationCertificate } from '@/lib/carrier-identity';
+import { bindNumber, getCarrierDomain } from '@/lib/services/registry';
 import { z } from 'zod';
 
 const claimSchema = z.object({
@@ -86,12 +94,19 @@ export async function POST(req: NextRequest) {
       // Check if this is an org nation (needs admin approval before full activation)
       const agentNation = await tx.nation.findUnique({
         where: { code: agent.nationCode },
-        select: { type: true },
+        select: { type: true, ownerId: true, adminUserIds: true, memberUserIds: true },
       });
       const isOrgNation = agentNation?.type === 'org';
 
+      // For org nations, auto-approve if the claiming user is an owner, admin, or member
+      const isOrgMember = isOrgNation && agentNation && (
+        isNationAdmin(agentNation as { ownerId: string; adminUserIds?: string[] }, session.user!.id) ||
+        (agentNation.memberUserIds as string[] || []).includes(session.user!.id)
+      );
+
       // Claim the agent: assign owner, clear claim token.
-      // For org nations: keep callEnabled=false (admin must approve).
+      // For org nations where user is NOT a member: keep callEnabled=false (admin must approve).
+      // For org nations where user IS a member: auto-approve, enable immediately.
       // For open nations: enable calling immediately.
       await tx.agent.update({
         where: { id: agent.id },
@@ -100,7 +115,7 @@ export async function POST(req: NextRequest) {
           claimedAt: new Date(),
           claimToken: { set: null },
           claimExpiresAt: { set: null },
-          callEnabled: isOrgNation ? false : true,
+          callEnabled: (isOrgNation && !isOrgMember) ? false : true,
         },
       });
     });
@@ -108,9 +123,31 @@ export async function POST(req: NextRequest) {
     // Check if org nation for response message
     const agentNation = await prisma.nation.findUnique({
       where: { code: agent.nationCode },
-      select: { type: true, displayName: true },
+      select: { type: true, displayName: true, ownerId: true, adminUserIds: true, memberUserIds: true },
     });
     const isOrgNation = agentNation?.type === 'org';
+    const isOrgMember = isOrgNation && agentNation && (
+      isNationAdmin(agentNation as { ownerId: string; adminUserIds?: string[] }, session.user!.id) ||
+      (agentNation.memberUserIds as string[] || []).includes(session.user!.id)
+    );
+    const needsOrgApproval = isOrgNation && !isOrgMember;
+
+    // For org members: issue cert + registry binding (auto-approved)
+    if (isOrgNation && isOrgMember) {
+      bindNumber({
+        moltNumber: agent.moltNumber,
+        carrierDomain: getCarrierDomain(),
+        nationCode: agent.nationCode,
+      }).catch(() => {/* non-critical */});
+
+      if (agent.publicKey) {
+        issueRegistrationCertificate({
+          moltNumber: agent.moltNumber,
+          agentPublicKey: agent.publicKey,
+          nationCode: agent.nationCode,
+        });
+      }
+    }
 
     // Send claim notification email (fire-and-forget, don't block response)
     if (user.email) {
@@ -131,10 +168,10 @@ export async function POST(req: NextRequest) {
         displayName: agent.displayName,
         nationCode: agent.nationCode,
       },
-      message: isOrgNation
+      message: needsOrgApproval
         ? `Successfully claimed ${agent.displayName} (${agent.moltNumber}). The agent still needs approval from the ${agentNation!.displayName} nation owner before it can operate.`
         : `Successfully claimed ${agent.displayName} (${agent.moltNumber}). The agent can now call out.`,
-      ...(isOrgNation ? { pendingOrgApproval: true } : {}),
+      ...(needsOrgApproval ? { pendingOrgApproval: true } : {}),
     });
   } catch (e) {
     if (e instanceof InsufficientCreditsError) {

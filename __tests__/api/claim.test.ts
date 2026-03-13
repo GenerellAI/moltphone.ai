@@ -278,8 +278,14 @@ describe('POST /api/agents/claim', () => {
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps callEnabled=false for org nation agents (pending org approval)', async () => {
-    mockPrisma.nation.findUnique.mockResolvedValue({ type: 'org', displayName: 'Acme Corp' });
+  it('keeps callEnabled=false for org nation agents when user is not a member (pending org approval)', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      type: 'org',
+      displayName: 'Acme Corp',
+      ownerId: 'other-user-id',
+      adminUserIds: [],
+      memberUserIds: [],
+    });
 
     const req = buildRequest('POST', '/api/agents/claim', {
       body: { claimToken: 'valid-claim-token-123' },
@@ -291,10 +297,78 @@ describe('POST /api/agents/claim', () => {
     expect(body.pendingOrgApproval).toBe(true);
     expect(body.message).toContain('approval');
 
-    // callEnabled should be false for org nations
+    // callEnabled should be false for org nations when user is not a member
     const updateCall = mockPrisma.agent.update.mock.calls[0][0];
     expect(updateCall.data.callEnabled).toBe(false);
     expect(updateCall.data.ownerId).toBe(TEST_USER.id);
+  });
+
+  it('auto-approves org nation agents when user is nation owner', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      type: 'org',
+      displayName: 'My Org',
+      ownerId: TEST_USER.id,
+      adminUserIds: [],
+      memberUserIds: [],
+    });
+
+    const req = buildRequest('POST', '/api/agents/claim', {
+      body: { claimToken: 'valid-claim-token-123' },
+    });
+    const res = await claimAgent(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingOrgApproval).toBeUndefined();
+    expect(body.message).toContain('can now call out');
+
+    const updateCall = mockPrisma.agent.update.mock.calls[0][0];
+    expect(updateCall.data.callEnabled).toBe(true);
+  });
+
+  it('auto-approves org nation agents when user is a member', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      type: 'org',
+      displayName: 'Member Org',
+      ownerId: 'other-owner',
+      adminUserIds: [],
+      memberUserIds: [TEST_USER.id],
+    });
+
+    const req = buildRequest('POST', '/api/agents/claim', {
+      body: { claimToken: 'valid-claim-token-123' },
+    });
+    const res = await claimAgent(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingOrgApproval).toBeUndefined();
+    expect(body.message).toContain('can now call out');
+
+    const updateCall = mockPrisma.agent.update.mock.calls[0][0];
+    expect(updateCall.data.callEnabled).toBe(true);
+  });
+
+  it('auto-approves org nation agents when user is an admin', async () => {
+    mockPrisma.nation.findUnique.mockResolvedValue({
+      type: 'org',
+      displayName: 'Admin Org',
+      ownerId: 'other-owner',
+      adminUserIds: [TEST_USER.id],
+      memberUserIds: [],
+    });
+
+    const req = buildRequest('POST', '/api/agents/claim', {
+      body: { claimToken: 'valid-claim-token-123' },
+    });
+    const res = await claimAgent(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.pendingOrgApproval).toBeUndefined();
+
+    const updateCall = mockPrisma.agent.update.mock.calls[0][0];
+    expect(updateCall.data.callEnabled).toBe(true);
   });
 });
 

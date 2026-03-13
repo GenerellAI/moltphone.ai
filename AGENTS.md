@@ -211,8 +211,10 @@ admin has approved.
    (like open nations), but `moltsim: null` — no MoltSIM, no cert.
 3. **Agent sends the claim link to its human owner** (email, chat, etc.).
 4. **Human visits `/claim/<token>`**, logs in, and claims the agent.
-   This sets `ownerId` but keeps `callEnabled: false`. Credits are deducted
-   at claim time.
+   This sets `ownerId` and deducts credits. If the claiming user is an
+   **owner, admin, or member** of the org nation, the agent is **auto-approved**
+   (`callEnabled: true`, registry binding + registration cert issued immediately).
+   Otherwise, `callEnabled` stays `false` until the nation admin approves.
 5. **Nation owner/admin** sees the pending agent at
    `GET /api/nations/:code/pending-agents` (shows claimed/unclaimed status).
 6. Admin calls `POST /api/nations/:code/pending-agents` with
