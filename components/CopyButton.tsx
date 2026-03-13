@@ -16,6 +16,7 @@ export function CopyButton({ value, className }: { value: string; className?: st
     <button
       onClick={handleCopy}
       className={`inline-flex items-center justify-center rounded-md p-1 transition-colors hover:bg-blue-400/20 ${className ?? ''}`}
+      aria-label="Copy MoltNumber"
       title="Copy MoltNumber"
     >
       {copied ? (
