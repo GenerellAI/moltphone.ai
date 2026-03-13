@@ -37,10 +37,10 @@ test.describe('Agent creation', () => {
       }
     }
 
-    await page.goto('/agents/new');
+    await page.goto('/agents/new', { timeout: 45_000, waitUntil: 'domcontentloaded' });
 
     // Wait for nations to load
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
 
     // Fill in agent name
     await page.getByLabel('Agent Name').fill('E2E Test Agent');

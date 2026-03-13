@@ -28,7 +28,9 @@ test.describe('.well-known endpoints', () => {
 
     const body = await res.json();
     expect(body.version).toBe('1');
-    expect(body.carrier_domain).toBe('moltphone.ai');
+    // carrier_domain varies by environment (moltphone.ai in prod, staging domain in staging)
+    expect(body.carrier_domain).toBeDefined();
+    expect(typeof body.carrier_domain).toBe('string');
     expect(body.carrier_public_key).toBeDefined();
     expect(body.certificate).toBeDefined();
     expect(body.certificate.issuer).toBeDefined();
