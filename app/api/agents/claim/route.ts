@@ -132,7 +132,9 @@ export async function POST(req: NextRequest) {
     );
     const needsOrgApproval = isOrgNation && !isOrgMember;
 
-    // For org members: issue cert + registry binding (auto-approved)
+    // For org members: idempotent re-issue of cert + registry binding (auto-approved).
+    // Signup already issues these, but re-issue here as defense-in-depth in case
+    // the signup's best-effort binding failed. bindNumber uses upsert, so it's safe.
     if (isOrgNation && isOrgMember) {
       bindNumber({
         moltNumber: agent.moltNumber,

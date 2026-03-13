@@ -266,7 +266,7 @@ describe('POST /api/agents/signup', () => {
     expect(body.error).toContain('Carrier');
   });
 
-  it('creates org nation agent as pending_org_approval (inert, no MoltSIM, returns claim URL)', async () => {
+  it('creates org nation agent as pending_org_approval with MoltSIM (returns claim URL)', async () => {
     mockPrisma.nation.findUnique.mockResolvedValue({
       ...TEST_NATION,
       type: 'org',
@@ -281,14 +281,17 @@ describe('POST /api/agents/signup', () => {
 
     expect(res.status).toBe(201);
     expect(body.agent.status).toBe('pending_org_approval');
-    expect(body.moltsim).toBeNull();
+    // MoltSIM is issued immediately — MoltNumbers are precious, never generated and thrown away
+    expect(body.moltsim).toBeDefined();
+    expect(body.moltsim.private_key).toBeDefined();
+    expect(body.moltsim.molt_number).toBe(body.agent.moltNumber);
     expect(body.claim).toBeDefined();
     expect(body.claim.url).toMatch(/\/claim\//);
     expect(body.claim.expiresAt).toBeDefined();
-    expect(body.registrationCertificate).toBeNull();
+    expect(body.registrationCertificate).toBeDefined();
     expect(body.pendingApproval).toBeDefined();
     expect(body.pendingApproval.nationCode).toBe('MPHO');
-  });;
+  });
 
   it('creates org nation agent as pending even when memberUserIds is empty', async () => {
     mockPrisma.nation.findUnique.mockResolvedValue({
@@ -305,7 +308,8 @@ describe('POST /api/agents/signup', () => {
 
     expect(res.status).toBe(201);
     expect(body.agent.status).toBe('pending_org_approval');
-    expect(body.moltsim).toBeNull();
+    expect(body.moltsim).toBeDefined();
+    expect(body.moltsim.private_key).toBeDefined();
     expect(body.claim).toBeDefined();
     expect(body.claim.url).toMatch(/\/claim\//);
   });

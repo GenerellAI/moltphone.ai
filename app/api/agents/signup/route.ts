@@ -81,9 +81,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Org nations: allow self-signup but agent is INERT until org owner approves.
-    // The agent gets created with no MoltSIM, no registry binding, and no
-    // registration certificate. The org owner sees the pending agent in
-    // nation settings and can approve or reject it.
+    // The agent gets its MoltSIM immediately (MoltNumbers are precious — we never
+    // generate a keypair and throw the private key away). Capabilities are restricted
+    // server-side by callEnabled=false, not by withholding credentials.
     const isOrgPending = nation.type === 'org';
 
     // Open nations must be public for self-signup
@@ -159,40 +159,6 @@ export async function POST(req: NextRequest) {
     // Check if this agent graduates the nation from provisional status
     await checkNationGraduation(data.nationCode).catch(() => {/* non-critical */});
 
-    // ── Org pending agents: return claim URL but no MoltSIM/cert/registry ──
-    // The human owner claims via the claim token. The nation admin approves separately.
-    // Both steps are required for full activation.
-    if (isOrgPending) {
-      const baseUrl = process.env.NEXTAUTH_URL || 'https://moltphone.ai';
-      const orgClaimUrl = `${baseUrl}/claim/${claimToken}`;
-
-      return NextResponse.json({
-        agent: {
-          id: agent.id,
-          moltNumber: agent.moltNumber,
-          nationCode: agent.nationCode,
-          displayName: agent.displayName,
-          description: agent.description,
-          skills: agent.skills,
-          nation: agent.nation,
-          status: 'pending_org_approval',
-          claimExpiresAt: claimExpiresAt.toISOString(),
-        },
-        claim: {
-          url: orgClaimUrl,
-          expiresAt: claimExpiresAt.toISOString(),
-          instructions: 'Send this claim link to your human owner. They must log in and claim before the expiry date. The nation owner must also approve the agent before it can operate.',
-        },
-        moltsim: null,
-        registrationCertificate: null,
-        pendingApproval: {
-          message: 'This agent has been registered on an org nation and requires two steps: (1) the human owner claims via the claim link, and (2) the nation owner approves. No MoltSIM or credentials are issued until both steps are complete.',
-          nationCode: data.nationCode,
-          nationDisplayName: nation.displayName,
-        },
-      }, { status: 201 });
-    }
-
     // Register the number with the MoltNumber registry (best-effort)
     bindNumber({ moltNumber, carrierDomain: getCarrierDomain(), nationCode: data.nationCode }).catch(() => {/* non-critical */});
 
@@ -239,16 +205,25 @@ export async function POST(req: NextRequest) {
         description: agent.description,
         skills: agent.skills,
         nation: agent.nation,
-        status: 'unclaimed',
+        status: isOrgPending ? 'pending_org_approval' : 'unclaimed',
         claimExpiresAt: claimExpiresAt.toISOString(),
       },
       moltsim,
       claim: {
         url: claimUrl,
         expiresAt: claimExpiresAt.toISOString(),
-        instructions: 'Send this claim link to your human owner. They must log in and verify ownership before the expiry date. Until claimed, this agent can receive tasks but cannot call out.',
+        instructions: isOrgPending
+          ? 'Send this claim link to your human owner. They must log in and claim before the expiry date. The nation owner must also approve the agent before it can operate.'
+          : 'Send this claim link to your human owner. They must log in and verify ownership before the expiry date. Until claimed, this agent can receive tasks but cannot call out.',
       },
       registrationCertificate: registrationCertToJSON(registrationCert),
+      ...(isOrgPending && {
+        pendingApproval: {
+          message: 'This agent has been registered on an org nation and requires two steps: (1) the human owner claims via the claim link, and (2) the nation owner approves. The MoltSIM is issued immediately — capabilities are restricted server-side until both steps are complete.',
+          nationCode: data.nationCode,
+          nationDisplayName: nation.displayName,
+        },
+      }),
     }, { status: 201 });
   } catch (e) {
     if (e instanceof z.ZodError) {

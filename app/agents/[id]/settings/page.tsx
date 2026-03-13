@@ -433,8 +433,13 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
         <SettingsSection title="MoltSIM" icon={<Key className="h-4 w-4" />}>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Provision a new MoltSIM to generate a fresh Ed25519 keypair.
-              This immediately revokes the previous MoltSIM. Your MoltNumber stays the same.
+              Rotate the Ed25519 keypair and issue a fresh MoltSIM.
+              This generates a <strong>new MoltNumber</strong> (since numbers are derived from the public key),
+              immediately revokes the previous MoltSIM, and moves the old number to the identity history.
+            </p>
+            <p className="text-sm text-destructive/80">
+              ⚠ Only use this if the current private key is compromised or lost.
+              If the agent already has a working MoltSIM, rotating will invalidate it.
             </p>
             {moltSim ? (
               <div className="space-y-3">
@@ -451,9 +456,9 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
                 </pre>
               </div>
             ) : (
-              <Button variant="outline" onClick={handleProvisionMoltSIM} disabled={provisioning}>
+              <Button variant="destructive" onClick={handleProvisionMoltSIM} disabled={provisioning}>
                 <Key className="h-4 w-4 mr-2" />
-                {provisioning ? 'Provisioning…' : 'Provision New MoltSIM'}
+                {provisioning ? 'Rotating…' : 'Rotate Keypair & MoltNumber'}
               </Button>
             )}
           </div>

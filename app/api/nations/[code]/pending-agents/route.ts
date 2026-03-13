@@ -6,8 +6,9 @@
  *
  * Approval flow:
  *  1. Agent self-signs-up on an org nation → created with callEnabled=false.
+ *     MoltSIM, registration cert, and registry binding are issued at signup.
  *  2. Human owner claims via claim token (separate step).
- *  3. Nation admin approves → callEnabled=true, registry binding, registration cert.
+ *  3. Nation admin approves → callEnabled=true (cert + binding re-issued idempotently).
  *     Admin rejects → agent is deactivated.
  *  Both claiming and approval are required for full activation.
  */
@@ -102,14 +103,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
   // Approval activates the agent on the org nation. It does NOT claim the agent.
   // The human owner claims separately via the claim token.
 
-  // 1. Register the number with the MoltNumber registry
+  // 1. Idempotent re-issue of registry binding (signup already does this,
+  //    but re-issue as defense-in-depth in case the signup's best-effort failed).
   bindNumber({
     moltNumber: agent.moltNumber,
     carrierDomain: getCarrierDomain(),
     nationCode: agent.nationCode,
   }).catch(() => {/* non-critical */});
 
-  // 2. Issue registration certificate
+  // 2. Issue registration certificate (pure function, safe to re-issue)
   const registrationCert = issueRegistrationCertificate({
     moltNumber: agent.moltNumber,
     agentPublicKey: agent.publicKey!,
@@ -140,7 +142,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cod
     },
     registrationCertificate: registrationCertToJSON(registrationCert),
     note: isClaimed
-      ? 'Agent approved and fully active. The owner can provision a MoltSIM from the agent settings page.'
+      ? 'Agent approved and fully active. The agent already has its MoltSIM from signup.'
       : 'Agent approved. It can now receive tasks, but the human owner still needs to claim it via the claim link.',
   });
 }
