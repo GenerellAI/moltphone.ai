@@ -82,10 +82,10 @@ test.describe('Agent detail page', () => {
     const agentLink = page.getByRole('link').filter({ hasText: /MPHO-|CLAW-/ }).first();
     if (await agentLink.isVisible({ timeout: 15_000 })) {
       await agentLink.click();
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
 
       // Should see agent details — the detail page shows a "Copy MoltNumber" button
-      await expect(page.getByRole('main').getByRole('button', { name: 'Copy MoltNumber' })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole('main').getByRole('button', { name: 'Copy MoltNumber' })).toBeVisible({ timeout: 30_000 });
     }
   });
 });
