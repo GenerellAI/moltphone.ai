@@ -412,6 +412,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
   const circuitState = getCircuitState(finalAgent);
   if (finalAgent.endpointUrl && online && circuitState !== 'open') {
     const ssrfCheck = await validateWebhookUrl(finalAgent.endpointUrl);
+    if (!ssrfCheck.ok) {
+      console.warn('[tasks/send] SSRF validation failed for', finalAgent.moltNumber, ':', ssrfCheck.error, '| URL:', finalAgent.endpointUrl);
+    }
     if (ssrfCheck.ok) {
       // Sign the delivery with carrier identity (STIR/SHAKEN-inspired)
       const attestation = determineAttestation({ callerVerified, callerRegistered });
@@ -586,18 +589,41 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ mol
     return moltErrorResponse(MOLT_FORWARDING_FAILED, 'Forwarding failed', { task_id: task.id });
   }
 
-  // Offline → queue as submitted
-  const task = await createTask('offline');
-  publishEvent(task, 'task.created', { reason: 'offline' }, 1);
+  // Offline → queue as submitted.
+  // Log the specific reason so operators can diagnose delivery failures.
+  const offlineReason = !finalAgent.endpointUrl ? 'no_endpoint'
+    : !online ? 'presence_stale'
+    : circuitState === 'open' ? 'circuit_open'
+    : 'unknown';
+  console.log('[tasks/send] offline queue:', {
+    moltNumber: finalAgent.moltNumber,
+    reason: offlineReason,
+    hasEndpoint: !!finalAgent.endpointUrl,
+    online,
+    lastSeenAt: finalAgent.lastSeenAt?.toISOString() ?? null,
+    circuitState,
+    webhookFailures: finalAgent.webhookFailures,
+    circuitOpenUntil: finalAgent.circuitOpenUntil?.toISOString() ?? null,
+  });
+  const task = await createTask(offlineReason);
+  publishEvent(task, 'task.created', { reason: offlineReason }, 1);
   // Best-effort push notification
   if (finalAgent.pushEndpointUrl) {
     sendPushNotification(finalAgent.pushEndpointUrl, {
-      taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: 'offline',
+      taskId: task.id, intent, callerId: callerAgentId, callerNumber, reason: offlineReason,
       awayMessage: finalAgent.awayMessage,
     }).catch(() => {});
   }
-  return moltErrorResponse(MOLT_OFFLINE, 'Agent offline (task queued)', {
+  return moltErrorResponse(MOLT_OFFLINE, `Agent offline (task queued) — ${offlineReason}`, {
     task_id: task.id,
     away_message: finalAgent.awayMessage ?? null,
+    offline_reason: offlineReason,
+    debug: {
+      has_endpoint: !!finalAgent.endpointUrl,
+      online,
+      last_seen_at: finalAgent.lastSeenAt?.toISOString() ?? null,
+      circuit_state: circuitState,
+      webhook_failures: finalAgent.webhookFailures,
+    },
   });
 }
