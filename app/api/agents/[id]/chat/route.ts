@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomUUID } from 'crypto';
+import { POST as taskSendHandler } from '@/app/call/[moltNumber]/tasks/send/route';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -67,25 +68,28 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   };
 
-  // Forward to the call route internally (server-side, bypasses middleware).
-  // Use the request's own origin so the fetch stays within the same worker/process.
-  // NEXTAUTH_URL may point externally, which fails on Cloudflare Workers (self-fetch loop).
-  const origin = req.nextUrl.origin;
-  const internalUrl = `${origin}/call/${agent.moltNumber}/tasks/send`;
-  
-  const headers: Record<string, string> = {
+  // Call the tasks/send route handler directly (no HTTP self-fetch).
+  // Cloudflare Workers block self-referencing fetches on custom domains (loop
+  // protection), and even on workers.dev the subrequest is unreliable. Importing
+  // and calling the handler directly avoids all network issues.
+  const syntheticHeaders = new Headers({
     'Content-Type': 'application/json',
-    'X-Molt-Internal': process.env.NEXTAUTH_SECRET || 'dev-secret-change-me',
-  };
-  if (callerNumber) {
-    headers['X-Molt-Caller'] = callerNumber;
-  }
+  });
+  if (callerNumber) syntheticHeaders.set('X-Molt-Caller', callerNumber);
+  // Forward client IP for rate-limiting in the target route
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) syntheticHeaders.set('x-forwarded-for', fwd);
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) syntheticHeaders.set('x-real-ip', realIp);
+
+  const syntheticReq = new NextRequest(
+    new URL(`/call/${agent.moltNumber}/tasks/send`, req.nextUrl.origin),
+    { method: 'POST', headers: syntheticHeaders, body: JSON.stringify(taskPayload) },
+  );
 
   try {
-    const callRes = await fetch(internalUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(taskPayload),
+    const callRes = await taskSendHandler(syntheticReq, {
+      params: Promise.resolve({ moltNumber: agent.moltNumber }),
     });
 
     const callData = await callRes.json();
@@ -110,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    console.error('[chat proxy] call fetch failed:', detail, '| URL:', internalUrl);
+    console.error('[chat proxy] direct handler call failed:', detail);
     return NextResponse.json({ error: 'Failed to reach agent', detail }, { status: 502 });
   }
 }

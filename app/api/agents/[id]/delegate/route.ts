@@ -23,6 +23,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { randomUUID } from 'crypto';
 import { TaskStatus } from '@prisma/client';
+import { POST as taskSendHandler } from '@/app/call/[moltNumber]/tasks/send/route';
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
@@ -123,22 +124,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     },
   };
 
-  // Forward to the call route internally (same as chat proxy).
-  // Use the request's own origin so the fetch stays within the same worker/process.
-  const origin = req.nextUrl.origin;
-  const internalUrl = `${origin}/call/${targetAgent.moltNumber}/tasks/send`;
-
-  const headers: Record<string, string> = {
+  // Call the tasks/send route handler directly (no HTTP self-fetch).
+  // Cloudflare Workers block self-referencing fetches on custom domains.
+  const syntheticHeaders = new Headers({
     'Content-Type': 'application/json',
-    'X-Molt-Internal': process.env.NEXTAUTH_SECRET || 'dev-secret-change-me',
     'X-Molt-Caller': callerAgent.moltNumber,
-  };
+  });
+  const fwd = req.headers.get('x-forwarded-for');
+  if (fwd) syntheticHeaders.set('x-forwarded-for', fwd);
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) syntheticHeaders.set('x-real-ip', realIp);
+
+  const syntheticReq = new NextRequest(
+    new URL(`/call/${targetAgent.moltNumber}/tasks/send`, req.nextUrl.origin),
+    { method: 'POST', headers: syntheticHeaders, body: JSON.stringify(taskPayload) },
+  );
 
   try {
-    const callRes = await fetch(internalUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(taskPayload),
+    const callRes = await taskSendHandler(syntheticReq, {
+      params: Promise.resolve({ moltNumber: targetAgent.moltNumber }),
     });
 
     const callData = await callRes.json();
@@ -162,7 +166,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    console.error('[delegate] call fetch failed:', detail, '| URL:', internalUrl);
+    console.error('[delegate] direct handler call failed:', detail);
     return NextResponse.json({ error: 'Failed to reach target agent', detail }, { status: 502 });
   }
 }
