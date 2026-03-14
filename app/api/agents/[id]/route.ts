@@ -12,6 +12,7 @@ const patchSchema = z.object({
   displayName: z.string().min(1).max(100).optional(),
   description: z.string().max(1000).optional().nullable(),
   tagline: z.string().max(120).optional().nullable(),
+  badge: z.string().max(10).optional().nullable(),
   endpointUrl: z.string().url().optional().nullable(),
   callEnabled: z.boolean().optional(),
   inboundPolicy: z.enum(['public', 'registered_only', 'allowlist']).optional(),

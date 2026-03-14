@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Loader2, Globe, Settings, Save, UserCheck, UserX, Clock } from 'lucide-react';
+import { ArrowLeft, Loader2, Globe, Settings, Save, UserCheck, UserX, Clock, Upload } from 'lucide-react';
 import { DomainVerification } from '@/components/DomainVerification';
 import { SettingsSection } from '@/components/SettingsSection';
 
@@ -55,6 +55,8 @@ export default function NationSettingsPage() {
   const [pendingAgents, setPendingAgents] = useState<PendingAgent[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null); // agentId being acted on
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [form, setForm] = useState({
     displayName: '',
@@ -73,6 +75,7 @@ export default function NationSettingsPage() {
       .then(r => { if (!r.ok) throw new Error('Not found'); return r.json(); })
       .then((data: Nation) => {
         setNation(data);
+        setAvatarUrl(data.avatarUrl ?? null);
         setForm({
           displayName: data.displayName,
           description: data.description || '',
@@ -112,6 +115,49 @@ export default function NationSettingsPage() {
       }
     } catch { /* ignore */ }
     setPendingAction(null);
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/nations/${code}/avatar`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        setAvatarUrl(data.avatarUrl);
+        setSuccess('Avatar uploaded!');
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        setError(data.error || 'Avatar upload failed');
+      }
+    } catch {
+      setError('Avatar upload failed');
+    }
+    setUploadingAvatar(false);
+    e.target.value = '';
+  }
+
+  async function handleAvatarDelete() {
+    setUploadingAvatar(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/nations/${code}/avatar`, { method: 'DELETE' });
+      if (res.ok) {
+        setAvatarUrl(null);
+        setSuccess('Avatar removed');
+        setTimeout(() => setSuccess(null), 3000);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to remove avatar');
+      }
+    } catch {
+      setError('Failed to remove avatar');
+    }
+    setUploadingAvatar(false);
   }
 
   const isAdmin = nation && session?.user?.id
@@ -188,6 +234,40 @@ export default function NationSettingsPage() {
               <Input value={form.badge} onChange={e => setForm(f => ({ ...f, badge: e.target.value }))}
                 maxLength={10} className="h-10 w-24" />
             </div>
+
+            {/* Avatar image upload */}
+            <div className="space-y-2">
+              <Label>Avatar Image</Label>
+              <div className="flex items-center gap-4">
+                <div className="relative w-14 h-14 rounded-full bg-muted flex items-center justify-center overflow-hidden border">
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarUrl} alt="Nation avatar" className="w-full h-full object-cover" />
+                  ) : form.badge ? (
+                    <span className="text-xl">{form.badge}</span>
+                  ) : (
+                    <Upload className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer">
+                      <Button type="button" variant="outline" size="sm" asChild disabled={uploadingAvatar}>
+                        <span>{uploadingAvatar ? 'Uploading…' : 'Upload Image'}</span>
+                      </Button>
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                    </label>
+                    {avatarUrl && (
+                      <Button type="button" variant="ghost" size="sm" onClick={handleAvatarDelete} disabled={uploadingAvatar} className="text-destructive hover:text-destructive">
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">JPEG, PNG, WebP, or GIF. Max 256 KB.</p>
+                </div>
+              </div>
+            </div>
+
             <div className="flex items-center gap-3">
               <input type="checkbox" id="isPublic" checked={form.isPublic}
                 onChange={e => setForm(f => ({ ...f, isPublic: e.target.checked }))}

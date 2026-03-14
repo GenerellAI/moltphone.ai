@@ -10,9 +10,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, CheckCircle2, ArrowLeft, Key, Copy, Check, Shield, Phone, Settings2, MessageSquare, GitFork, AlertTriangle, Globe } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ArrowLeft, Key, Copy, Check, Shield, Phone, Settings2, MessageSquare, GitFork, AlertTriangle, Globe, Upload, X } from 'lucide-react';
 import { PolicySection } from '@/components/PolicyEditor';
 import { AgentDomainClaim } from '@/components/AgentDomainClaim';
+
+const EMOJI_OPTIONS = ['🤖', '🧠', '🦾', '🔮', '⚡', '🛡️', '🌐', '📡', '🔧', '🎯', '🦊', '🐙', '🪼', '🧬', '💎', '🌀'];
 
 interface AgentSettings {
   id: string;
@@ -20,6 +22,8 @@ interface AgentSettings {
   displayName: string;
   description: string | null;
   tagline: string | null;
+  badge: string | null;
+  avatarUrl: string | null;
   endpointUrl: string | null;
   callEnabled: boolean;
   inboundPolicy: string;
@@ -57,6 +61,8 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [deletingAgent, setDeletingAgent] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => { params.then(p => setAgentId(p.id)); }, [params]);
   useEffect(() => { if (status === 'unauthenticated') router.push('/login'); }, [status, router]);
@@ -72,10 +78,12 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
         if (!data) return;
         setAgent(data);
         setIsPersonalAgent(!!data.isPersonalAgent);
+        setAvatarUrl(data.avatarUrl ?? null);
         setForm({
           displayName: data.displayName,
           description: data.description ?? '',
           tagline: data.tagline ?? '',
+          badge: data.badge ?? '',
           endpointUrl: data.endpointUrl ?? '',
           callEnabled: data.callEnabled,
           inboundPolicy: data.inboundPolicy,
@@ -105,6 +113,7 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
       displayName: form.displayName,
       description: form.description || null,
       tagline: form.tagline || null,
+      badge: form.badge || null,
       endpointUrl: form.endpointUrl || null,
       callEnabled: form.callEnabled,
       inboundPolicy: form.inboundPolicy,
@@ -151,6 +160,48 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !agentId) return;
+    setUploadingAvatar(true);
+    setError('');
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/agents/${agentId}/avatar`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        setAvatarUrl(data.avatarUrl);
+        setSuccess('Avatar uploaded!');
+      } else {
+        setError(data.error || 'Avatar upload failed');
+      }
+    } catch {
+      setError('Avatar upload failed');
+    }
+    setUploadingAvatar(false);
+    e.target.value = '';
+  }
+
+  async function handleAvatarDelete() {
+    if (!agentId) return;
+    setUploadingAvatar(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/agents/${agentId}/avatar`, { method: 'DELETE' });
+      if (res.ok) {
+        setAvatarUrl(null);
+        setSuccess('Avatar removed');
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to remove avatar');
+      }
+    } catch {
+      setError('Failed to remove avatar');
+    }
+    setUploadingAvatar(false);
   }
 
   // selectClasses removed — using shadcn Select component
@@ -220,6 +271,72 @@ export default function AgentSettingsPage({ params }: { params: Promise<{ id: st
               <Label>Tagline</Label>
               <Input value={(form as Record<string, unknown>).tagline as string || ''} onChange={e => setForm(f => ({ ...f, tagline: e.target.value }))}
                 maxLength={120} placeholder="A short one-liner shown on agent cards" className="h-10" />
+            </div>
+
+            {/* Avatar & Emoji */}
+            <div className="space-y-3">
+              <Label>Avatar & Emoji</Label>
+              <div className="flex items-start gap-4">
+                {/* Avatar image upload */}
+                <div className="flex flex-col items-center gap-2">
+                  <div className="relative w-16 h-16 rounded-full bg-muted flex items-center justify-center overflow-hidden border">
+                    {avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : form.badge ? (
+                      <span className="text-2xl">{form.badge}</span>
+                    ) : (
+                      <Upload className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <label className="cursor-pointer text-xs text-primary hover:underline">
+                      {uploadingAvatar ? 'Uploading…' : 'Upload'}
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                    </label>
+                    {avatarUrl && (
+                      <button type="button" onClick={handleAvatarDelete} disabled={uploadingAvatar} className="text-xs text-destructive hover:underline">
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Max 256 KB</p>
+                </div>
+
+                {/* Emoji picker */}
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {EMOJI_OPTIONS.map(emoji => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setForm(f => ({ ...f, badge: f.badge === emoji ? '' : emoji }))}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-base transition-all ${
+                          form.badge === emoji
+                            ? 'bg-primary/20 ring-2 ring-primary scale-110'
+                            : 'bg-muted hover:bg-muted/80'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={form.badge || ''}
+                      onChange={e => setForm(f => ({ ...f, badge: e.target.value }))}
+                      placeholder="Or type a custom emoji…"
+                      maxLength={10}
+                      className="h-8 w-44 text-sm"
+                    />
+                    {form.badge && (
+                      <button type="button" onClick={() => setForm(f => ({ ...f, badge: '' }))} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {!isPersonalAgent && (
