@@ -77,6 +77,7 @@ export default function SettingsPage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [badge, setBadge] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState('');
   const [savingBadge, setSavingBadge] = useState(false);
   const [badgeSuccess, setBadgeSuccess] = useState(false);
 
@@ -313,13 +314,20 @@ export default function SettingsPage() {
                           const file = e.target.files?.[0];
                           if (!file || !profile.personalAgentId) return;
                           setUploadingAvatar(true);
+                          setAvatarError('');
                           try {
                             const fd = new FormData();
                             fd.append('file', file);
                             const res = await fetch(`/api/agents/${profile.personalAgentId}/avatar`, { method: 'POST', body: fd });
                             const data = await res.json();
-                            if (res.ok) setAvatarUrl(data.avatarUrl);
-                          } catch { /* ignore */ }
+                            if (res.ok) {
+                              setAvatarUrl(data.avatarUrl);
+                            } else {
+                              setAvatarError(data.error || 'Avatar upload failed');
+                            }
+                          } catch {
+                            setAvatarError('Avatar upload failed');
+                          }
                           setUploadingAvatar(false);
                           e.target.value = '';
                         }} disabled={uploadingAvatar} />
@@ -328,10 +336,18 @@ export default function SettingsPage() {
                         <button type="button" onClick={async () => {
                           if (!profile.personalAgentId) return;
                           setUploadingAvatar(true);
+                          setAvatarError('');
                           try {
                             const res = await fetch(`/api/agents/${profile.personalAgentId}/avatar`, { method: 'DELETE' });
-                            if (res.ok) setAvatarUrl(null);
-                          } catch { /* ignore */ }
+                            if (res.ok) {
+                              setAvatarUrl(null);
+                            } else {
+                              const data = await res.json().catch(() => ({}));
+                              setAvatarError(data.error || 'Failed to remove avatar');
+                            }
+                          } catch {
+                            setAvatarError('Failed to remove avatar');
+                          }
                           setUploadingAvatar(false);
                         }} disabled={uploadingAvatar} className="text-[11px] text-destructive hover:underline">
                           Remove
@@ -339,6 +355,7 @@ export default function SettingsPage() {
                       )}
                     </div>
                     <p className="text-[10px] text-muted-foreground">Max 256 KB</p>
+                    {avatarError && <p className="text-[10px] text-destructive">{avatarError}</p>}
                   </div>
 
                   {/* Emoji picker */}

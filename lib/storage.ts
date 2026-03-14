@@ -83,6 +83,11 @@ function getS3(): S3Client | null {
  * @param data      File contents as Buffer
  * @param mimeType  MIME type (e.g. "image/jpeg")
  * @returns         URL path for the file (e.g. "/avatars/agent-id.jpg" or full CDN URL)
+ *
+ * Storage priority:
+ *   1. S3/R2 (if S3_BUCKET configured)
+ *   2. Local filesystem (if fs module available — Node.js dev)
+ *   3. Data URI fallback (edge runtimes without S3 — works everywhere)
  */
 export async function uploadFile(
   key: string,
@@ -93,7 +98,11 @@ export async function uploadFile(
   if (s3) {
     return uploadS3(s3, key, data, mimeType);
   }
-  return uploadLocal(key, data);
+  if (fsPromises && path) {
+    return uploadLocal(key, data);
+  }
+  // Fallback: encode as data URI — works on edge runtimes without S3
+  return `data:${mimeType};base64,${data.toString('base64')}`;
 }
 
 /**
@@ -105,6 +114,9 @@ export async function uploadFile(
  *                  or "https://cdn.example.com/avatars/agent-id.jpg")
  */
 export async function deleteFile(urlPath: string): Promise<void> {
+  // Data URIs live in the database — nothing to delete from storage
+  if (urlPath.startsWith('data:')) return;
+
   const s3 = getS3();
   if (s3) {
     return deleteS3(s3, urlPath);
