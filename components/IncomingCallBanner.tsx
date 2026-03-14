@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Phone, PhoneOff, ShieldAlert, ShieldCheck, Globe, Github } from 'lucide-react';
-import Image from 'next/image';
+
 import { useSSEListener, type SSETaskData } from '@/components/SSEProvider';
 import { useStatus } from '@/components/StatusProvider';
 import { useSound } from '@/components/SoundProvider';
@@ -199,12 +199,10 @@ export function IncomingCallBanner() {
           {/* Avatar */}
           <div className="relative shrink-0">
             {callerProfile?.avatarUrl ? (
-              <Image
+              <img
                 src={callerProfile.avatarUrl}
                 alt={incoming.callerName}
-                width={48}
-                height={48}
-                className="rounded-full object-cover"
+                className="rounded-full object-cover w-12 h-12"
               />
             ) : (
               <div

@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
-import Image from 'next/image';
+
 import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -57,20 +57,16 @@ export default async function ContactsPage() {
                   <div className="flex flex-col items-center text-center gap-3">
                     <div className="relative">
                       {c.agent.avatarUrl ? (
-                        <Image
+                        <img
                           src={c.agent.avatarUrl}
                           alt={c.agent.displayName}
-                          width={64}
-                          height={64}
                           className="rounded-full object-cover w-16 h-16"
                         />
                       ) : c.agent.nation.avatarUrl ? (
                         <div className="w-16 h-16 rounded-full overflow-hidden">
-                          <Image
+                          <img
                             src={c.agent.nation.avatarUrl}
                             alt={c.agent.nation.displayName}
-                            width={64}
-                            height={64}
                             className="rounded-full object-cover w-16 h-16"
                           />
                         </div>

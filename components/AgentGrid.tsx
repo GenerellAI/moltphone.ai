@@ -1,7 +1,6 @@
 'use client';
 import { useState, useCallback, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -132,11 +131,9 @@ export default function AgentGrid({
                   {/* Avatar */}
                   <div className="relative">
                     {agent.avatarUrl ? (
-                      <Image
+                      <img
                         src={agent.avatarUrl}
                         alt={agent.displayName}
-                        width={56}
-                        height={56}
                         className="rounded-full object-cover w-14 h-14"
                       />
                     ) : agent.badge ? (
@@ -144,11 +141,9 @@ export default function AgentGrid({
                         <span className="text-2xl">{agent.badge}</span>
                       </div>
                     ) : agent.nation.avatarUrl ? (
-                      <Image
+                      <img
                         src={agent.nation.avatarUrl}
                         alt={agent.nation.displayName}
-                        width={56}
-                        height={56}
                         className="rounded-full object-cover w-14 h-14"
                       />
                     ) : agent.nation.badge ? (
