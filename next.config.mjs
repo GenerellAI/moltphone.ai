@@ -8,6 +8,13 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
+  // Disable Next.js image optimization — the /_next/image endpoint is not
+  // available on Cloudflare Workers. Images are served directly from R2
+  // via /api/storage/[...key].
+  images: {
+    unoptimized: true,
+  },
+
   // Security headers — enforced in production
   async headers() {
     if (process.env.NODE_ENV !== 'production') return [];
