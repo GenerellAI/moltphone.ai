@@ -17,7 +17,9 @@ The admin dashboard is at `/admin` with five tabs: Overview, Blocks, Policies, C
 | `POST /api/admin/expire-proposals` | Expire stale direct-connection proposals |
 | `POST /api/admin/expire-nations` | Deactivate provisional nations; graduate successful ones |
 | `POST /api/admin/expire-port-requests` | Auto-approve expired port requests; execute approved ones |
+| `POST /api/admin/expire-stale-calls` | Cancel stale ringing tasks (>1h), complete stale working/input_required (>30min) |
 | `POST /api/admin/task-retry-worker` | Retry failed webhook deliveries |
+| `POST /api/admin/task-cleanup` | Delete completed/canceled/failed tasks older than retention window (30 days) |
 | `POST /api/admin/nonce-cleanup` | Purge expired nonce records from PostgreSQL |
 
 All cron jobs are idempotent — safe to run concurrently from multiple instances.

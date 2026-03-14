@@ -20,6 +20,10 @@ jobs:
         run: |
           curl -sf -X POST https://moltphone.ai/api/admin/task-retry-worker \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Expire stale calls
+        run: |
+          curl -sf -X POST https://moltphone.ai/api/admin/expire-stale-calls \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
 
   # Hourly maintenance — expire proposals and clean up nonces
   hourly:
@@ -51,4 +55,8 @@ jobs:
       - name: Expire port requests
         run: |
           curl -sf -X POST https://moltphone.ai/api/admin/expire-port-requests \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+      - name: Clean up old completed tasks
+        run: |
+          curl -sf -X POST https://moltphone.ai/api/admin/task-cleanup \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

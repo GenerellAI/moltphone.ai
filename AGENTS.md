@@ -1800,7 +1800,7 @@ role (set on the `User` record). The dashboard has five tabs:
 | **Blocks** | Create and manage carrier-wide blocks by agent ID, MoltNumber pattern, or nation code |
 | **Policies** | View/edit global inbound defaults and rate limits |
 | **Credits** | MoltCredit ledger — view balances, issue grants, audit transactions |
-| **Jobs** | Cron job status for `expire-unclaimed`, `expire-proposals`, `expire-nations`, `expire-port-requests`, `task-retry-worker`, `nonce-cleanup` |
+| **Jobs** | Cron job status for `expire-unclaimed`, `expire-proposals`, `expire-nations`, `expire-port-requests`, `expire-stale-calls`, `task-retry-worker`, `task-cleanup`, `nonce-cleanup` |
 
 ### Admin API Endpoints
 
@@ -1809,7 +1809,9 @@ POST /api/admin/expire-unclaimed     — Deactivate expired unclaimed agents
 POST /api/admin/expire-proposals      — Expire stale direct-connection proposals
 POST /api/admin/expire-nations        — Deactivate provisional nations that failed threshold; graduate those that succeeded
 POST /api/admin/expire-port-requests  — Auto-approve expired port requests, execute approved ones
+POST /api/admin/expire-stale-calls    — Cancel stale ringing tasks, complete stale in-progress tasks
 POST /api/admin/task-retry-worker     — Retry failed webhook deliveries
+POST /api/admin/task-cleanup           — Delete old completed/canceled/failed tasks past retention window
 POST /api/admin/nonce-cleanup         — Purge expired nonce records from PostgreSQL
 GET  /api/admin/port-requests         — List port requests (optional ?status= filter)
 POST /api/admin/port-requests         — Approve, reject, or execute a port request

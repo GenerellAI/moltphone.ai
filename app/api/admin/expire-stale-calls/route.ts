@@ -4,6 +4,7 @@
  * Cron job to resolve stale calls:
  * - `submitted` (Ringing) tasks older than 1 hour → canceled (Missed)
  * - `working` (In Progress) tasks with no activity for 30 min → completed (Ended)
+ * - `input_required` (Awaiting Reply) tasks with no activity for 30 min → completed (Ended)
  *
  * This prevents the call list from showing permanently stuck "Ringing" and
  * "In Progress" entries.
@@ -19,7 +20,7 @@ import { TaskStatus } from '@prisma/client';
 /** Submitted (ringing) tasks older than this are considered missed */
 const RINGING_TIMEOUT_MS = 60 * 60 * 1000; // 1 hour
 
-/** Working (in-progress) tasks with no activity for this long are considered ended */
+/** Working/input_required tasks with no activity for this long are considered ended */
 const WORKING_TIMEOUT_MS = 30 * 60 * 1000; // 30 min
 
 export async function POST(req: NextRequest) {
@@ -46,11 +47,11 @@ export async function POST(req: NextRequest) {
     data: { status: TaskStatus.canceled },
   });
 
-  // Complete stale in-progress tasks (working > 30 min with no activity)
+  // Complete stale in-progress tasks (working/input_required > 30 min with no activity)
   const workingCutoff = new Date(now.getTime() - WORKING_TIMEOUT_MS);
   const completedWorking = await prisma.task.updateMany({
     where: {
-      status: TaskStatus.working,
+      status: { in: [TaskStatus.working, TaskStatus.input_required] },
       updatedAt: { lt: workingCutoff },
     },
     data: { status: TaskStatus.completed },
