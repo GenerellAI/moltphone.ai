@@ -52,12 +52,19 @@ export async function POST(
     );
   }
 
-  const key = `avatars/${id}${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const avatarUrl = await uploadFile(key, buffer, file.type);
-  await prisma.agent.update({ where: { id }, data: { avatarUrl } });
-
-  return NextResponse.json({ avatarUrl });
+  try {
+    const key = `avatars/${id}${ext}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const avatarUrl = await uploadFile(key, buffer, file.type);
+    await prisma.agent.update({ where: { id }, data: { avatarUrl } });
+    return NextResponse.json({ avatarUrl });
+  } catch (err) {
+    console.error('[avatar] upload failed:', err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Upload failed' },
+      { status: 500 },
+    );
+  }
 }
 
 export async function DELETE(

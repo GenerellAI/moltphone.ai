@@ -62,12 +62,19 @@ export async function POST(
     await deleteFile(nation.avatarUrl);
   }
 
-  const key = `nation-avatars/${nation.code.toLowerCase()}${ext}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const avatarUrl = await uploadFile(key, buffer, file.type);
-  await prisma.nation.update({ where: { code: nation.code }, data: { avatarUrl } });
-
-  return NextResponse.json({ avatarUrl });
+  try {
+    const key = `nation-avatars/${nation.code.toLowerCase()}${ext}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const avatarUrl = await uploadFile(key, buffer, file.type);
+    await prisma.nation.update({ where: { code: nation.code }, data: { avatarUrl } });
+    return NextResponse.json({ avatarUrl });
+  } catch (err) {
+    console.error('[nation-avatar] upload failed:', err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Upload failed' },
+      { status: 500 },
+    );
+  }
 }
 
 export async function DELETE(

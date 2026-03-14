@@ -319,14 +319,14 @@ export default function SettingsPage() {
                             const fd = new FormData();
                             fd.append('file', file);
                             const res = await fetch(`/api/agents/${profile.personalAgentId}/avatar`, { method: 'POST', body: fd });
-                            const data = await res.json();
-                            if (res.ok) {
+                            const data = await res.json().catch(() => ({}));
+                            if (res.ok && data.avatarUrl) {
                               setAvatarUrl(data.avatarUrl);
                             } else {
-                              setAvatarError(data.error || 'Avatar upload failed');
+                              setAvatarError(data.error || `Upload failed (${res.status})`);
                             }
                           } catch {
-                            setAvatarError('Avatar upload failed');
+                            setAvatarError('Avatar upload failed — check network');
                           }
                           setUploadingAvatar(false);
                           e.target.value = '';
