@@ -40,17 +40,21 @@ export async function GET() {
     (profile as Record<string, unknown>).email = null;
   }
 
-  // Include personal agent description
+  // Include personal agent fields
   let personalAgentDescription: string | null = null;
+  let personalAgentBadge: string | null = null;
+  let personalAgentAvatarUrl: string | null = null;
   if (user.personalAgentId) {
     const pa = await prisma.agent.findUnique({
       where: { id: user.personalAgentId },
-      select: { description: true },
+      select: { description: true, badge: true, avatarUrl: true },
     });
     personalAgentDescription = pa?.description ?? null;
+    personalAgentBadge = pa?.badge ?? null;
+    personalAgentAvatarUrl = pa?.avatarUrl ?? null;
   }
 
-  return NextResponse.json({ user: { ...profile, hasPassword: !!passwordHash, personalAgentDescription } });
+  return NextResponse.json({ user: { ...profile, hasPassword: !!passwordHash, personalAgentDescription, personalAgentBadge, personalAgentAvatarUrl } });
 }
 
 // PATCH /api/settings — update user profile
@@ -169,17 +173,21 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    // Fetch personal agent description for the response
+    // Fetch personal agent fields for the response
     let paDescription: string | null = null;
+    let paBadge: string | null = null;
+    let paAvatarUrl: string | null = null;
     if (updated.personalAgentId) {
       const pa = await prisma.agent.findUnique({
         where: { id: updated.personalAgentId },
-        select: { description: true },
+        select: { description: true, badge: true, avatarUrl: true },
       });
       paDescription = pa?.description ?? null;
+      paBadge = pa?.badge ?? null;
+      paAvatarUrl = pa?.avatarUrl ?? null;
     }
 
-    return NextResponse.json({ user: { ...updated, hasPassword: !!updateData.passwordHash || undefined, personalAgentDescription: paDescription } });
+    return NextResponse.json({ user: { ...updated, hasPassword: !!updateData.passwordHash || undefined, personalAgentDescription: paDescription, personalAgentBadge: paBadge, personalAgentAvatarUrl: paAvatarUrl } });
   }
 
   // Only personal agent description was updated — re-fetch profile
@@ -199,11 +207,15 @@ export async function PATCH(req: NextRequest) {
   if (!refreshed) return NextResponse.json({ error: 'User not found' }, { status: 404 });
   const { passwordHash: ph2, ...prof2 } = refreshed;
   let paDesc2: string | null = null;
+  let paBadge2: string | null = null;
+  let paAvatarUrl2: string | null = null;
   if (refreshed.personalAgentId) {
-    const pa2 = await prisma.agent.findUnique({ where: { id: refreshed.personalAgentId }, select: { description: true } });
+    const pa2 = await prisma.agent.findUnique({ where: { id: refreshed.personalAgentId }, select: { description: true, badge: true, avatarUrl: true } });
     paDesc2 = pa2?.description ?? null;
+    paBadge2 = pa2?.badge ?? null;
+    paAvatarUrl2 = pa2?.avatarUrl ?? null;
   }
-  return NextResponse.json({ user: { ...prof2, hasPassword: !!ph2, personalAgentDescription: paDesc2 } });
+  return NextResponse.json({ user: { ...prof2, hasPassword: !!ph2, personalAgentDescription: paDesc2, personalAgentBadge: paBadge2, personalAgentAvatarUrl: paAvatarUrl2 } });
 }
 
 // DELETE /api/settings — delete account and all associated data

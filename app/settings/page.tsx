@@ -22,7 +22,11 @@ import {
   MessageSquare,
   AlertTriangle,
   Globe,
+  Upload,
+  X,
 } from 'lucide-react';
+
+const EMOJI_OPTIONS = ['🤖', '🧠', '🦾', '🔮', '⚡', '🛡️', '🌐', '📡', '🔧', '🎯', '🦊', '🐙', '🪼', '🧬', '💎', '🌀'];
 
 interface UserProfile {
   id: string;
@@ -34,6 +38,8 @@ interface UserProfile {
   personalAgentId: string | null;
   hasPassword: boolean;
   personalAgentDescription?: string | null;
+  personalAgentBadge?: string | null;
+  personalAgentAvatarUrl?: string | null;
 }
 
 export default function SettingsPage() {
@@ -67,6 +73,13 @@ export default function SettingsPage() {
   const [policyScope, setPolicyScope] = useState<'global' | string>('global');
   const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
 
+  // Avatar & emoji
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [badge, setBadge] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [savingBadge, setSavingBadge] = useState(false);
+  const [badgeSuccess, setBadgeSuccess] = useState(false);
+
   // Account deletion
   const [deleting, setDeleting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
@@ -95,6 +108,8 @@ export default function SettingsPage() {
         setProfile(data.user);
         setName(data.user.name || '');
         setPaDescription(data.user.personalAgentDescription || '');
+        setAvatarUrl(data.user.personalAgentAvatarUrl ?? null);
+        setBadge(data.user.personalAgentBadge || '');
         personalAgentId = data.user.personalAgentId || null;
       }
 
@@ -272,6 +287,125 @@ export default function SettingsPage() {
           )}
 
           <Separator />
+
+          {/* Avatar & Emoji */}
+          {profile.personalAgentId && (
+            <>
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">Avatar & emoji</p>
+                <div className="flex items-start gap-4">
+                  {/* Avatar image */}
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className="relative w-14 h-14 rounded-full bg-muted flex items-center justify-center overflow-hidden border">
+                      {avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : badge ? (
+                        <span className="text-2xl">{badge}</span>
+                      ) : (
+                        <Upload className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <label className="cursor-pointer text-[11px] text-primary hover:underline">
+                        {uploadingAvatar ? 'Uploading…' : 'Upload'}
+                        <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          if (!file || !profile.personalAgentId) return;
+                          setUploadingAvatar(true);
+                          try {
+                            const fd = new FormData();
+                            fd.append('file', file);
+                            const res = await fetch(`/api/agents/${profile.personalAgentId}/avatar`, { method: 'POST', body: fd });
+                            const data = await res.json();
+                            if (res.ok) setAvatarUrl(data.avatarUrl);
+                          } catch { /* ignore */ }
+                          setUploadingAvatar(false);
+                          e.target.value = '';
+                        }} disabled={uploadingAvatar} />
+                      </label>
+                      {avatarUrl && (
+                        <button type="button" onClick={async () => {
+                          if (!profile.personalAgentId) return;
+                          setUploadingAvatar(true);
+                          try {
+                            const res = await fetch(`/api/agents/${profile.personalAgentId}/avatar`, { method: 'DELETE' });
+                            if (res.ok) setAvatarUrl(null);
+                          } catch { /* ignore */ }
+                          setUploadingAvatar(false);
+                        }} disabled={uploadingAvatar} className="text-[11px] text-destructive hover:underline">
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Max 256 KB</p>
+                  </div>
+
+                  {/* Emoji picker */}
+                  <div className="flex-1 space-y-2">
+                    <div className="flex flex-wrap gap-1">
+                      {EMOJI_OPTIONS.map(emoji => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => setBadge(prev => prev === emoji ? '' : emoji)}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-sm transition-all ${
+                            badge === emoji
+                              ? 'bg-primary/20 ring-2 ring-primary scale-110'
+                              : 'bg-muted hover:bg-muted/80'
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={badge}
+                        onChange={e => setBadge(e.target.value)}
+                        placeholder="Or type a custom emoji…"
+                        maxLength={10}
+                        className="h-7 w-40 px-2 text-sm rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                      {badge && (
+                        <button type="button" onClick={() => setBadge('')} className="text-muted-foreground hover:text-foreground">
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={savingBadge || badge === (profile.personalAgentBadge || '')}
+                        onClick={async () => {
+                          if (!profile.personalAgentId) return;
+                          setSavingBadge(true);
+                          setBadgeSuccess(false);
+                          try {
+                            const res = await fetch(`/api/agents/${profile.personalAgentId}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ badge: badge || null }),
+                            });
+                            if (res.ok) {
+                              setProfile(prev => prev ? { ...prev, personalAgentBadge: badge || null } : prev);
+                              setBadgeSuccess(true);
+                              setTimeout(() => setBadgeSuccess(false), 3000);
+                            }
+                          } finally {
+                            setSavingBadge(false);
+                          }
+                        }}
+                      >
+                        {savingBadge ? <Loader2 className="h-3 w-3 animate-spin" /> : badgeSuccess ? 'Saved' : 'Save'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <Separator />
+            </>
+          )}
 
           {/* Personal Agent Description */}
           {profile.personalAgentId && (
