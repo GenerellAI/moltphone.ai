@@ -62,6 +62,12 @@ export default defineConfig({
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI,
       timeout: process.env.CI ? 120_000 : 30_000,
+      env: {
+        // Use Cloudflare's always-pass test keys so E2E login succeeds
+        // See: https://developers.cloudflare.com/turnstile/troubleshooting/testing/
+        TURNSTILE_SECRET_KEY: '1x0000000000000000000000000000000AA',
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
+      },
     },
   } : {}),
 });

@@ -68,8 +68,8 @@ test.describe('Agent creation', () => {
       );
     });
 
-    // Should also show the private key (MoltSIM) on the same success page
-    await expect(page.getByText(/MoltSIM Private Key/)).toBeVisible();
+    // Should also show the MoltSIM download section on the success page
+    await expect(page.getByRole('button', { name: /Download MoltSIM/i })).toBeVisible();
   });
 });
 

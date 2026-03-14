@@ -11,19 +11,14 @@ test.use({ storageState: { cookies: [], origins: [] } });
 
 // When running against a remote staging URL (CF Workers), networkidle never
 // fires because Cloudflare analytics/beacon scripts keep the network active.
-// Locally (Next.js dev server), networkidle is needed for React hydration.
-const isRemote = !!process.env.BASE_URL;
+// Locally with Turnstile enabled, the widget also prevents networkidle.
+// In both cases, waiting for the submit button to be enabled is the correct signal.
 
 /** Wait for form to be interactive (hydrated) after navigation. */
 async function waitForHydration(page: import('@playwright/test').Page) {
-  if (isRemote) {
-    // On CF Workers with always-pass Turnstile, wait for the submit button
-    // to be enabled — this proves React has hydrated AND Turnstile completed.
-    await expect(page.getByRole('main').getByRole('button').first()).toBeEnabled({ timeout: 30_000 });
-  } else {
-    // Locally, networkidle reliably indicates React has hydrated
-    await page.waitForLoadState('networkidle');
-  }
+  // Wait for the submit button to be enabled — this proves React has hydrated
+  // AND Turnstile completed (if present, the button stays disabled until the token arrives).
+  await expect(page.getByRole('main').getByRole('button').first()).toBeEnabled({ timeout: 30_000 });
 }
 
 test.describe('Login page', () => {
