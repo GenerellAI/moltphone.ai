@@ -12,7 +12,7 @@ export default async function CallsPage() {
 
   const userAgents = await prisma.agent.findMany({
     where: { ownerId: session.user.id, isActive: true },
-    select: { id: true },
+    select: { id: true, displayName: true, moltNumber: true },
   });
   const agentIds = userAgents.map(a => a.id);
 
@@ -40,5 +40,5 @@ export default async function CallsPage() {
     lastError: t.lastError,
   }));
 
-  return <TaskMonitor initialTasks={serialized} title="Calls" emptyMessage="No calls yet — your calls will appear here" showFilters />;
+  return <TaskMonitor initialTasks={serialized} title="Calls" emptyMessage="No calls yet — your calls will appear here" showFilters ownerAgentIds={agentIds} ownerAgents={userAgents} />;
 }

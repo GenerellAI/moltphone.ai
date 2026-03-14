@@ -1,19 +1,26 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
-  Send, Phone, PhoneIncoming, PhoneMissed, MessageCircle,
+  Send, Phone, PhoneIncoming, PhoneOutgoing, PhoneMissed, MessageCircle,
   Mail, SendHorizontal, Inbox, CheckCircle2, AlertTriangle,
-  ArrowRightLeft, RotateCcw, Paperclip, Bot, User, Ban,
+  ArrowRightLeft, RotateCcw, Paperclip, Bot, User, Ban, Info,
+  ChevronDown,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useSSE, useSSEListener, type SSETaskData } from '@/components/SSEProvider';
 
 // ── Types ────────────────────────────────────────────────
+
+interface OwnerAgent {
+  id: string;
+  displayName: string;
+  moltNumber: string;
+}
 
 interface AgentRef {
   id: string;
@@ -130,9 +137,47 @@ const intentLabel: Record<string, string> = {
   text: 'Text',
 };
 
+// ── Date grouping helper ─────────────────────────────────
+
+interface DateGroup {
+  label: string;
+  tasks: TaskSummary[];
+}
+
+function groupByDate(tasks: TaskSummary[]): DateGroup[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+
+  const groups: Map<string, TaskSummary[]> = new Map();
+  const order: string[] = [];
+
+  for (const task of tasks) {
+    const d = new Date(task.createdAt);
+    const taskDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    let label: string;
+    if (taskDate.getTime() === today.getTime()) {
+      label = 'Today';
+    } else if (taskDate.getTime() === yesterday.getTime()) {
+      label = 'Yesterday';
+    } else {
+      label = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+    }
+
+    if (!groups.has(label)) {
+      groups.set(label, []);
+      order.push(label);
+    }
+    groups.get(label)!.push(task);
+  }
+
+  return order.map(label => ({ label, tasks: groups.get(label)! }));
+}
+
 // ── Component ────────────────────────────────────────────
 
-export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMessage = 'No calls yet — your recents will appear here', showFilters = false, mode = 'tasks', ownerAgentIds = [] }: { initialTasks: TaskSummary[]; title?: string; emptyMessage?: string; showFilters?: boolean; mode?: 'tasks' | 'threads'; ownerAgentIds?: string[] }) {
+export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMessage = 'No calls yet — your recents will appear here', showFilters = false, mode = 'tasks', ownerAgentIds = [], ownerAgents = [] }: { initialTasks: TaskSummary[]; title?: string; emptyMessage?: string; showFilters?: boolean; mode?: 'tasks' | 'threads'; ownerAgentIds?: string[]; ownerAgents?: OwnerAgent[] }) {
   const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<TaskSummary[]>(initialTasks);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -143,6 +188,8 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
   const [loadingDetail, setLoadingDetail] = useState(false);
   useSSE();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [agentFilter, setAgentFilter] = useState<string>('all'); // 'all' or agent ID
+  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const [retrying, setRetrying] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
@@ -153,8 +200,15 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  // Filter tasks by agent (applies to both modes)
+  const agentFilteredTasks = agentFilter === 'all'
+    ? tasks
+    : tasks.filter(t =>
+        t.caller?.id === agentFilter || t.callee.id === agentFilter
+      );
+
   // Filter tasks by status
-  const filteredTasks = tasks.filter(t => {
+  const filteredTasks = agentFilteredTasks.filter(t => {
     switch (statusFilter) {
       case 'active': return ['submitted', 'working', 'input_required'].includes(t.status);
       case 'missed': return t.status === 'canceled';
@@ -164,8 +218,8 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
     }
   });
 
-  const failedCount = tasks.filter(t => t.status === 'failed').length;
-  const missedCount = tasks.filter(t => t.status === 'canceled').length;
+  const failedCount = agentFilteredTasks.filter(t => t.status === 'failed').length;
+  const missedCount = agentFilteredTasks.filter(t => t.status === 'canceled').length;
 
   // Retry a failed task
   const retryTask = async (taskId: string) => {
@@ -203,7 +257,7 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
   }, [selectedTaskId, replyText, sending]);
 
   // ── Thread grouping (for messages mode) ────────────────
-  const ownerIdSet = new Set(ownerAgentIds);
+  const ownerIdSet = useMemo(() => new Set(ownerAgentIds), [ownerAgentIds]);
 
   /** Get the "other" agent for a task (the one that isn't us) */
   const getContact = useCallback((task: TaskSummary): AgentRef => {
@@ -216,7 +270,7 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
   const threads: Thread[] = (() => {
     if (mode !== 'threads') return [];
     const map = new Map<string, Thread>();
-    for (const task of tasks) {
+    for (const task of agentFilteredTasks) {
       const contact = getContact(task);
       const existing = map.get(contact.id);
       if (existing) {
@@ -398,6 +452,48 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
               </span>
             )}
           </div>
+          {/* Agent filter dropdown */}
+          {ownerAgents.length > 1 && (
+            <div className="relative">
+              <button
+                onClick={() => setAgentDropdownOpen(o => !o)}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg transition-colors hover:opacity-80"
+                style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', color: agentFilter === 'all' ? 'var(--color-muted)' : 'var(--color-fg)' }}
+              >
+                <Bot className="h-3 w-3" />
+                <span className="max-w-[120px] truncate">
+                  {agentFilter === 'all' ? 'All agents' : ownerAgents.find(a => a.id === agentFilter)?.displayName ?? 'Agent'}
+                </span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+              {agentDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setAgentDropdownOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-40 rounded-lg py-1 min-w-[180px] shadow-lg"
+                       style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)' }}>
+                    <button
+                      onClick={() => { setAgentFilter('all'); setAgentDropdownOpen(false); }}
+                      className={`w-full text-left text-xs px-3 py-2 transition-colors hover:opacity-80 ${agentFilter === 'all' ? 'font-medium' : 'text-muted'}`}
+                      style={agentFilter === 'all' ? { background: 'color-mix(in srgb, var(--color-brand) 10%, transparent)' } : {}}
+                    >
+                      All agents
+                    </button>
+                    {ownerAgents.map(agent => (
+                      <button
+                        key={agent.id}
+                        onClick={() => { setAgentFilter(agent.id); setAgentDropdownOpen(false); }}
+                        className={`w-full text-left text-xs px-3 py-2 transition-colors hover:opacity-80 ${agentFilter === agent.id ? 'font-medium' : 'text-muted'}`}
+                        style={agentFilter === agent.id ? { background: 'color-mix(in srgb, var(--color-brand) 10%, transparent)' } : {}}
+                      >
+                        <div className="truncate">{agent.displayName}</div>
+                        <div className="text-[10px] opacity-50 truncate">{agent.moltNumber}</div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Status filter tabs (calls only) */}
@@ -486,53 +582,80 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
             <p>{statusFilter !== 'all' ? `No ${statusFilter} conversations` : emptyMessage}</p>
           </div>
         ) : (
-          <div className="space-y-1 overflow-y-auto flex-1 min-h-0">
-            {filteredTasks.map(task => {
-              const isSelected = task.id === selectedTaskId;
-              const isFailed = task.status === 'failed';
-              const isMissed = task.status === 'canceled';
-              return (
-                <button
-                  key={task.id}
-                  onClick={() => selectTask(task.id)}
-                  className={`card w-full text-left p-3 transition-all duration-100 ${isSelected ? 'ring-2' : 'hover:opacity-80'}`}
-                  style={{
-                    ...(isSelected ? { borderColor: 'var(--color-brand)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--color-brand) 20%, transparent)' } : {}),
-                    ...(isFailed && !isSelected ? { borderLeft: '3px solid var(--color-danger, #ef4444)' } : {}),
-                    ...(isMissed && !isSelected ? { borderLeft: '3px solid #f59e0b' } : {}),
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center justify-center">{getStatusIcon(task.status, task.intent)}</span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-sm truncate">
-                          <span className={`truncate ${isMissed ? 'text-orange-400' : 'text-muted'}`}>
-                            {task.caller?.displayName ?? 'Anonymous'}
-                          </span>
-                          <span className="text-muted" style={{ opacity: 0.4 }}>→</span>
-                          <span className="truncate">{task.callee.displayName}</span>
-                        </div>
-                        <div className="text-xs text-muted mt-0.5" style={{ opacity: 0.6 }}>
-                          {new Date(task.createdAt).toLocaleString()}
-                          {isMissed && <span className="ml-1 text-orange-400">· Missed</span>}
-                        </div>
-                        {isFailed && task.lastError && (
-                          <div className="text-xs mt-0.5" style={{ color: 'var(--color-danger, #ef4444)', opacity: 0.8 }}>
-                            {errorLabel[task.lastError] || task.lastError}
+          <div className="space-y-0 overflow-y-auto flex-1 min-h-0">
+            {groupByDate(filteredTasks).map(group => (
+              <div key={group.label}>
+                <div className="text-[10px] uppercase tracking-wider text-muted px-2 pt-3 pb-1 sticky top-0 z-10 font-medium"
+                     style={{ background: 'var(--color-bg)', opacity: 0.7 }}>
+                  {group.label}
+                </div>
+                <div className="space-y-1">
+                  {group.tasks.map(task => {
+                    const isSelected = task.id === selectedTaskId;
+                    const isFailed = task.status === 'failed';
+                    const isMissed = task.status === 'canceled';
+                    const isOutbound = task.caller != null && ownerIdSet.has(task.caller.id);
+                    const isInbound = !isOutbound && ownerIdSet.has(task.callee.id);
+                    return (
+                      <button
+                        key={task.id}
+                        onClick={() => selectTask(task.id)}
+                        className={`card w-full text-left p-3 transition-all duration-100 ${isSelected ? 'ring-2' : 'hover:opacity-80'}`}
+                        style={{
+                          ...(isSelected ? { borderColor: 'var(--color-brand)', boxShadow: '0 0 0 2px color-mix(in srgb, var(--color-brand) 20%, transparent)' } : {}),
+                          ...(isFailed && !isSelected ? { borderLeft: '3px solid var(--color-danger, #ef4444)' } : {}),
+                          ...(isMissed && !isSelected ? { borderLeft: '3px solid #f59e0b' } : {}),
+                        }}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center justify-center">
+                              {isOutbound
+                                ? <PhoneOutgoing className={`${iconClass} text-emerald-500`} />
+                                : isInbound
+                                  ? <PhoneIncoming className={`${iconClass} text-blue-400`} />
+                                  : getStatusIcon(task.status, task.intent)}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 text-sm truncate">
+                                {isOutbound ? (
+                                  <>
+                                    <span className="truncate">{task.callee.displayName}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className={`truncate ${isMissed ? 'text-orange-400' : 'text-muted'}`}>
+                                      {task.caller?.displayName ?? 'Anonymous'}
+                                    </span>
+                                    <span className="text-muted" style={{ opacity: 0.4 }}>→</span>
+                                    <span className="truncate">{task.callee.displayName}</span>
+                                  </>
+                                )}
+                              </div>
+                              <div className="text-xs text-muted mt-0.5" style={{ opacity: 0.6 }}>
+                                {new Date(task.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                {isInbound && <span className="ml-1">· Inbound</span>}
+                                {isMissed && <span className="ml-1 text-orange-400">· Missed</span>}
+                              </div>
+                              {isFailed && task.lastError && (
+                                <div className="text-xs mt-0.5" style={{ color: 'var(--color-danger, #ef4444)', opacity: 0.8 }}>
+                                  {errorLabel[task.lastError] || task.lastError}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0 ml-2">
-                      <span className={statusBadge[task.status] || 'badge'} style={{ fontSize: '0.65rem' }}>
-                        {getStatusLabel(task.status, task.intent)}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+                          <div className="text-right shrink-0 ml-2">
+                            <span className={statusBadge[task.status] || 'badge'} style={{ fontSize: '0.65rem' }}>
+                              {getStatusLabel(task.status, task.intent)}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -575,6 +698,10 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
                         {thread.contact.moltNumber} · {thread.messageCount} message{thread.messageCount !== 1 ? 's' : ''}
                       </div>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 text-[11px] text-muted" style={{ opacity: 0.6 }}>
+                    <Info className="h-3 w-3 shrink-0" />
+                    <span>Each message is an independent exchange — the receiving agent does not retain context from previous messages.</span>
                   </div>
                 </div>
 
@@ -791,59 +918,78 @@ export default function TaskMonitor({ initialTasks, title = 'Recents', emptyMess
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Reply input — shown for active tasks */}
-            {['submitted', 'working', 'input_required'].includes(taskDetail.status) && (
-              <div className="p-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
-                <div className="flex items-end gap-2">
-                  <textarea
-                    ref={inputRef}
-                    value={replyText}
-                    onChange={e => setReplyText(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendReply();
-                      }
-                    }}
-                    placeholder="Type a message…"
-                    rows={1}
-                    className="flex-1 resize-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2"
-                    style={{
-                      background: 'var(--color-surface)',
-                      border: '1px solid var(--color-border)',
-                      color: 'var(--color-fg)',
-                      maxHeight: '120px',
-                    }}
-                    disabled={sending}
-                  />
-                  <button
-                    onClick={() => sendReply()}
-                    disabled={sending || !replyText.trim()}
-                    className="shrink-0 rounded-xl p-2.5 transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
-                    style={{
-                      background: replyText.trim() ? 'var(--color-brand)' : 'var(--color-surface)',
-                      color: replyText.trim() ? 'white' : 'var(--color-muted)',
-                      border: '1px solid var(--color-border)',
-                    }}
-                    title="Send (Enter)"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
+            {/* Reply input — only shown for outbound calls (user is the caller) */}
+            {(() => {
+              const isActive = ['submitted', 'working', 'input_required'].includes(taskDetail.status);
+              const isOutbound = taskDetail.caller != null && ownerIdSet.has(taskDetail.caller.id);
+              const isInbound = !isOutbound && ownerIdSet.has(taskDetail.callee.id);
+
+              if (!isActive) return null;
+
+              if (isInbound) {
+                return (
+                  <div className="p-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                    <div className="flex items-center gap-2 text-xs text-muted" style={{ opacity: 0.7 }}>
+                      <Bot className="h-3.5 w-3.5 shrink-0" />
+                      <span>Your agent is handling this conversation automatically</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-3 border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <div className="flex items-end gap-2">
+                    <textarea
+                      ref={inputRef}
+                      value={replyText}
+                      onChange={e => setReplyText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          sendReply();
+                        }
+                      }}
+                      placeholder="Type a message…"
+                      rows={1}
+                      className="flex-1 resize-none rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2"
+                      style={{
+                        background: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-fg)',
+                        maxHeight: '120px',
+                      }}
+                      disabled={sending}
+                    />
+                    <button
+                      onClick={() => sendReply()}
+                      disabled={sending || !replyText.trim()}
+                      className="shrink-0 rounded-xl p-2.5 transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+                      style={{
+                        background: replyText.trim() ? 'var(--color-brand)' : 'var(--color-surface)',
+                        color: replyText.trim() ? 'white' : 'var(--color-muted)',
+                        border: '1px solid var(--color-border)',
+                      }}
+                      title="Send (Enter)"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-xs text-muted" style={{ opacity: 0.5 }}>
+                      Enter to send · Shift+Enter for new line
+                    </span>
+                    <button
+                      onClick={() => sendReply(true)}
+                      className="text-xs text-muted hover:text-foreground transition-colors"
+                      disabled={sending}
+                    >
+                      End conversation
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between mt-1.5">
-                  <span className="text-xs text-muted" style={{ opacity: 0.5 }}>
-                    Enter to send · Shift+Enter for new line
-                  </span>
-                  <button
-                    onClick={() => sendReply(true)}
-                    className="text-xs text-muted hover:text-foreground transition-colors"
-                    disabled={sending}
-                  >
-                    End conversation
-                  </button>
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </>
         ) : null
         )}
