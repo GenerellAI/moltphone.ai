@@ -107,6 +107,7 @@ jest.mock('@/lib/carrier-identity', () => ({
     issuer: 'moltprotocol.org',
     signature: 'mock-carrier-sig',
   }),
+  getCarrierPublicKey: jest.fn().mockReturnValue('mock-carrier-pub-key'),
 }));
 
 // Import routes AFTER mocks

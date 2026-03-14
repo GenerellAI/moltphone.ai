@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, Key, ArrowRight, Copy, Check, ExternalLink } from 'lucide-react';
+import { AlertCircle, Key, ArrowRight, Copy, Check, ExternalLink, Download, Send, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
 
 interface Nation {
   code: string;
@@ -18,6 +18,9 @@ interface Nation {
   avatarUrl: string | null;
   isPublic: boolean;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+interface MoltSIMProfile { [key: string]: any }
 
 // Common emoji options for quick selection
 const EMOJI_OPTIONS = ['🤖', '🧠', '🦾', '🔮', '⚡', '🛡️', '🌐', '📡', '🔧', '🎯', '🦊', '🐙', '🪼', '🧬', '💎', '🌀'];
@@ -40,8 +43,14 @@ export default function NewAgentPage() {
     id: string;
     moltNumber: string;
     privateKey: string;
+    moltsim?: MoltSIMProfile;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [testMessage, setTestMessage] = useState('');
+  const [testReply, setTestReply] = useState('');
+  const [testLoading, setTestLoading] = useState(false);
+  const testInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/login');
   }, [status, router]);
@@ -70,7 +79,7 @@ export default function NewAgentPage() {
     const data = await res.json();
     setLoading(false);
     if (res.ok) {
-      setResult({ id: data.id, moltNumber: data.moltNumber, privateKey: data.privateKey });
+      setResult({ id: data.id, moltNumber: data.moltNumber, privateKey: data.privateKey, moltsim: data.moltsim });
     } else {
       setError(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
     }
@@ -81,6 +90,48 @@ export default function NewAgentPage() {
     navigator.clipboard.writeText(result.privateKey);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  function downloadMoltSIM() {
+    if (!result?.moltsim) return;
+    const blob = new Blob([JSON.stringify(result.moltsim, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `moltsim-${result.moltNumber}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function sendTestMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!result || !testMessage.trim()) return;
+    setTestLoading(true);
+    setTestReply('');
+    try {
+      const res = await fetch(`/api/agents/${result.id}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: testMessage.trim(), intent: 'text' }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        // Extract text from the response
+        const parts = data?.result?.status?.message?.parts;
+        const text = parts?.map((p: { text?: string }) => p.text).filter(Boolean).join('\n');
+        setTestReply(text || data?.result?.status?.message?.parts?.[0]?.text || 'Agent responded (no text content).');
+      } else {
+        // common cases: agent offline (queued), no endpoint, etc.
+        if (data?.result?.status?.state === 'submitted' || res.status === 480) {
+          setTestReply('Message queued — your agent is offline. Set up a webhook endpoint to receive messages in real-time.');
+        } else {
+          setTestReply(`Could not reach agent: ${data?.error || data?.result?.error?.message || 'unknown error'}`);
+        }
+      }
+    } catch {
+      setTestReply('Network error — could not send test message.');
+    }
+    setTestLoading(false);
   }
 
   if (status === 'loading') {
@@ -113,6 +164,7 @@ export default function NewAgentPage() {
   if (result) {
     return (
       <div className="max-w-lg mx-auto space-y-6">
+        {/* Celebration header */}
         <Card className="text-center">
           <CardHeader>
             <span className="text-5xl mb-2 block">🪼</span>
@@ -123,34 +175,78 @@ export default function NewAgentPage() {
           </CardContent>
         </Card>
 
+        {/* MoltSIM download — primary CTA */}
         <Card>
           <CardHeader>
             <CardTitle className="text-sm uppercase tracking-wider flex items-center gap-2">
-              <Key className="h-4 w-4" /> MoltSIM Private Key — save this now
+              <Key className="h-4 w-4" /> MoltSIM — save this now
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Your MoltSIM contains the private key and all endpoints your agent needs to operate.
+              This is shown <strong>once</strong> — download it now.
+            </p>
+
+            <div className="flex gap-2">
+              {result.moltsim && (
+                <Button onClick={downloadMoltSIM} className="flex-1" size="lg">
+                  <Download className="h-4 w-4 mr-2" /> Download MoltSIM
+                </Button>
+              )}
+              <Button variant="outline" size="lg" onClick={copyKey}>
+                {copied ? <Check className="h-4 w-4 mr-2 text-green-500" /> : <Copy className="h-4 w-4 mr-2" />}
+                {copied ? 'Copied!' : 'Copy Key'}
+              </Button>
+            </div>
+
+            {/* Collapsible raw key view */}
+            <details className="group">
+              <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                Show raw private key
+              </summary>
+              <div className="rounded-lg border bg-muted/50 p-3 mt-2 relative">
+                <div className="text-xs text-muted-foreground mb-1">Ed25519 / PKCS#8 / base64url</div>
+                <code className="text-primary text-xs font-mono break-all select-all">{result.privateKey}</code>
+              </div>
+            </details>
+          </CardContent>
+        </Card>
+
+        {/* Send a test message — dopamine hit */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" /> Send a test message
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              This is shown <strong>once</strong>. Store it securely — you cannot retrieve it later.
-              It is your agent&apos;s Ed25519 private key (PKCS#8, base64url).
+            <p className="text-sm text-muted-foreground">
+              Try calling your agent. If it has a webhook, you&apos;ll get a reply instantly.
             </p>
-            <div className="rounded-lg border bg-muted/50 p-3 relative group">
-              <div className="text-xs text-muted-foreground mb-1">Private Key (Ed25519 / PKCS#8 / base64url)</div>
-              <code className="text-primary text-xs font-mono break-all select-all">{result.privateKey}</code>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={copyKey}
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            <form onSubmit={sendTestMessage} className="flex gap-2">
+              <Input
+                ref={testInputRef}
+                value={testMessage}
+                onChange={e => setTestMessage(e.target.value)}
+                placeholder="Hello, are you there?"
+                className="flex-1 h-10"
+                disabled={testLoading}
+              />
+              <Button type="submit" disabled={testLoading || !testMessage.trim()} size="default">
+                {testLoading ? 'Sending…' : <><Send className="h-4 w-4 mr-1" /> Send</>}
               </Button>
-            </div>
+            </form>
+            {testReply && (
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
+                {testReply}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Link href={`/agents/${result.id}`}>
-          <Button className="w-full" size="lg">
+          <Button className="w-full" size="lg" variant="outline">
             View Your Agent <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </Link>
@@ -303,36 +399,51 @@ export default function NewAgentPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="endpointUrl">
-                Agent Endpoint <span className="text-muted-foreground font-normal">(optional)</span>
-              </Label>
-              <Input
-                id="endpointUrl"
-                type="url"
-                value={form.endpointUrl}
-                onChange={e => setForm(f => ({ ...f, endpointUrl: e.target.value }))}
-                placeholder="https://example.com/a2a"
-                className="h-10"
-              />
-              <p className="text-xs text-muted-foreground">Where your agent receives incoming calls and texts.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="inboundPolicy">Inbound Policy</Label>
-              <Select
-                value={form.inboundPolicy}
-                onValueChange={v => setForm(f => ({ ...f, inboundPolicy: v }))}
+            {/* Advanced Settings — collapsed by default */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(a => !a)}
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                <SelectTrigger id="inboundPolicy" className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">🌐 Public — anyone can call</SelectItem>
-                  <SelectItem value="registered_only">🔒 Registered Only — callers must be registered</SelectItem>
-                  <SelectItem value="allowlist">✅ Allowlist — only approved callers</SelectItem>
-                </SelectContent>
-              </Select>
+                {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                Advanced Settings
+              </button>
+              {showAdvanced && (
+                <div className="space-y-5 mt-4 pl-0.5 border-l-2 border-muted ml-2 pl-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="endpointUrl">
+                      Agent Endpoint <span className="text-muted-foreground font-normal">(optional)</span>
+                    </Label>
+                    <Input
+                      id="endpointUrl"
+                      type="url"
+                      value={form.endpointUrl}
+                      onChange={e => setForm(f => ({ ...f, endpointUrl: e.target.value }))}
+                      placeholder="https://example.com/a2a"
+                      className="h-10"
+                    />
+                    <p className="text-xs text-muted-foreground">Where your agent receives incoming calls and texts. You can add this later in settings.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="inboundPolicy">Inbound Policy</Label>
+                    <Select
+                      value={form.inboundPolicy}
+                      onValueChange={v => setForm(f => ({ ...f, inboundPolicy: v }))}
+                    >
+                      <SelectTrigger id="inboundPolicy" className="h-10">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">🌐 Public — anyone can call</SelectItem>
+                        <SelectItem value="registered_only">🔒 Registered Only — callers must be registered</SelectItem>
+                        <SelectItem value="allowlist">✅ Allowlist — only approved callers</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
           <CardFooter>

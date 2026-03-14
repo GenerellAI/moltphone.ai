@@ -8,8 +8,10 @@ import { generateKeyPair } from '@/lib/ed25519';
 import { validateWebhookUrl, checkEndpointOwnership } from '@/lib/ssrf';
 import { challengeEndpoint } from '@/lib/endpoint-challenge';
 import { requireHttps } from '@/lib/require-https';
-import { issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON } from '@/lib/carrier-identity';
+import { issueRegistrationCertificate, registrationCertToJSON, getCarrierCertificateJSON, getCarrierPublicKey } from '@/lib/carrier-identity';
 import { rateLimit } from '@/lib/rate-limit';
+import { CALL_BASE_URL, callUrl } from '@/lib/call-url';
+import { CARRIER_DOMAIN } from '@/carrier.config';
 import { canCreateAgent, deductAgentCreationCredits, AGENT_CREATION_COST, checkNationGraduation } from '@/lib/services/credits';
 import { authenticateApiKey } from '@/lib/api-key-auth';
 import { bindNumber, getCarrierDomain } from '@/lib/services/registry';
@@ -281,9 +283,32 @@ export async function POST(req: NextRequest) {
     // 5. Register the number with the MoltNumber registry (best-effort)
     bindNumber({ moltNumber, carrierDomain: getCarrierDomain(), nationCode: data.nationCode }).catch(() => {/* non-critical */});
 
+    // Build full MoltSIM profile (matching self-signup format)
+    const slug = moltNumber;
+    const moltsim = {
+      version: '1',
+      carrier: CARRIER_DOMAIN,
+      agent_id: agent.id,
+      molt_number: moltNumber,
+      carrier_call_base: CALL_BASE_URL,
+      inbox_url: callUrl(slug, '/tasks'),
+      task_reply_url: callUrl(slug, '/tasks/:id/reply'),
+      task_cancel_url: callUrl(slug, '/tasks/:id/cancel'),
+      presence_url: callUrl(slug, '/presence/heartbeat'),
+      public_key: keyPair.publicKey,
+      private_key: keyPair.privateKey,
+      carrier_public_key: getCarrierPublicKey(),
+      signature_algorithm: 'Ed25519' as const,
+      canonical_string: 'METHOD\nPATH\nCALLER_AGENT_ID\nTARGET_AGENT_ID\nTIMESTAMP\nNONCE\nBODY_SHA256_HEX',
+      timestamp_window_seconds: 300,
+      registration_certificate: registrationCertToJSON(registrationCert),
+      carrier_certificate: getCarrierCertificateJSON(),
+    };
+
     return NextResponse.json({
       ...moltPage,
       privateKey: keyPair.privateKey,
+      moltsim,
       registrationCertificate: registrationCertToJSON(registrationCert),
       carrierCertificate: getCarrierCertificateJSON(),
     }, { status: 201 });
