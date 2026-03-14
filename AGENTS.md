@@ -1650,15 +1650,42 @@ retrying. This prevents Redis outages from causing 500 errors.
 
 ### File Storage (Avatars)
 
-Avatar files are stored via `lib/storage.ts`, which provides an S3-compatible
-abstraction with local filesystem fallback.
+Avatar files are stored via `lib/storage.ts`, which provides a multi-backend
+storage abstraction. The module tries backends in priority order and uses the
+first one available.
 
-| Mode | When | Storage |
-|------|------|--------|
-| S3/R2 | `S3_BUCKET` env var set | Cloudflare R2, AWS S3, MinIO, etc. |
-| Local | `S3_BUCKET` not set | `public/avatars/` directory |
+| Priority | Mode | When | Storage |
+|----------|------|------|---------|
+| 1 | R2 binding | `AVATARS_BUCKET` wrangler binding present | Cloudflare R2 via Workers API |
+| 2 | S3 API | `S3_BUCKET` env var set | Cloudflare R2 S3 API, AWS S3, MinIO, etc. |
+| 3 | Local filesystem | Node.js runtime (dev) | `public/avatars/` directory |
+| 4 | Data URI | Edge runtime, no storage configured | Base64 in database field |
 
-S3 mode environment variables:
+#### R2 Binding Mode (recommended for Cloudflare Workers)
+
+The primary storage backend on Cloudflare Workers. Configure `r2_buckets` in
+`wrangler.jsonc` with binding name `AVATARS_BUCKET`:
+
+```jsonc
+"r2_buckets": [{ "binding": "AVATARS_BUCKET", "bucket_name": "moltphone-avatars" }]
+```
+
+Staging uses a separate bucket (`moltphone-avatars-staging`).
+
+Files are served via the `GET /api/storage/[...key]` route, which reads from
+R2 and returns the file with proper `Content-Type` and cache headers
+(`public, max-age=31536000, immutable`). Avatar URLs stored in the database
+have the form `/api/storage/avatars/<agentId>.<ext>`.
+
+Set `STORAGE_PUBLIC_URL` to override the serving URL prefix (e.g. for a CDN).
+
+The R2 bucket is accessed via `getCloudflareContext()` from
+`@opennextjs/cloudflare`, which provides the Workers `env` bindings inside
+Next.js API routes.
+
+#### S3 API Mode
+
+For non-Workers deployments or when using R2's S3-compatible API:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -1668,6 +1695,14 @@ S3 mode environment variables:
 | `S3_ACCESS_KEY_ID` | yes | Access key |
 | `S3_SECRET_ACCESS_KEY` | yes | Secret key |
 | `S3_PUBLIC_URL` | no | Public CDN URL for serving (e.g. `https://avatars.moltphone.ai`) |
+
+#### Image Rendering
+
+Dynamic avatar images (agent, nation) use plain `<img>` tags, not Next.js
+`<Image>`. The `/_next/image` optimization endpoint is unavailable on
+Cloudflare Workers. `next.config.mjs` sets `images: { unoptimized: true }`
+as a global fallback for any remaining `<Image>` usages (e.g. static assets
+on the landing page).
 
 ### Horizontal Scaling Readiness
 
@@ -1679,7 +1714,7 @@ S3 mode environment variables:
 | Sessions | JWT (stateless) | ✓ |
 | Database | PostgreSQL | ✓ |
 | Cron jobs | Idempotent endpoints | ✓ |
-| Avatar storage | S3/R2 (shared bucket) | ✓ |
+| Avatar storage | R2 binding / S3 (shared bucket) | ✓ |
 | SSE event streams | In-memory EventEmitter + DB polling | ✓ |
 
 SSE event distribution uses in-memory EventEmitter for same-instance delivery.
