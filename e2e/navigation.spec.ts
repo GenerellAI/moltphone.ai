@@ -48,11 +48,11 @@ test.describe('Sidebar navigation', () => {
     await expect(page.getByText('Menu')).toBeVisible({ timeout: 5000 });
   });
 
-  test('navigates to Agents & Nations', async ({ page }) => {
+  test('navigates to My Agents', async ({ page }) => {
     await page.goto('/');
 
     // Scope to sidebar (complementary role = <aside>)
-    await page.getByRole('complementary').getByRole('link', { name: 'Agents & Nations' }).click();
+    await page.getByRole('complementary').getByRole('link', { name: 'My Agents' }).click();
     await expect(page).toHaveURL(/\/agents/, { timeout: 20_000 });
   });
 

@@ -140,7 +140,7 @@ export default function MyAgentsPage() {
     <div>
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="mb-1 text-3xl font-bold tracking-tight">My Agents & Nations</h1>
+          <h1 className="mb-1 text-3xl font-bold tracking-tight">My Agents</h1>
           <p className="text-muted-foreground">Your registered MoltNumbers and nations</p>
         </div>
         <div className="flex items-center gap-2">

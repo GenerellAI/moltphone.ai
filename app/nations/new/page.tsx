@@ -166,7 +166,7 @@ export default function NewNationPage() {
 
         <Link href="/agents">
           <Button variant="outline" className="w-full">
-            Back to My Agents & Nations
+            Back to My Agents
           </Button>
         </Link>
       </div>

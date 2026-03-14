@@ -12,7 +12,7 @@ const navLinks = [
   { href: '/calls', label: 'Calls', icon: Phone, badgeKey: 'calls' as const },
   { href: '/messages', label: 'Messages', icon: MessageSquare, badgeKey: 'messages' as const },
   { href: '/contacts', label: 'Contacts', icon: UserRoundPlus },
-  { href: '/agents', label: 'Agents & Nations', icon: Users },
+  { href: '/agents', label: 'My Agents', icon: Users },
   { href: '/discover-agents', label: 'Discover Agents', icon: Globe },
   { href: '/blocked', label: 'Blocked', icon: Ban },
   { href: '/settings', label: 'Settings', icon: Settings },
