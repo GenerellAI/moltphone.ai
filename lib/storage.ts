@@ -1,26 +1,43 @@
 /**
- * File storage abstraction — S3-compatible (R2/S3/MinIO) + local fallback.
+ * File storage abstraction.
  *
- * Backend selection:
- *   - `S3_BUCKET` env var set → S3-compatible storage (Cloudflare R2, AWS S3, etc.)
- *   - Otherwise → local filesystem (`public/` directory)
+ * Storage priority:
+ *   1. R2 binding (Cloudflare Workers — `AVATARS_BUCKET` wrangler binding)
+ *   2. S3-compatible API (`S3_BUCKET` env var — R2 S3 API, AWS S3, MinIO)
+ *   3. Local filesystem (Node.js development)
+ *   4. Data URI fallback (edge runtimes without any storage configured)
  *
- * Required env vars for S3 mode:
- *   S3_BUCKET         — bucket name (e.g. "moltphone-avatars")
- *   S3_REGION          — region (e.g. "auto" for R2, "us-east-1" for S3)
- *   S3_ENDPOINT        — endpoint URL (e.g. "https://<account-id>.r2.cloudflarestorage.com")
+ * R2 binding mode (recommended for Cloudflare Workers):
+ *   Configure `r2_buckets` in wrangler.jsonc with binding name `AVATARS_BUCKET`.
+ *   Files are served via `/api/storage/[...key]` route.
+ *   Set `STORAGE_PUBLIC_URL` to override the serving URL prefix.
+ *
+ * S3 API mode:
+ *   S3_BUCKET         — bucket name
+ *   S3_REGION          — region (default: "auto" for R2)
+ *   S3_ENDPOINT        — endpoint URL
  *   S3_ACCESS_KEY_ID   — access key
  *   S3_SECRET_ACCESS_KEY — secret key
- *
- * Optional:
  *   S3_PUBLIC_URL      — public base URL for serving files
- *                        (e.g. "https://avatars.moltphone.ai" or R2 custom domain)
- *                        If not set, returns the S3 key path prefixed with "/"
  *
  * All functions return URL paths suitable for storing in `avatarUrl` DB field.
  */
 
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+
+// ── Cloudflare R2 type (minimal interface for Workers binding) ───
+
+/** Minimal R2Bucket interface — avoids @cloudflare/workers-types dependency */
+interface R2BucketLike {
+  put(key: string, value: ArrayBuffer | Buffer | ReadableStream | string, options?: {
+    httpMetadata?: { contentType?: string; cacheControl?: string };
+  }): Promise<unknown>;
+  get(key: string): Promise<{
+    body: ReadableStream;
+    httpMetadata?: { contentType?: string; cacheControl?: string };
+  } | null>;
+  delete(key: string): Promise<void>;
+}
 
 // fs/path dynamically required — not available on Cloudflare Workers
 // Only used for local filesystem fallback (development mode)
@@ -35,6 +52,25 @@ try {
   path = require('path');
 } catch {
   // Not available on edge runtimes — S3/R2 must be configured
+}
+
+// ── R2 binding access ────────────────────────────────────
+
+/**
+ * Try to get the R2 bucket binding from the Cloudflare Workers context.
+ * Returns null when not running on Workers or binding not configured.
+ */
+async function getR2Bucket(): Promise<R2BucketLike | null> {
+  try {
+    // Dynamic import — only available when deployed via @opennextjs/cloudflare
+    const { getCloudflareContext } = await import('@opennextjs/cloudflare');
+    const ctx = await getCloudflareContext({ async: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bucket = (ctx.env as any).AVATARS_BUCKET as R2BucketLike | undefined;
+    return bucket ?? null;
+  } catch {
+    return null;
+  }
 }
 
 // ── S3 client (lazy singleton) ───────────────────────────
@@ -82,26 +118,37 @@ function getS3(): S3Client | null {
  * @param key       Storage key (e.g. "avatars/agent-id.jpg")
  * @param data      File contents as Buffer
  * @param mimeType  MIME type (e.g. "image/jpeg")
- * @returns         URL path for the file (e.g. "/avatars/agent-id.jpg" or full CDN URL)
+ * @returns         URL path for the file (e.g. "/api/storage/avatars/agent-id.jpg" or CDN URL)
  *
  * Storage priority:
- *   1. S3/R2 (if S3_BUCKET configured)
- *   2. Local filesystem (if fs module available — Node.js dev)
- *   3. Data URI fallback (edge runtimes without S3 — works everywhere)
+ *   1. R2 binding (Cloudflare Workers — uses wrangler binding)
+ *   2. S3 API (if S3_BUCKET configured)
+ *   3. Local filesystem (if fs module available — Node.js dev)
+ *   4. Data URI fallback (edge runtimes without any storage)
  */
 export async function uploadFile(
   key: string,
   data: Buffer,
   mimeType: string,
 ): Promise<string> {
+  // 1. Try R2 binding (Cloudflare Workers)
+  const r2 = await getR2Bucket();
+  if (r2) {
+    return uploadR2(r2, key, data, mimeType);
+  }
+
+  // 2. Try S3 API
   const s3 = getS3();
   if (s3) {
     return uploadS3(s3, key, data, mimeType);
   }
+
+  // 3. Try local filesystem
   if (fsPromises && path) {
     return uploadLocal(key, data);
   }
-  // Fallback: encode as data URI — works on edge runtimes without S3
+
+  // 4. Fallback: data URI (works everywhere but stored in DB)
   return `data:${mimeType};base64,${data.toString('base64')}`;
 }
 
@@ -117,11 +164,98 @@ export async function deleteFile(urlPath: string): Promise<void> {
   // Data URIs live in the database — nothing to delete from storage
   if (urlPath.startsWith('data:')) return;
 
+  // 1. Try R2 binding
+  const r2 = await getR2Bucket();
+  if (r2) {
+    return deleteR2(r2, urlPath);
+  }
+
+  // 2. Try S3 API
   const s3 = getS3();
   if (s3) {
     return deleteS3(s3, urlPath);
   }
+
+  // 3. Local filesystem
   return deleteLocal(urlPath);
+}
+
+// ── R2 binding implementation ────────────────────────────
+
+/** URL prefix for serving R2 files through the API route */
+const R2_SERVE_PREFIX = '/api/storage';
+
+async function uploadR2(
+  r2: R2BucketLike,
+  key: string,
+  data: Buffer,
+  mimeType: string,
+): Promise<string> {
+  await r2.put(key, data, {
+    httpMetadata: {
+      contentType: mimeType,
+      cacheControl: 'public, max-age=31536000, immutable',
+    },
+  });
+
+  // Return URL served by /api/storage/[...key] route
+  const publicUrl = process.env.STORAGE_PUBLIC_URL;
+  if (publicUrl) {
+    return `${publicUrl.replace(/\/$/, '')}/${key}`;
+  }
+  return `${R2_SERVE_PREFIX}/${key}`;
+}
+
+async function deleteR2(r2: R2BucketLike, urlPath: string): Promise<void> {
+  // Extract key from URL path
+  let key = urlPath;
+  const publicUrl = process.env.STORAGE_PUBLIC_URL;
+  if (publicUrl && key.startsWith(publicUrl)) {
+    key = key.slice(publicUrl.replace(/\/$/, '').length + 1);
+  } else if (key.startsWith(R2_SERVE_PREFIX + '/')) {
+    key = key.slice(R2_SERVE_PREFIX.length + 1);
+  } else if (key.startsWith('/')) {
+    key = key.slice(1);
+  }
+
+  try {
+    await r2.delete(key);
+  } catch {
+    // R2 delete is idempotent — catch network errors
+  }
+}
+
+/**
+ * Read a file from storage. Used by the /api/storage/[...key] route to serve R2 files.
+ * Returns null if the file doesn't exist or storage is not available.
+ */
+export async function readFile(key: string): Promise<{ data: ReadableStream | Buffer; mimeType: string; cacheControl?: string } | null> {
+  // 1. Try R2 binding
+  const r2 = await getR2Bucket();
+  if (r2) {
+    const obj = await r2.get(key);
+    if (!obj) return null;
+    return {
+      data: obj.body as ReadableStream,
+      mimeType: obj.httpMetadata?.contentType || 'application/octet-stream',
+      cacheControl: obj.httpMetadata?.cacheControl || undefined,
+    };
+  }
+
+  // 2. Try local filesystem
+  if (fsPromises && path) {
+    const filepath = path.join(getPublicDir(), key);
+    try {
+      const data = await fsPromises.readFile(filepath);
+      const ext = path.extname(key).toLowerCase();
+      const mimeMap: Record<string, string> = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif' };
+      return { data, mimeType: mimeMap[ext] || 'application/octet-stream' };
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }
 
 // ── S3 implementation ────────────────────────────────────
